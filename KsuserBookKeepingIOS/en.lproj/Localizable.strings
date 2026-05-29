@@ -1,1 +1,11 @@
-"home.greeting" = "Hello, world!";
+"tab.dashboard" = "Home";
+"tab.transactions" = "Transactions";
+"tab.record" = "Record";
+"tab.reports" = "Reports";
+"tab.profile" = "Me";
+
+"dashboard.placeholder" = "View balances, budgets, and this month's cash flow.";
+"transactions.placeholder" = "Browse, filter, and manage every transaction.";
+"record.placeholder" = "Create a new income, expense, or transfer entry.";
+"reports.placeholder" = "Review category trends and spending summaries.";
+"profile.placeholder" = "Manage account, sync, and app settings.";

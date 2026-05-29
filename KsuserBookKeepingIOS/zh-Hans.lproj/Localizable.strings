@@ -1,1 +1,11 @@
-"home.greeting" = "你好，世界！";
+"tab.dashboard" = "首页";
+"tab.transactions" = "流水";
+"tab.record" = "记账";
+"tab.reports" = "报表";
+"tab.profile" = "我的";
+
+"dashboard.placeholder" = "查看账户余额、预算进度和本月收支。";
+"transactions.placeholder" = "浏览、筛选和管理每一笔流水。";
+"record.placeholder" = "新增支出、收入或转账记录。";
+"reports.placeholder" = "查看分类趋势和消费统计。";
+"profile.placeholder" = "管理账号、同步和应用设置。";
