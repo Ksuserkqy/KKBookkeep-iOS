@@ -1,0 +1,41 @@
+.DS_Store
+
+# Local collaboration and agent instructions
+AGENTS.md
+CLAUDE.md
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+*.xcscmblueprint
+
+# Build products and indexes
+DerivedData/
+build/
+.build/
+*.ipa
+*.dSYM/
+*.dSYM.zip
+*.xcarchive
+
+# Signing, provisioning, and secrets
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.p12
+*.pem
+*.key
+*.entitlements.local
+*.xcconfig.local
+*.env
+*.env.*
+
+# Swift Package Manager local state
+.swiftpm/
+Package.resolved.local
+
+# CocoaPods / Carthage generated state
+Pods/
+Carthage/Build/

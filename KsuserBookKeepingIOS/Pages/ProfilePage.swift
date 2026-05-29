@@ -36,7 +36,7 @@ struct ProfilePage: View {
                     }
                 }
             }
-            .navigationTitle("tab.profile")
+            .navigationTitle(Text("tab.profile"))
         }
     }
 }

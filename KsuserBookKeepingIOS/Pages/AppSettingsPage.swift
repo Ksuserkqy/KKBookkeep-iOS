@@ -26,7 +26,13 @@ struct AppSettingsPage: View {
                 Text("settings.theme.footer")
             }
         }
-        .navigationTitle("settings.title")
+        .navigationTitle(Text("settings.title"))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                AppBackButton()
+            }
+        }
     }
 }

@@ -11,6 +11,10 @@ struct ContentView: View {
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
 
+    private var activeLocaleIdentifier: String {
+        AppLanguage(rawValue: language)?.localeIdentifier ?? Locale.current.identifier
+    }
+
     var body: some View {
         TabView {
             DashboardPage()
@@ -38,8 +42,9 @@ struct ContentView: View {
                 Label("tab.profile", systemImage: "person.crop.circle")
             }
         }
+        .id(activeLocaleIdentifier)
         .tint(.accentColor)
-        .environment(\.locale, Locale(identifier: AppLanguage(rawValue: language)?.localeIdentifier ?? Locale.current.identifier))
+        .environment(\.locale, Locale(identifier: activeLocaleIdentifier))
         .preferredColorScheme(AppTheme(rawValue: theme)?.colorScheme)
     }
 }

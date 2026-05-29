@@ -19,7 +19,13 @@ struct LegalInfoPage: View {
                 Label("legal.thirdPartySharing", systemImage: "person.2.badge.gearshape")
             }
         }
-        .navigationTitle("legal.title")
+        .navigationTitle(Text("legal.title"))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                AppBackButton()
+            }
+        }
     }
 }

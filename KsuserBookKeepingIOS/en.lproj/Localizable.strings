@@ -4,6 +4,8 @@
 "tab.reports" = "Reports";
 "tab.profile" = "Me";
 
+"common.back" = "Back";
+
 "dashboard.placeholder" = "View balances, budgets, and this month's cash flow.";
 "transactions.placeholder" = "Browse, filter, and manage every transaction.";
 "record.placeholder" = "Create a new income, expense, or transfer entry.";
@@ -26,7 +28,7 @@
 "settings.theme.dark" = "Dark";
 "settings.theme.footer" = "Choose how Yangyang Bookkeeping looks on this device.";
 
-"app.name" = "KsuserBookkeep";
+"app.name" = "KKBookkeep";
 "about.title" = "About";
 "about.version" = "Version";
 "about.legalInfo" = "Legal Information";

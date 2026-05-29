@@ -4,6 +4,8 @@
 "tab.reports" = "报表";
 "tab.profile" = "我的";
 
+"common.back" = "返回";
+
 "dashboard.placeholder" = "查看账户余额、预算进度和本月收支。";
 "transactions.placeholder" = "浏览、筛选和管理每一笔流水。";
 "record.placeholder" = "新增支出、收入或转账记录。";

@@ -25,7 +25,7 @@ struct AppPlaceholderPage: View {
             .padding(24)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(.systemGroupedBackground))
-            .navigationTitle(titleKey)
+            .navigationTitle(Text(titleKey))
         }
     }
 }
