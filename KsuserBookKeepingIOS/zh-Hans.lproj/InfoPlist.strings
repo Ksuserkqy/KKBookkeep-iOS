@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "羊羊记账";
 "CFBundleName" = "羊羊记账";
+"NSFaceIDUsageDescription" = "用于解锁羊羊记账。";

@@ -5,6 +5,7 @@
 "tab.profile" = "Me";
 
 "common.back" = "Back";
+"common.cancel" = "Cancel";
 "common.save" = "Save";
 
 "dashboard.placeholder" = "View balances, budgets, and this month's cash flow.";
@@ -92,7 +93,32 @@
 "settings.theme.system" = "Follow System";
 "settings.theme.light" = "Light";
 "settings.theme.dark" = "Dark";
-"settings.theme.footer" = "Choose how Yangyang Bookkeeping looks on this device.";
+"settings.theme.footer" = "Choose how KKBookkeep looks on this device.";
+"settings.security.section" = "Security";
+"settings.security.appLock" = "Require Password on Launch";
+"settings.security.changePassword" = "Change Unlock Password";
+"settings.security.biometricUnlock" = "Use Biometric Unlock";
+"settings.security.biometricUnavailable" = "No available biometric authentication is enabled on this device.";
+"settings.security.footer" = "The unlock password and biometric settings stay on this device and are not backed up or synced.";
+"settings.security.password.setup.title" = "Set Unlock Password";
+"settings.security.password.change.title" = "Change Unlock Password";
+"settings.security.password.placeholder" = "Unlock password";
+"settings.security.password.confirm.placeholder" = "Confirm unlock password";
+"settings.security.password.requirement" = "Use at least 4 characters. The password is stored in this device's keychain.";
+"settings.security.error.passwordTooShort" = "Use at least 4 characters.";
+"settings.security.error.passwordMismatch" = "The passwords do not match.";
+"settings.security.error.saveFailed" = "Could not save the password. Please try again.";
+"settings.security.error.biometricUnavailable" = "Biometric authentication is not available on this device.";
+"settings.security.error.biometricFailed" = "Biometric authentication did not pass.";
+
+"appLock.title" = "KKBookkeep is Locked";
+"appLock.subtitle" = "Enter the local unlock password to continue.";
+"appLock.password.placeholder" = "Unlock password";
+"appLock.unlock" = "Unlock";
+"appLock.useBiometrics" = "Use Biometrics";
+"appLock.biometric.reason" = "Verify your identity to unlock KKBookkeep.";
+"appLock.error.wrongPassword" = "Incorrect password.";
+"appLock.error.biometricFailed" = "Biometric authentication did not pass.";
 
 "app.name" = "KKBookkeep";
 "about.title" = "About";

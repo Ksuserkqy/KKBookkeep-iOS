@@ -5,6 +5,7 @@
 "tab.profile" = "我的";
 
 "common.back" = "返回";
+"common.cancel" = "取消";
 "common.save" = "保存";
 
 "dashboard.placeholder" = "查看账户余额、预算进度和本月收支。";
@@ -93,6 +94,31 @@
 "settings.theme.light" = "浅色";
 "settings.theme.dark" = "深色";
 "settings.theme.footer" = "选择羊羊记账在此设备上的显示风格。";
+"settings.security.section" = "安全";
+"settings.security.appLock" = "进入应用时需要密码";
+"settings.security.changePassword" = "修改解锁密码";
+"settings.security.biometricUnlock" = "使用生物识别解锁";
+"settings.security.biometricUnavailable" = "当前设备未开启可用的生物识别。";
+"settings.security.footer" = "解锁密码和生物识别设置只保存在本设备，不参与备份或同步。";
+"settings.security.password.setup.title" = "设置解锁密码";
+"settings.security.password.change.title" = "修改解锁密码";
+"settings.security.password.placeholder" = "解锁密码";
+"settings.security.password.confirm.placeholder" = "确认解锁密码";
+"settings.security.password.requirement" = "至少 4 位字符。密码会保存到本机钥匙串。";
+"settings.security.error.passwordTooShort" = "密码至少需要 4 位字符。";
+"settings.security.error.passwordMismatch" = "两次输入的密码不一致。";
+"settings.security.error.saveFailed" = "密码保存失败，请稍后重试。";
+"settings.security.error.biometricUnavailable" = "当前设备无法使用生物识别。";
+"settings.security.error.biometricFailed" = "生物识别验证未通过。";
+
+"appLock.title" = "羊羊记账已锁定";
+"appLock.subtitle" = "输入本机解锁密码后继续使用。";
+"appLock.password.placeholder" = "解锁密码";
+"appLock.unlock" = "解锁";
+"appLock.useBiometrics" = "使用生物识别";
+"appLock.biometric.reason" = "验证身份后解锁羊羊记账。";
+"appLock.error.wrongPassword" = "密码不正确。";
+"appLock.error.biometricFailed" = "生物识别验证未通过。";
 
 "app.name" = "羊羊记账";
 "about.title" = "关于";

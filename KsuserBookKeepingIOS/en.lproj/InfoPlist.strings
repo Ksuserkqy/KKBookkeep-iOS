@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "KKBookkeep";
 "CFBundleName" = "KKBookkeep";
+"NSFaceIDUsageDescription" = "Used to unlock KKBookkeep.";
