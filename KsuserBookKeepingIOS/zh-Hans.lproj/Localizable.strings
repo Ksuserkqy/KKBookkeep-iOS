@@ -9,3 +9,31 @@
 "record.placeholder" = "新增支出、收入或转账记录。";
 "reports.placeholder" = "查看分类趋势和消费统计。";
 "profile.placeholder" = "管理账号、同步和应用设置。";
+
+"profile.title" = "个人中心";
+"profile.settings" = "设置";
+"profile.about" = "关于";
+
+"settings.title" = "应用设置";
+"settings.language" = "语言";
+"settings.language.system" = "跟随系统";
+"settings.language.zhHans" = "简体中文";
+"settings.language.en" = "英文";
+"settings.language.footer" = "修改后会立即影响应用内文案。";
+"settings.theme" = "主题";
+"settings.theme.system" = "跟随系统";
+"settings.theme.light" = "浅色";
+"settings.theme.dark" = "深色";
+"settings.theme.footer" = "选择羊羊记账在此设备上的显示风格。";
+
+"app.name" = "羊羊记账";
+"about.title" = "关于";
+"about.version" = "版本信息";
+"about.legalInfo" = "法律信息";
+"about.icp" = "沪ICP备XXXXX";
+"about.copyright" = "版权所有 Ksuser KsuserKqy";
+
+"legal.title" = "法律信息";
+"legal.userAgreement" = "用户协议";
+"legal.privacyPolicy" = "隐私政策";
+"legal.thirdPartySharing" = "第三方信息共享清单";

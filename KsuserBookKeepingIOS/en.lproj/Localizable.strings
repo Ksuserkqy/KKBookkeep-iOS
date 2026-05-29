@@ -9,3 +9,31 @@
 "record.placeholder" = "Create a new income, expense, or transfer entry.";
 "reports.placeholder" = "Review category trends and spending summaries.";
 "profile.placeholder" = "Manage account, sync, and app settings.";
+
+"profile.title" = "Personal Center";
+"profile.settings" = "Settings";
+"profile.about" = "About";
+
+"settings.title" = "App Settings";
+"settings.language" = "Language";
+"settings.language.system" = "Follow System";
+"settings.language.zhHans" = "Simplified Chinese";
+"settings.language.en" = "English";
+"settings.language.footer" = "Changes apply immediately inside the app.";
+"settings.theme" = "Theme";
+"settings.theme.system" = "Follow System";
+"settings.theme.light" = "Light";
+"settings.theme.dark" = "Dark";
+"settings.theme.footer" = "Choose how Yangyang Bookkeeping looks on this device.";
+
+"app.name" = "Yangyang Bookkeeping";
+"about.title" = "About";
+"about.version" = "Version";
+"about.legalInfo" = "Legal Information";
+"about.icp" = "沪ICP备XXXXX";
+"about.copyright" = "Copyright Ksuser KsuserKqy";
+
+"legal.title" = "Legal Information";
+"legal.userAgreement" = "User Agreement";
+"legal.privacyPolicy" = "Privacy Policy";
+"legal.thirdPartySharing" = "Third-Party Information Sharing List";
