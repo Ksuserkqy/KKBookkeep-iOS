@@ -5,6 +5,7 @@
 "tab.profile" = "Me";
 
 "common.back" = "Back";
+"common.save" = "Save";
 
 "dashboard.placeholder" = "View balances, budgets, and this month's cash flow.";
 "transactions.placeholder" = "Browse, filter, and manage every transaction.";
@@ -13,8 +14,73 @@
 "profile.placeholder" = "Manage account, sync, and app settings.";
 
 "profile.title" = "Personal Center";
+"profile.displayName.placeholder" = "No nickname set";
+"profile.section.account" = "Account & Sync";
+"profile.section.app" = "App";
+"profile.edit" = "Edit Profile";
+"profile.sync" = "Backup & Sync";
 "profile.settings" = "Settings";
 "profile.about" = "About";
+
+"profile.edit.title" = "Edit Profile";
+"profile.edit.avatar" = "Change Photo";
+"profile.edit.section.basic" = "Basic Info";
+"profile.edit.section.preferences" = "Bookkeeping Preferences";
+"profile.edit.section.note" = "Note";
+"profile.edit.displayName.placeholder" = "Nickname";
+"profile.edit.email.placeholder" = "Email";
+"profile.edit.phone.placeholder" = "Phone";
+"profile.edit.currency" = "Default Currency";
+"profile.edit.currency.cny" = "Chinese Yuan CNY";
+"profile.edit.currency.usd" = "US Dollar USD";
+"profile.edit.currency.eur" = "Euro EUR";
+"profile.edit.currency.jpy" = "Japanese Yen JPY";
+"profile.edit.timeZone" = "Default Time Zone";
+"profile.edit.timeZone.shanghai" = "China Standard Time";
+"profile.edit.timeZone.current" = "Follow System";
+"profile.edit.timeZone.utc" = "Coordinated Universal Time";
+"profile.edit.note.placeholder" = "Personal note";
+
+"sync.title" = "Backup & Sync";
+"sync.section.status" = "Backup Status";
+"sync.section.provider" = "Backup Location";
+"sync.section.webDAV" = "WebDAV Account";
+"sync.section.behavior" = "Backup & Import Policy";
+"sync.section.encryption" = "File Encryption";
+"sync.status" = "Current Status";
+"sync.status.localOnly" = "Local ledger only";
+"sync.lastSync" = "Last Backup";
+"sync.lastSync.never" = "Never synced";
+"sync.conflictHandling" = "Conflict Handling";
+"sync.conflictHandling.automatic" = "Automatic with history kept";
+"sync.backupEnabled" = "Enable File Backup";
+"sync.provider" = "File Location";
+"sync.provider.iCloudDrive" = "iCloud Drive";
+"sync.provider.webDAV" = "WebDAV";
+"sync.webDAV.server.placeholder" = "Server URL";
+"sync.webDAV.authentication" = "Authentication";
+"sync.webDAV.authentication.password" = "Username & Password";
+"sync.webDAV.authentication.token" = "Access Token";
+"sync.webDAV.username.placeholder" = "Username";
+"sync.webDAV.password.placeholder" = "Password";
+"sync.webDAV.token.placeholder" = "Access token";
+"sync.webDAV.footer" = "WebDAV credentials will be stored in system secure storage. Access tokens are not used for file encryption.";
+"sync.backupOnChange" = "Back up when changes occur";
+"sync.autoImport" = "Auto-import external changes";
+"sync.backupInterval" = "Fallback Check Interval";
+"sync.backupInterval.oneMinute" = "1 minute";
+"sync.backupInterval.fiveMinutes" = "5 minutes";
+"sync.backupInterval.tenMinutes" = "10 minutes";
+"sync.behavior.footer" = "Changes are backed up as soon as possible; background checks depend on system scheduling.";
+"sync.encryption.enabled" = "Encrypt Backup Files";
+"sync.encryption.password.placeholder" = "Sync password";
+"sync.encryption.confirm.placeholder" = "Confirm sync password";
+"sync.encryption.algorithm" = "Encryption Algorithm";
+"sync.encryption.algorithm.aesGCM" = "AES-GCM symmetric encryption";
+"sync.encryption.footer" = "The sync password derives the file encryption key and will later be stored in system secure storage.";
+"sync.action.testConnection" = "Test Backup Location";
+"sync.action.backupNow" = "Back Up Now";
+"sync.action.importNow" = "Import Now";
 
 "settings.title" = "App Settings";
 "settings.language" = "Language";

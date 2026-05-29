@@ -5,6 +5,7 @@
 "tab.profile" = "我的";
 
 "common.back" = "返回";
+"common.save" = "保存";
 
 "dashboard.placeholder" = "查看账户余额、预算进度和本月收支。";
 "transactions.placeholder" = "浏览、筛选和管理每一笔流水。";
@@ -13,8 +14,73 @@
 "profile.placeholder" = "管理账号、同步和应用设置。";
 
 "profile.title" = "个人中心";
+"profile.displayName.placeholder" = "未设置昵称";
+"profile.section.account" = "账号与同步";
+"profile.section.app" = "应用";
+"profile.edit" = "编辑个人信息";
+"profile.sync" = "备份与同步";
 "profile.settings" = "设置";
 "profile.about" = "关于";
+
+"profile.edit.title" = "编辑个人信息";
+"profile.edit.avatar" = "更换头像";
+"profile.edit.section.basic" = "基本信息";
+"profile.edit.section.preferences" = "记账偏好";
+"profile.edit.section.note" = "备注";
+"profile.edit.displayName.placeholder" = "昵称";
+"profile.edit.email.placeholder" = "邮箱";
+"profile.edit.phone.placeholder" = "手机号";
+"profile.edit.currency" = "默认币种";
+"profile.edit.currency.cny" = "人民币 CNY";
+"profile.edit.currency.usd" = "美元 USD";
+"profile.edit.currency.eur" = "欧元 EUR";
+"profile.edit.currency.jpy" = "日元 JPY";
+"profile.edit.timeZone" = "默认时区";
+"profile.edit.timeZone.shanghai" = "中国标准时间";
+"profile.edit.timeZone.current" = "跟随系统";
+"profile.edit.timeZone.utc" = "协调世界时";
+"profile.edit.note.placeholder" = "个人备注";
+
+"sync.title" = "备份与同步";
+"sync.section.status" = "备份状态";
+"sync.section.provider" = "备份位置";
+"sync.section.webDAV" = "WebDAV 账号";
+"sync.section.behavior" = "备份与导入策略";
+"sync.section.encryption" = "文件加密";
+"sync.status" = "当前状态";
+"sync.status.localOnly" = "仅本地账本";
+"sync.lastSync" = "最近备份";
+"sync.lastSync.never" = "从未同步";
+"sync.conflictHandling" = "冲突处理";
+"sync.conflictHandling.automatic" = "自动解决并保留记录";
+"sync.backupEnabled" = "启用文件备份";
+"sync.provider" = "文件位置";
+"sync.provider.iCloudDrive" = "iCloud云盘";
+"sync.provider.webDAV" = "WebDAV";
+"sync.webDAV.server.placeholder" = "服务器地址";
+"sync.webDAV.authentication" = "鉴权方式";
+"sync.webDAV.authentication.password" = "用户名和密码";
+"sync.webDAV.authentication.token" = "访问令牌";
+"sync.webDAV.username.placeholder" = "用户名";
+"sync.webDAV.password.placeholder" = "密码";
+"sync.webDAV.token.placeholder" = "访问令牌";
+"sync.webDAV.footer" = "WebDAV 凭据会保存到系统安全存储，访问令牌不用于文件加密。";
+"sync.backupOnChange" = "有修改时自动备份";
+"sync.autoImport" = "自动导入外部增量";
+"sync.backupInterval" = "兜底检查间隔";
+"sync.backupInterval.oneMinute" = "1 分钟";
+"sync.backupInterval.fiveMinutes" = "5 分钟";
+"sync.backupInterval.tenMinutes" = "10 分钟";
+"sync.behavior.footer" = "有修改时会尽快备份；后台定期检查受系统调度影响。";
+"sync.encryption.enabled" = "加密备份文件";
+"sync.encryption.password.placeholder" = "同步密码";
+"sync.encryption.confirm.placeholder" = "确认同步密码";
+"sync.encryption.algorithm" = "加密算法";
+"sync.encryption.algorithm.aesGCM" = "AES-GCM 对称加密";
+"sync.encryption.footer" = "同步密码用于派生文件加密密钥，后续将保存到系统安全存储。";
+"sync.action.testConnection" = "测试备份位置";
+"sync.action.backupNow" = "立即备份";
+"sync.action.importNow" = "立即导入";
 
 "settings.title" = "应用设置";
 "settings.language" = "语言";
