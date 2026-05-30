@@ -183,18 +183,10 @@ private struct CategoryEditorSheet: View {
                 }
 
                 Section {
-                    Picker("management.color", selection: $draft.colorHex) {
-                        ForEach(DraftCustomizationOptions.colors, id: \.self) { colorHex in
-                            HStack {
-                                Circle()
-                                    .fill(Color(hex: colorHex))
-                                    .frame(width: 16, height: 16)
-
-                                Text(colorHex)
-                            }
-                            .tag(colorHex)
-                        }
-                    }
+                    DraftColorSelectionPicker(
+                        colorHex: $draft.colorHex,
+                        previewIconName: draft.iconName
+                    )
                 } header: {
                     Text("management.section.appearance")
                 }

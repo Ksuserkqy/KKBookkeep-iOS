@@ -1,0 +1,342 @@
+[
+  {
+    "id": "accessibility",
+    "label": "Accessibility",
+    "iconCount": 24
+  },
+  {
+    "id": "alert",
+    "label": "Alert",
+    "iconCount": 10
+  },
+  {
+    "id": "alphabet",
+    "label": "Alphabet",
+    "iconCount": 29
+  },
+  {
+    "id": "animals",
+    "label": "Animals",
+    "iconCount": 25
+  },
+  {
+    "id": "arrows",
+    "label": "Arrows",
+    "iconCount": 119
+  },
+  {
+    "id": "astronomy",
+    "label": "Astronomy",
+    "iconCount": 20
+  },
+  {
+    "id": "automotive",
+    "label": "Automotive",
+    "iconCount": 29
+  },
+  {
+    "id": "buildings",
+    "label": "Buildings",
+    "iconCount": 74
+  },
+  {
+    "id": "business",
+    "label": "Business",
+    "iconCount": 98
+  },
+  {
+    "id": "camping",
+    "label": "Camping",
+    "iconCount": 37
+  },
+  {
+    "id": "charity",
+    "label": "Charity",
+    "iconCount": 19
+  },
+  {
+    "id": "charts-diagrams",
+    "label": "Charts + Diagrams",
+    "iconCount": 18
+  },
+  {
+    "id": "childhood",
+    "label": "Childhood",
+    "iconCount": 25
+  },
+  {
+    "id": "clothing-fashion",
+    "label": "Clothing + Fashion",
+    "iconCount": 12
+  },
+  {
+    "id": "coding",
+    "label": "Coding",
+    "iconCount": 51
+  },
+  {
+    "id": "communication",
+    "label": "Communication",
+    "iconCount": 57
+  },
+  {
+    "id": "connectivity",
+    "label": "Connectivity",
+    "iconCount": 14
+  },
+  {
+    "id": "construction",
+    "label": "Construction",
+    "iconCount": 30
+  },
+  {
+    "id": "design",
+    "label": "Design",
+    "iconCount": 54
+  },
+  {
+    "id": "devices-hardware",
+    "label": "Devices + Hardware",
+    "iconCount": 44
+  },
+  {
+    "id": "disaster",
+    "label": "Disaster + Crisis",
+    "iconCount": 37
+  },
+  {
+    "id": "editing",
+    "label": "Editing",
+    "iconCount": 47
+  },
+  {
+    "id": "education",
+    "label": "Education",
+    "iconCount": 24
+  },
+  {
+    "id": "emoji",
+    "label": "Emoji",
+    "iconCount": 36
+  },
+  {
+    "id": "energy",
+    "label": "Energy",
+    "iconCount": 37
+  },
+  {
+    "id": "files",
+    "label": "Files",
+    "iconCount": 37
+  },
+  {
+    "id": "film-video",
+    "label": "Film + Video",
+    "iconCount": 23
+  },
+  {
+    "id": "food-beverage",
+    "label": "Food + Beverage",
+    "iconCount": 48
+  },
+  {
+    "id": "fruits-vegetables",
+    "label": "Fruits + Vegetables",
+    "iconCount": 6
+  },
+  {
+    "id": "gaming",
+    "label": "Gaming",
+    "iconCount": 46
+  },
+  {
+    "id": "gender",
+    "label": "Genders",
+    "iconCount": 15
+  },
+  {
+    "id": "halloween",
+    "label": "Halloween",
+    "iconCount": 13
+  },
+  {
+    "id": "hands",
+    "label": "Hands",
+    "iconCount": 33
+  },
+  {
+    "id": "holidays",
+    "label": "Holidays",
+    "iconCount": 14
+  },
+  {
+    "id": "household",
+    "label": "Household",
+    "iconCount": 48
+  },
+  {
+    "id": "humanitarian",
+    "label": "Humanitarian",
+    "iconCount": 334
+  },
+  {
+    "id": "logistics",
+    "label": "Logistics",
+    "iconCount": 58
+  },
+  {
+    "id": "maps",
+    "label": "Maps",
+    "iconCount": 139
+  },
+  {
+    "id": "maritime",
+    "label": "Maritime",
+    "iconCount": 14
+  },
+  {
+    "id": "marketing",
+    "label": "Marketing",
+    "iconCount": 24
+  },
+  {
+    "id": "mathematics",
+    "label": "Mathematics",
+    "iconCount": 23
+  },
+  {
+    "id": "media-playback",
+    "label": "Media Playback",
+    "iconCount": 39
+  },
+  {
+    "id": "medical-health",
+    "label": "Medical + Health",
+    "iconCount": 114
+  },
+  {
+    "id": "money",
+    "label": "Money",
+    "iconCount": 73
+  },
+  {
+    "id": "moving",
+    "label": "Moving",
+    "iconCount": 16
+  },
+  {
+    "id": "music-audio",
+    "label": "Music + Audio",
+    "iconCount": 23
+  },
+  {
+    "id": "nature",
+    "label": "Nature",
+    "iconCount": 28
+  },
+  {
+    "id": "numbers",
+    "label": "Numbers",
+    "iconCount": 10
+  },
+  {
+    "id": "photos-images",
+    "label": "Photos + Images",
+    "iconCount": 25
+  },
+  {
+    "id": "political",
+    "label": "Political",
+    "iconCount": 20
+  },
+  {
+    "id": "punctuation-symbols",
+    "label": "Punctuation + Symbols",
+    "iconCount": 32
+  },
+  {
+    "id": "religion",
+    "label": "Religion",
+    "iconCount": 44
+  },
+  {
+    "id": "science",
+    "label": "Science",
+    "iconCount": 33
+  },
+  {
+    "id": "science-fiction",
+    "label": "Science Fiction",
+    "iconCount": 13
+  },
+  {
+    "id": "security",
+    "label": "Security",
+    "iconCount": 61
+  },
+  {
+    "id": "shapes",
+    "label": "Shapes",
+    "iconCount": 30
+  },
+  {
+    "id": "shopping",
+    "label": "Shopping",
+    "iconCount": 62
+  },
+  {
+    "id": "social",
+    "label": "Social",
+    "iconCount": 35
+  },
+  {
+    "id": "spinners",
+    "label": "Spinners",
+    "iconCount": 28
+  },
+  {
+    "id": "sports-fitness",
+    "label": "Sports + Fitness",
+    "iconCount": 33
+  },
+  {
+    "id": "text-formatting",
+    "label": "Text Formatting",
+    "iconCount": 43
+  },
+  {
+    "id": "time",
+    "label": "Time",
+    "iconCount": 18
+  },
+  {
+    "id": "toggle",
+    "label": "Toggle",
+    "iconCount": 16
+  },
+  {
+    "id": "transportation",
+    "label": "Transportation",
+    "iconCount": 52
+  },
+  {
+    "id": "travel-hotel",
+    "label": "Travel + Hotel",
+    "iconCount": 75
+  },
+  {
+    "id": "users-people",
+    "label": "Users + People",
+    "iconCount": 119
+  },
+  {
+    "id": "weather",
+    "label": "Weather",
+    "iconCount": 37
+  },
+  {
+    "id": "writing",
+    "label": "Writing",
+    "iconCount": 31
+  }
+]

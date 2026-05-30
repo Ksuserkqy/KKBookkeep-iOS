@@ -39,6 +39,7 @@ struct DraftAccount: Codable, Identifiable, Equatable {
     var type: DraftAccountType
     var iconName: String
     var colorHex: String
+    var balanceText: String
     var note: String
 
     init(
@@ -48,6 +49,7 @@ struct DraftAccount: Codable, Identifiable, Equatable {
         type: DraftAccountType = .cash,
         iconName: String = "wallet",
         colorHex: String = "#F6C343",
+        balanceText: String = "0",
         note: String = ""
     ) {
         self.id = id
@@ -56,6 +58,7 @@ struct DraftAccount: Codable, Identifiable, Equatable {
         self.type = type
         self.iconName = iconName
         self.colorHex = colorHex
+        self.balanceText = balanceText
         self.note = note
     }
 
@@ -67,6 +70,7 @@ struct DraftAccount: Codable, Identifiable, Equatable {
         self.type = try container.decodeIfPresent(DraftAccountType.self, forKey: .type) ?? .cash
         self.iconName = try container.decodeIfPresent(String.self, forKey: .iconName) ?? ""
         self.colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? ""
+        self.balanceText = try container.decodeIfPresent(String.self, forKey: .balanceText) ?? "0"
         self.note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
     }
 }
@@ -209,9 +213,13 @@ final class DraftBookkeepingStore: ObservableObject {
         messageKey = "record.draft.saved"
     }
 
-    func addAccount(name: String, type: DraftAccountType, iconName: String, colorHex: String, note: String) {
+    func addAccount(name: String, type: DraftAccountType, iconName: String, colorHex: String, balanceText: String, note: String) -> Bool {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
+        guard !trimmedName.isEmpty else { return false }
+        guard let normalizedBalanceText = DraftAmountFormatter.normalizedAmountText(balanceText, allowNegative: false) else {
+            messageKey = "management.account.error.invalidBalance"
+            return false
+        }
 
         accounts.append(DraftAccount(
             id: UUID().uuidString,
@@ -220,24 +228,32 @@ final class DraftBookkeepingStore: ObservableObject {
             type: type,
             iconName: iconName,
             colorHex: colorHex,
+            balanceText: normalizedBalanceText,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines)
         ))
         persistAccounts()
         messageKey = "management.account.saved"
+        return true
     }
 
-    func updateAccount(id: String, name: String, type: DraftAccountType, iconName: String, colorHex: String, note: String) {
+    func updateAccount(id: String, name: String, type: DraftAccountType, iconName: String, colorHex: String, balanceText: String, note: String) -> Bool {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
+        guard !trimmedName.isEmpty else { return false }
+        guard let normalizedBalanceText = DraftAmountFormatter.normalizedAmountText(balanceText, allowNegative: false) else {
+            messageKey = "management.account.error.invalidBalance"
+            return false
+        }
 
-        guard let index = accounts.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = accounts.firstIndex(where: { $0.id == id }) else { return false }
         accounts[index].name = trimmedName
         accounts[index].type = type
         accounts[index].iconName = iconName
         accounts[index].colorHex = colorHex
+        accounts[index].balanceText = normalizedBalanceText
         accounts[index].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
         persistAccounts()
         messageKey = "management.account.saved"
+        return true
     }
 
     func deleteAccount(id: String) -> Bool {
@@ -364,6 +380,7 @@ final class DraftBookkeepingStore: ObservableObject {
                 normalized.type = defaults.type
             }
         }
+        normalized.balanceText = Self.normalizedBalanceText(normalized.balanceText)
 
         return normalized
     }
@@ -444,7 +461,8 @@ final class DraftBookkeepingStore: ObservableObject {
             isDefault: true,
             type: .cash,
             iconName: "money-bill",
-            colorHex: "#F6C343"
+            colorHex: "#F6C343",
+            balanceText: "0"
         ),
         DraftAccount(
             id: "account.bankCard",
@@ -452,7 +470,8 @@ final class DraftBookkeepingStore: ObservableObject {
             isDefault: true,
             type: .debitCard,
             iconName: "credit-card",
-            colorHex: "#4F8EF7"
+            colorHex: "#4F8EF7",
+            balanceText: "0"
         )
     ]
 
@@ -470,6 +489,10 @@ final class DraftBookkeepingStore: ObservableObject {
 
     private static func localized(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
+    }
+
+    private static func normalizedBalanceText(_ text: String) -> String {
+        DraftAmountFormatter.normalizedAmountText(text, allowNegative: false) ?? "0"
     }
 
     private static func fontAwesomeName(for legacyName: String) -> String {
