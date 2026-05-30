@@ -57,6 +57,7 @@
 "management.action.delete" = "删除";
 "management.icon" = "图标";
 "management.icon.more" = "更多图标";
+"management.icon.more.short" = "更多";
 "management.icon.all" = "全部图标";
 "management.icon.search.placeholder" = "搜索图标名称或关键词";
 "management.icon.notice.version" = "当前内置 Font Awesome Free %@ 图标库。";

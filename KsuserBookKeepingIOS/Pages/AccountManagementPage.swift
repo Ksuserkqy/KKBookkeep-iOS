@@ -475,29 +475,33 @@ struct IconGridPicker: View {
                 }
             }
             .padding(.vertical, 6)
-            .padding(.bottom, 56)
+            .padding(.bottom, 40)
 
             Button {
                 isAllIconsPresented = true
             } label: {
-                ZStack {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .frame(width: 54, height: 54)
-                        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 5)
-
-                    DraftVisualBadge(iconName: "ellipsis", colorHex: colorHex, size: 46)
-                        .overlay {
-                            Circle()
-                                .stroke(Color.accentColor, lineWidth: 2)
-                        }
-                    }
+                Label {
+                    Text("management.icon.more.short")
+                        .font(.subheadline.weight(.semibold))
+                } icon: {
+                    FontAwesomeIcon(name: "ellipsis", size: 13)
+                }
+                .foregroundStyle(Color(hex: colorHex))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(hex: colorHex), lineWidth: 1.5)
+                }
+                .shadow(color: .black.opacity(0.10), radius: 10, x: 0, y: 4)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text("management.icon.more"))
-            .padding(.trailing, 2)
-            .padding(.bottom, 8)
+            .offset(x: 8, y: 6)
         }
+        .padding(.trailing, 8)
+        .padding(.bottom, 6)
         .sheet(isPresented: $isAllIconsPresented) {
             FontAwesomeIconSearchSheet(
                 selectedIconName: $selectedIconName,

@@ -57,6 +57,7 @@
 "management.action.delete" = "Delete";
 "management.icon" = "Icon";
 "management.icon.more" = "More Icons";
+"management.icon.more.short" = "More";
 "management.icon.all" = "All Icons";
 "management.icon.search.placeholder" = "Search icon name or keyword";
 "management.icon.notice.version" = "This picker includes Font Awesome Free %@.";
