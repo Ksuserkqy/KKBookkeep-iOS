@@ -6,6 +6,7 @@ struct RecordPage: View {
 
     @State private var selectedKind = DraftEntryKind.expense
     @State private var amountText = ""
+    @State private var transferInAmountText = ""
     @State private var selectedCategoryId = ""
     @State private var selectedAccountId = ""
     @State private var selectedFromAccountId = ""
@@ -26,7 +27,11 @@ struct RecordPage: View {
                     .pickerStyle(.segmented)
                 }
 
-                amountSection
+                if selectedKind == .transfer {
+                    transferAmountSection
+                } else {
+                    amountSection
+                }
 
                 if selectedKind == .transfer {
                     transferAccountSection
@@ -70,7 +75,16 @@ struct RecordPage: View {
             }
             .onChange(of: selectedKind) { _, _ in
                 errorKey = nil
+                if selectedKind == .transfer, transferInAmountText.isEmpty {
+                    transferInAmountText = amountText
+                }
                 normalizeSelections()
+            }
+            .onChange(of: amountText) { oldValue, newValue in
+                guard selectedKind == .transfer else { return }
+                if transferInAmountText.isEmpty || transferInAmountText == oldValue {
+                    transferInAmountText = newValue
+                }
             }
             .onChange(of: draftStore.accounts) { _, _ in
                 normalizeSelections()
@@ -90,28 +104,46 @@ struct RecordPage: View {
         }
     }
 
+    private var transferAmountSection: some View {
+        Section {
+            TextField("record.transferOutAmount.placeholder", text: $amountText)
+                .keyboardType(.decimalPad)
+
+            TextField("record.transferInAmount.placeholder", text: $transferInAmountText)
+                .keyboardType(.decimalPad)
+        } header: {
+            Text("record.section.transferAmount")
+        } footer: {
+            Text("record.transferAmount.footer")
+        }
+    }
+
     private var categoryAndAccountSection: some View {
         Section {
-            Picker("record.category", selection: $selectedCategoryId) {
-                Text("record.picker.unselected").tag("")
-                ForEach(draftStore.categories(for: selectedKind)) { category in
-                    HStack {
-                        FontAwesomeIcon(name: category.iconName)
-                        Text(category.name)
-                    }
-                    .tag(category.id)
-                }
+            NavigationLink {
+                RecordVisualSelectionPage(
+                    titleKey: "record.category",
+                    items: categorySelectionItems(for: selectedKind),
+                    selectedId: $selectedCategoryId
+                )
+            } label: {
+                RecordVisualSelectionRow(
+                    titleKey: "record.category",
+                    item: categorySelectionItem(for: selectedCategoryId)
+                )
             }
 
-            Picker("record.account", selection: $selectedAccountId) {
-                Text("record.picker.unselected").tag("")
-                ForEach(draftStore.accounts) { account in
-                    HStack {
-                        FontAwesomeIcon(name: account.iconName)
-                        Text(account.name)
-                    }
-                    .tag(account.id)
-                }
+            NavigationLink {
+                RecordVisualSelectionPage(
+                    titleKey: "record.account",
+                    items: accountSelectionItems,
+                    selectedId: $selectedAccountId
+                )
+            } label: {
+                RecordVisualSelectionRow(
+                    titleKey: "record.account",
+                    item: accountSelectionItem(for: selectedAccountId)
+                )
             }
         } header: {
             Text("record.section.bookkeeping")
@@ -120,26 +152,30 @@ struct RecordPage: View {
 
     private var transferAccountSection: some View {
         Section {
-            Picker("record.fromAccount", selection: $selectedFromAccountId) {
-                Text("record.picker.unselected").tag("")
-                ForEach(draftStore.accounts) { account in
-                    HStack {
-                        FontAwesomeIcon(name: account.iconName)
-                        Text(account.name)
-                    }
-                    .tag(account.id)
-                }
+            NavigationLink {
+                RecordVisualSelectionPage(
+                    titleKey: "record.fromAccount",
+                    items: accountSelectionItems,
+                    selectedId: $selectedFromAccountId
+                )
+            } label: {
+                RecordVisualSelectionRow(
+                    titleKey: "record.fromAccount",
+                    item: accountSelectionItem(for: selectedFromAccountId)
+                )
             }
 
-            Picker("record.toAccount", selection: $selectedToAccountId) {
-                Text("record.picker.unselected").tag("")
-                ForEach(draftStore.accounts) { account in
-                    HStack {
-                        FontAwesomeIcon(name: account.iconName)
-                        Text(account.name)
-                    }
-                    .tag(account.id)
-                }
+            NavigationLink {
+                RecordVisualSelectionPage(
+                    titleKey: "record.toAccount",
+                    items: accountSelectionItems,
+                    selectedId: $selectedToAccountId
+                )
+            } label: {
+                RecordVisualSelectionRow(
+                    titleKey: "record.toAccount",
+                    item: accountSelectionItem(for: selectedToAccountId)
+                )
             }
         } header: {
             Text("record.section.transfer")
@@ -175,12 +211,58 @@ struct RecordPage: View {
         }
     }
 
+    private var accountSelectionItems: [RecordVisualSelectionItem] {
+        draftStore.accounts.map { account in
+            RecordVisualSelectionItem(
+                id: account.id,
+                name: account.name,
+                iconName: account.iconName,
+                colorHex: account.colorHex
+            )
+        }
+    }
+
+    private func categorySelectionItems(for kind: DraftEntryKind) -> [RecordVisualSelectionItem] {
+        draftStore.categories(for: kind).map { category in
+            RecordVisualSelectionItem(
+                id: category.id,
+                name: category.name,
+                iconName: category.iconName,
+                colorHex: category.colorHex
+            )
+        }
+    }
+
+    private func accountSelectionItem(for id: String) -> RecordVisualSelectionItem {
+        accountSelectionItems.first { $0.id == id } ?? Self.unselectedSelectionItem
+    }
+
+    private func categorySelectionItem(for id: String) -> RecordVisualSelectionItem {
+        categorySelectionItems(for: selectedKind).first { $0.id == id } ?? Self.unselectedSelectionItem
+    }
+
+    private static var unselectedSelectionItem: RecordVisualSelectionItem {
+        RecordVisualSelectionItem(
+            id: "",
+            name: NSLocalizedString("record.picker.unselected", comment: ""),
+            iconName: "circle-question",
+            colorHex: "#64748B"
+        )
+    }
+
     private func saveDraft() {
         draftStore.clearMessage()
 
         guard isPositiveAmount(amountText) else {
             errorKey = "record.error.invalidAmount"
             return
+        }
+
+        if selectedKind == .transfer {
+            guard isPositiveAmount(transferInAmountText) else {
+                errorKey = "record.error.invalidTransferInAmount"
+                return
+            }
         }
 
         switch selectedKind {
@@ -207,11 +289,13 @@ struct RecordPage: View {
         }
 
         let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTransferInAmount = transferInAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let draft = DraftTransaction(
             id: UUID().uuidString,
             kind: selectedKind,
             amountText: trimmedAmount,
+            transferInAmountText: selectedKind == .transfer ? trimmedTransferInAmount : nil,
             categoryId: selectedKind == .transfer ? nil : selectedCategoryId,
             accountId: selectedKind == .transfer ? nil : selectedAccountId,
             fromAccountId: selectedKind == .transfer ? selectedFromAccountId : nil,
@@ -239,6 +323,69 @@ struct RecordPage: View {
         }
 
         return true
+    }
+}
+
+private struct RecordVisualSelectionItem: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let iconName: String
+    let colorHex: String
+}
+
+private struct RecordVisualSelectionRow: View {
+    let titleKey: LocalizedStringKey
+    let item: RecordVisualSelectionItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(titleKey)
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 16)
+
+            HStack(spacing: 8) {
+                DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
+
+                Text(item.name)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
+private struct RecordVisualSelectionPage: View {
+    let titleKey: LocalizedStringKey
+    let items: [RecordVisualSelectionItem]
+    @Binding var selectedId: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List(items) { item in
+            Button {
+                selectedId = item.id
+                dismiss()
+            } label: {
+                HStack(spacing: 12) {
+                    DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex)
+
+                    Text(item.name)
+                        .foregroundStyle(.primary)
+
+                    Spacer()
+
+                    if selectedId == item.id {
+                        Image(systemName: "checkmark")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.tint)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .navigationTitle(Text(titleKey))
     }
 }
 

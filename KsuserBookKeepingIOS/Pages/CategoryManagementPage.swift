@@ -11,8 +11,12 @@ struct CategoryManagementPage: View {
         Form {
             Section {
                 Picker("management.category.kind", selection: $selectedKind) {
-                    Text("record.kind.expense").tag(DraftEntryKind.expense)
-                    Text("record.kind.income").tag(DraftEntryKind.income)
+                    Label("record.kind.expense", systemImage: "minus.circle.fill")
+                        .labelStyle(.titleAndIcon)
+                        .tag(DraftEntryKind.expense)
+                    Label("record.kind.income", systemImage: "plus.circle.fill")
+                        .labelStyle(.titleAndIcon)
+                        .tag(DraftEntryKind.income)
                 }
                 .pickerStyle(.segmented)
             }

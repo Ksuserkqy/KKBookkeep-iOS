@@ -21,6 +21,10 @@
 "record.kind.transfer" = "转账";
 "record.section.amount" = "金额";
 "record.amount.placeholder" = "输入金额";
+"record.section.transferAmount" = "转账金额";
+"record.transferOutAmount.placeholder" = "转出金额";
+"record.transferInAmount.placeholder" = "转入金额";
+"record.transferAmount.footer" = "默认转入金额与转出金额相同；如有手续费，可分别调整两边金额。";
 "record.section.bookkeeping" = "记账信息";
 "record.section.transfer" = "转账账户";
 "record.section.detail" = "详情";
@@ -35,6 +39,7 @@
 "record.footer.draftOnly" = "当前只生成本机草稿，尚未正式写入账本。";
 "record.draft.saved" = "草稿已保存，尚未正式入账。";
 "record.error.invalidAmount" = "请输入大于 0 的金额。";
+"record.error.invalidTransferInAmount" = "请输入大于 0 的转入金额。";
 "record.error.categoryRequired" = "请选择分类。";
 "record.error.accountRequired" = "请选择账户。";
 "record.error.sameTransferAccount" = "转出账户和转入账户不能相同。";
@@ -44,6 +49,8 @@
 "transactions.draft.footer" = "接入 SQLite 后，这里会显示正式流水列表。";
 "transactions.draft.kind" = "类型";
 "transactions.draft.amount" = "金额";
+"transactions.draft.transferOutAmount" = "转出金额";
+"transactions.draft.transferInAmount" = "转入金额";
 "transactions.draft.date" = "日期";
 "transactions.draft.category" = "分类";
 "transactions.draft.account" = "账户";
@@ -144,6 +151,7 @@
 "management.account.section.basic" = "账户信息";
 "management.account.section.note" = "备注";
 "management.account.footer" = "账户暂存在本机，后续会接入正式账本。";
+"management.account.footer.sort" = "账户暂存在本机，点“编辑”后可拖动排序，后续会接入正式账本。";
 "management.account.add" = "新增账户";
 "management.account.add.title" = "新增账户";
 "management.account.edit.title" = "编辑账户";

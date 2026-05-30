@@ -142,6 +142,7 @@ struct DraftTransaction: Codable, Identifiable, Equatable {
     var id: String
     var kind: DraftEntryKind
     var amountText: String
+    var transferInAmountText: String?
     var categoryId: String?
     var accountId: String?
     var fromAccountId: String?
@@ -254,6 +255,11 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         messageKey = "management.account.saved"
         return true
+    }
+
+    func moveAccounts(from source: IndexSet, to destination: Int) {
+        accounts.move(fromOffsets: source, toOffset: destination)
+        persistAccounts()
     }
 
     func deleteAccount(id: String) -> Bool {

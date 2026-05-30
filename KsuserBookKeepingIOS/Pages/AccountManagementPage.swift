@@ -69,10 +69,13 @@ struct AccountManagementPage: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .onMove { source, destination in
+                    draftStore.moveAccounts(from: source, to: destination)
+                }
             } header: {
                 Text("management.account.section")
             } footer: {
-                Text("management.account.footer")
+                Text("management.account.footer.sort")
             }
 
             Section {
@@ -89,6 +92,10 @@ struct AccountManagementPage: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 AppBackButton()
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                EditButton()
             }
         }
         .sheet(isPresented: $isEditorPresented) {

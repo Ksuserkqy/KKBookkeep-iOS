@@ -66,6 +66,7 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
         }
+        .dismissKeyboardOnBackgroundTap()
         .id(activeLocaleIdentifier)
         .tint(.accentColor)
         .environment(\.locale, Locale(identifier: activeLocaleIdentifier))

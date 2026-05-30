@@ -18,7 +18,12 @@ struct TransactionsPage: View {
 
                             VStack(alignment: .leading, spacing: 10) {
                                 DraftSummaryRow(titleKey: "transactions.draft.kind", value: localizedTitle(for: draft.kind))
-                                DraftSummaryRow(titleKey: "transactions.draft.amount", value: draft.amountText)
+                                if draft.kind == .transfer {
+                                    DraftSummaryRow(titleKey: "transactions.draft.transferOutAmount", value: draft.amountText)
+                                    DraftSummaryRow(titleKey: "transactions.draft.transferInAmount", value: draft.transferInAmountText ?? draft.amountText)
+                                } else {
+                                    DraftSummaryRow(titleKey: "transactions.draft.amount", value: draft.amountText)
+                                }
                                 DraftSummaryRow(titleKey: "transactions.draft.date", value: Self.dateFormatter.string(from: draft.date))
 
                                 if draft.kind == .transfer {
