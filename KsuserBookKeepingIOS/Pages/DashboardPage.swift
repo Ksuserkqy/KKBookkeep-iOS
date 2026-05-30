@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @Binding var selectedTab: AppTab
+    @Binding var requestedRecordKind: DraftEntryKind?
 
     private var totalBalanceText: String {
         let total = draftStore.accounts.reduce(Decimal(0)) { partialResult, account in
@@ -124,6 +125,7 @@ struct DashboardPage: View {
                     systemImage: "minus.circle.fill",
                     tint: .red
                 ) {
+                    requestedRecordKind = .expense
                     selectedTab = .record
                 }
 
@@ -132,6 +134,7 @@ struct DashboardPage: View {
                     systemImage: "plus.circle.fill",
                     tint: .green
                 ) {
+                    requestedRecordKind = .income
                     selectedTab = .record
                 }
 
@@ -140,6 +143,7 @@ struct DashboardPage: View {
                     systemImage: "arrow.left.arrow.right.circle.fill",
                     tint: .blue
                 ) {
+                    requestedRecordKind = .transfer
                     selectedTab = .record
                 }
             }
@@ -474,6 +478,9 @@ private struct DashboardEmptyState: View {
 }
 
 #Preview {
-    DashboardPage(selectedTab: .constant(.dashboard))
+    DashboardPage(
+        selectedTab: .constant(.dashboard),
+        requestedRecordKind: .constant(nil)
+    )
         .environmentObject(DraftBookkeepingStore())
 }

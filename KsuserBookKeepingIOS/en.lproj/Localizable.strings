@@ -9,6 +9,10 @@
 "common.ok" = "OK";
 "common.save" = "Save";
 
+"quickAction.expense.title" = "Record Expense";
+"quickAction.income.title" = "Record Income";
+"quickAction.transfer.title" = "Record Transfer";
+
 "dashboard.placeholder" = "View balances, budgets, and this month's cash flow.";
 "dashboard.greeting" = "Ready for today's entry";
 "dashboard.subtitle" = "Check the local ledger at a glance.";

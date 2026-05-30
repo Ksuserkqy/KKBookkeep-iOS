@@ -9,6 +9,10 @@
 "common.ok" = "确定";
 "common.save" = "保存";
 
+"quickAction.expense.title" = "记一笔支出";
+"quickAction.income.title" = "记一笔收入";
+"quickAction.transfer.title" = "记一笔转账";
+
 "dashboard.placeholder" = "查看账户余额、预算进度和本月收支。";
 "dashboard.greeting" = "今天也记一笔";
 "dashboard.subtitle" = "快速查看本机账本状态。";

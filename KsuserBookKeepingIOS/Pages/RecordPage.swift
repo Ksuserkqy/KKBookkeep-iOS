@@ -3,6 +3,7 @@ import SwiftUI
 struct RecordPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @Binding var selectedTab: AppTab
+    @Binding var requestedKind: DraftEntryKind?
     @StateObject private var locationProvider = CurrentLocationProvider()
 
     @State private var selectedKind = DraftEntryKind.expense
@@ -75,6 +76,11 @@ struct RecordPage: View {
             }
             .navigationTitle(Text("tab.record"))
             .onAppear {
+                applyRequestedKindIfNeeded()
+                normalizeSelections()
+            }
+            .onChange(of: requestedKind) { _, _ in
+                applyRequestedKindIfNeeded()
                 normalizeSelections()
             }
             .onChange(of: selectedKind) { _, _ in
@@ -265,6 +271,13 @@ struct RecordPage: View {
         if selectedKind != .transfer, !categories.contains(where: { $0.id == selectedCategoryId }) {
             selectedCategoryId = defaultCategoryId(in: categories)
         }
+    }
+
+    private func applyRequestedKindIfNeeded() {
+        guard let requestedKind else { return }
+
+        selectedKind = requestedKind
+        self.requestedKind = nil
     }
 
     private func defaultAccountId(in accounts: [DraftAccount]) -> String {
@@ -497,6 +510,9 @@ private struct RecordVisualSelectionPage: View {
 }
 
 #Preview {
-    RecordPage(selectedTab: .constant(.record))
+    RecordPage(
+        selectedTab: .constant(.record),
+        requestedKind: .constant(nil)
+    )
         .environmentObject(DraftBookkeepingStore())
 }

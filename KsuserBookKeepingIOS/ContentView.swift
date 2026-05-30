@@ -13,6 +13,7 @@ struct ContentView: View {
     @EnvironmentObject private var profileStore: ProfileStore
     @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
     @EnvironmentObject private var draftBookkeepingStore: DraftBookkeepingStore
+    @EnvironmentObject private var quickActionRouter: HomeScreenQuickActionRouter
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
     @StateObject private var appLock = AppLockManager()
@@ -23,6 +24,7 @@ struct ContentView: View {
     @State private var hasPendingMetadataBackup = false
     @State private var metadataBackupTask: Task<Void, Never>?
     @State private var selectedTab = AppTab.dashboard
+    @State private var requestedRecordKind: DraftEntryKind?
 
     private var activeLocaleIdentifier: String {
         AppLanguage(rawValue: language)?.localeIdentifier ?? Locale.current.identifier
@@ -31,7 +33,10 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             TabView(selection: $selectedTab) {
-                DashboardPage(selectedTab: $selectedTab)
+                DashboardPage(
+                    selectedTab: $selectedTab,
+                    requestedRecordKind: $requestedRecordKind
+                )
                 .tabItem {
                     Label("tab.dashboard", systemImage: "house.fill")
                 }
@@ -43,7 +48,10 @@ struct ContentView: View {
                 }
                 .tag(AppTab.transactions)
 
-                RecordPage(selectedTab: $selectedTab)
+                RecordPage(
+                    selectedTab: $selectedTab,
+                    requestedKind: $requestedRecordKind
+                )
                 .tabItem {
                     Label("tab.record", systemImage: "plus.circle.fill")
                 }
@@ -78,7 +86,12 @@ struct ContentView: View {
         .environmentObject(appLock)
         .preferredColorScheme(AppTheme(rawValue: theme)?.colorScheme)
         .task {
+            quickActionRouter.configureShortcuts()
+            handleQuickAction(quickActionRouter.pendingAction)
             await importRemoteDataIfNeeded(force: true)
+        }
+        .onChange(of: quickActionRouter.pendingAction) { _, action in
+            handleQuickAction(action)
         }
         .onReceive(draftBookkeepingStore.$localMetadataChangeToken.dropFirst()) { _ in
             scheduleMetadataBackup()
@@ -127,6 +140,14 @@ struct ContentView: View {
         )
         lastRemoteDataImportAt = Date()
         isImportingRemoteData = false
+    }
+
+    private func handleQuickAction(_ action: HomeScreenQuickAction?) {
+        guard let action else { return }
+
+        requestedRecordKind = action.recordKind
+        selectedTab = .record
+        quickActionRouter.clearPendingAction()
     }
 
     private func scheduleMetadataBackup() {
@@ -183,4 +204,5 @@ enum AppTab: Hashable {
         .environmentObject(ProfileStore())
         .environmentObject(SyncSettingsStore())
         .environmentObject(DraftBookkeepingStore())
+        .environmentObject(HomeScreenQuickActionRouter.shared)
 }
