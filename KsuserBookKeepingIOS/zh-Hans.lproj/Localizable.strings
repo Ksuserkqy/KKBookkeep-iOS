@@ -170,6 +170,7 @@
 "management.category.section" = "本机暂存分类";
 "management.category.section.basic" = "分类信息";
 "management.category.footer" = "分类暂存在本机，后续会接入正式账本。";
+"management.category.footer.sort" = "分类暂存在本机，点“编辑”后可拖动排序，后续会接入正式账本。";
 "management.category.add" = "新增分类";
 "management.category.add.title" = "新增分类";
 "management.category.edit.title" = "编辑分类";

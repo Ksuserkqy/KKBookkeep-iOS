@@ -251,12 +251,16 @@ private struct AccountEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("common.cancel", action: onCancel)
+                    Button(action: onCancel) {
+                        Label("common.cancel", systemImage: "xmark")
+                    }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("common.save", action: onSave)
-                        .disabled(!draft.isSaveEnabled)
+                    Button(action: onSave) {
+                        Label("common.save", systemImage: "checkmark")
+                    }
+                    .disabled(!draft.isSaveEnabled)
                 }
             }
         }

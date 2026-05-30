@@ -170,6 +170,7 @@
 "management.category.section" = "Local Draft Categories";
 "management.category.section.basic" = "Category Info";
 "management.category.footer" = "Categories are saved locally for now and will later connect to the formal ledger.";
+"management.category.footer.sort" = "Categories are saved locally for now. Tap Edit to drag and reorder; they will later connect to the formal ledger.";
 "management.category.add" = "Add Category";
 "management.category.add.title" = "Add Category";
 "management.category.edit.title" = "Edit Category";

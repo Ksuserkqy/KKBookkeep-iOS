@@ -52,10 +52,13 @@ struct CategoryManagementPage: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .onMove { source, destination in
+                    draftStore.moveCategories(kind: selectedKind, from: source, to: destination)
+                }
             } header: {
                 Text("management.category.section")
             } footer: {
-                Text("management.category.footer")
+                Text("management.category.footer.sort")
             }
 
             Section {
@@ -72,6 +75,10 @@ struct CategoryManagementPage: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 AppBackButton()
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                EditButton()
             }
         }
         .sheet(isPresented: $isEditorPresented) {
@@ -195,12 +202,16 @@ private struct CategoryEditorSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("common.cancel", action: onCancel)
+                    Button(action: onCancel) {
+                        Label("common.cancel", systemImage: "xmark")
+                    }
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("common.save", action: onSave)
-                        .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button(action: onSave) {
+                        Label("common.save", systemImage: "checkmark")
+                    }
+                    .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }

@@ -296,6 +296,26 @@ final class DraftBookkeepingStore: ObservableObject {
         messageKey = "management.category.saved"
     }
 
+    func moveCategories(kind: DraftEntryKind, from source: IndexSet, to destination: Int) {
+        var visibleCategories = categories(for: kind)
+        visibleCategories.move(fromOffsets: source, toOffset: destination)
+
+        var reorderedCategories: [DraftCategory] = []
+        var movedCategoryIndex = visibleCategories.startIndex
+
+        for category in categories {
+            if category.kind == kind {
+                reorderedCategories.append(visibleCategories[movedCategoryIndex])
+                movedCategoryIndex = visibleCategories.index(after: movedCategoryIndex)
+            } else {
+                reorderedCategories.append(category)
+            }
+        }
+
+        categories = reorderedCategories
+        persistCategories()
+    }
+
     func deleteCategory(id: String) -> Bool {
         guard let category = categories.first(where: { $0.id == id }) else { return false }
         guard categories(for: category.kind).count > 1 else {
