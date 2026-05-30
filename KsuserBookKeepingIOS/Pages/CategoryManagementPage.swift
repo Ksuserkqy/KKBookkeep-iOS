@@ -22,6 +22,14 @@ struct CategoryManagementPage: View {
                 .pickerStyle(.segmented)
             }
 
+            Section {
+                Button {
+                    beginAdding()
+                } label: {
+                    Label("management.category.add", systemImage: "plus.circle.fill")
+                }
+            }
+
             if let messageKey = draftStore.messageKey {
                 Section {
                     Text(LocalizedStringKey(messageKey))
@@ -82,14 +90,6 @@ struct CategoryManagementPage: View {
                 Text("management.category.section")
             } footer: {
                 Text("management.category.footer.sort")
-            }
-
-            Section {
-                Button {
-                    beginAdding()
-                } label: {
-                    Label("management.category.add", systemImage: "plus.circle.fill")
-                }
             }
         }
         .navigationTitle(Text("management.category.title"))

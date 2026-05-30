@@ -18,6 +18,14 @@ struct AccountManagementPage: View {
             }
 
             Section {
+                Button {
+                    beginAdding()
+                } label: {
+                    Label("management.account.add", systemImage: "plus.circle.fill")
+                }
+            }
+
+            Section {
                 ForEach(draftStore.accounts) { account in
                     HStack(spacing: 12) {
                         DraftVisualBadge(iconName: account.iconName, colorHex: account.colorHex)
@@ -87,14 +95,6 @@ struct AccountManagementPage: View {
                 Text("management.account.section")
             } footer: {
                 Text("management.account.footer.sort")
-            }
-
-            Section {
-                Button {
-                    beginAdding()
-                } label: {
-                    Label("management.account.add", systemImage: "plus.circle.fill")
-                }
             }
         }
         .navigationTitle(Text("management.account.title"))
