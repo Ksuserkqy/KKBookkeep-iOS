@@ -4,6 +4,7 @@ struct CategoryManagementPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @State private var selectedKind = DraftEntryKind.expense
     @State private var editingCategory: DraftCategory?
+    @State private var deletingCategory: DraftCategory?
     @State private var draft = CategoryEditorDraft.empty
     @State private var isEditorPresented = false
 
@@ -34,7 +35,15 @@ struct CategoryManagementPage: View {
                     HStack(spacing: 12) {
                         DraftVisualBadge(iconName: category.iconName, colorHex: category.colorHex)
 
-                        Text(category.name)
+                        HStack(spacing: 6) {
+                            Text(category.name)
+
+                            if category.isDefault {
+                                Text("management.defaultBadge")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
 
                         Spacer()
 
@@ -46,13 +55,23 @@ struct CategoryManagementPage: View {
                         .buttonStyle(.borderless)
                         .accessibilityLabel(Text("management.action.edit"))
 
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
-                            _ = draftStore.deleteCategory(id: category.id)
+                            deletingCategory = category
                         } label: {
-                            Image(systemName: "trash")
+                            Label("management.action.delete", systemImage: "trash")
                         }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel(Text("management.action.delete"))
+                        .tint(.red)
+
+                        if !category.isDefault {
+                            Button {
+                                draftStore.setDefaultCategory(id: category.id)
+                            } label: {
+                                Label("management.action.setDefault", systemImage: "checkmark.circle")
+                            }
+                            .tint(.accentColor)
+                        }
                     }
                     .padding(.vertical, 4)
                 }
@@ -98,6 +117,28 @@ struct CategoryManagementPage: View {
                 }
             )
         }
+        .confirmationDialog(
+            Text("management.category.delete.confirm.title"),
+            isPresented: Binding(
+                get: { deletingCategory != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        deletingCategory = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("management.action.delete", role: .destructive) {
+                deletePendingCategory()
+            }
+
+            Button("common.cancel", role: .cancel) {
+                deletingCategory = nil
+            }
+        } message: {
+            Text("management.category.delete.confirm.message")
+        }
     }
 
     private func beginAdding() {
@@ -130,6 +171,15 @@ struct CategoryManagementPage: View {
         }
 
         isEditorPresented = false
+    }
+
+    private func deletePendingCategory() {
+        guard let deletingCategory else {
+            return
+        }
+
+        _ = draftStore.deleteCategory(id: deletingCategory.id)
+        self.deletingCategory = nil
     }
 }
 

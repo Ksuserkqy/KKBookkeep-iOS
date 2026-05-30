@@ -196,19 +196,32 @@ struct RecordPage: View {
     private func normalizeSelections() {
         let accounts = draftStore.accounts
         if !accounts.contains(where: { $0.id == selectedAccountId }) {
-            selectedAccountId = accounts.first?.id ?? ""
+            selectedAccountId = defaultAccountId(in: accounts)
         }
         if !accounts.contains(where: { $0.id == selectedFromAccountId }) {
-            selectedFromAccountId = accounts.first?.id ?? ""
+            selectedFromAccountId = defaultAccountId(in: accounts)
         }
         if !accounts.contains(where: { $0.id == selectedToAccountId }) {
-            selectedToAccountId = accounts.dropFirst().first?.id ?? accounts.first?.id ?? ""
+            selectedToAccountId = defaultTransferDestinationAccountId(in: accounts)
         }
 
         let categories = draftStore.categories(for: selectedKind)
         if selectedKind != .transfer, !categories.contains(where: { $0.id == selectedCategoryId }) {
-            selectedCategoryId = categories.first?.id ?? ""
+            selectedCategoryId = defaultCategoryId(in: categories)
         }
+    }
+
+    private func defaultAccountId(in accounts: [DraftAccount]) -> String {
+        accounts.first { $0.isDefault }?.id ?? accounts.first?.id ?? ""
+    }
+
+    private func defaultTransferDestinationAccountId(in accounts: [DraftAccount]) -> String {
+        let defaultId = defaultAccountId(in: accounts)
+        return accounts.first { $0.id != defaultId }?.id ?? defaultId
+    }
+
+    private func defaultCategoryId(in categories: [DraftCategory]) -> String {
+        categories.first { $0.isDefault }?.id ?? categories.first?.id ?? ""
     }
 
     private var accountSelectionItems: [RecordVisualSelectionItem] {

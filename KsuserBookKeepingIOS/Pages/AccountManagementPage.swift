@@ -3,6 +3,7 @@ import SwiftUI
 struct AccountManagementPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @State private var editingAccount: DraftAccount?
+    @State private var deletingAccount: DraftAccount?
     @State private var draft = AccountEditorDraft.empty
     @State private var isEditorPresented = false
 
@@ -59,13 +60,23 @@ struct AccountManagementPage: View {
                         .buttonStyle(.borderless)
                         .accessibilityLabel(Text("management.action.edit"))
 
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
-                            _ = draftStore.deleteAccount(id: account.id)
+                            deletingAccount = account
                         } label: {
-                            Image(systemName: "trash")
+                            Label("management.action.delete", systemImage: "trash")
                         }
-                        .buttonStyle(.borderless)
-                        .accessibilityLabel(Text("management.action.delete"))
+                        .tint(.red)
+
+                        if !account.isDefault {
+                            Button {
+                                draftStore.setDefaultAccount(id: account.id)
+                            } label: {
+                                Label("management.action.setDefault", systemImage: "checkmark.circle")
+                            }
+                            .tint(.accentColor)
+                        }
                     }
                     .padding(.vertical, 4)
                 }
@@ -110,6 +121,28 @@ struct AccountManagementPage: View {
                 }
             )
         }
+        .confirmationDialog(
+            Text("management.account.delete.confirm.title"),
+            isPresented: Binding(
+                get: { deletingAccount != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        deletingAccount = nil
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("management.action.delete", role: .destructive) {
+                deletePendingAccount()
+            }
+
+            Button("common.cancel", role: .cancel) {
+                deletingAccount = nil
+            }
+        } message: {
+            Text("management.account.delete.confirm.message")
+        }
     }
 
     private func beginAdding() {
@@ -149,6 +182,15 @@ struct AccountManagementPage: View {
                 isEditorPresented = false
             }
         }
+    }
+
+    private func deletePendingAccount() {
+        guard let deletingAccount else {
+            return
+        }
+
+        _ = draftStore.deleteAccount(id: deletingAccount.id)
+        self.deletingAccount = nil
     }
 }
 

@@ -62,6 +62,7 @@
 "management.action.rename" = "Rename";
 "management.action.edit" = "Edit";
 "management.action.delete" = "Delete";
+"management.action.setDefault" = "Set Default";
 "management.icon" = "Icon";
 "management.icon.more" = "More Icons";
 "management.icon.more.short" = "More";
@@ -169,6 +170,9 @@
 "management.account.type.other" = "Other Account";
 "management.account.saved" = "Account saved.";
 "management.account.deleted" = "Account deleted.";
+"management.account.defaultSet" = "Default account updated.";
+"management.account.delete.confirm.title" = "Delete Account?";
+"management.account.delete.confirm.message" = "This account will be removed from local drafts.";
 "management.account.error.lastItem" = "Keep at least one account.";
 "management.account.error.invalidBalance" = "Enter a valid account balance with up to two decimal places.";
 "management.account.default.cash" = "Cash";
@@ -186,6 +190,9 @@
 "management.category.name.placeholder" = "Category name";
 "management.category.saved" = "Category saved.";
 "management.category.deleted" = "Category deleted.";
+"management.category.defaultSet" = "Default category updated.";
+"management.category.delete.confirm.title" = "Delete Category?";
+"management.category.delete.confirm.message" = "This category will be removed from local drafts.";
 "management.category.error.lastItem" = "Keep at least one category for each type.";
 "management.category.default.food" = "Food";
 "management.category.default.transport" = "Transport";

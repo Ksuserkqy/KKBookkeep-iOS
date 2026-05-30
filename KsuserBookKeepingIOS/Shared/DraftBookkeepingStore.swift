@@ -78,6 +78,7 @@ struct DraftAccount: Codable, Identifiable, Equatable {
 struct DraftCategory: Codable, Identifiable, Equatable {
     var id: String
     var name: String
+    var isDefault: Bool
     var kind: DraftEntryKind
     var iconName: String
     var colorHex: String
@@ -85,12 +86,14 @@ struct DraftCategory: Codable, Identifiable, Equatable {
     init(
         id: String,
         name: String,
+        isDefault: Bool = false,
         kind: DraftEntryKind,
         iconName: String = "tag",
         colorHex: String = "#F6C343"
     ) {
         self.id = id
         self.name = name
+        self.isDefault = isDefault
         self.kind = kind
         self.iconName = iconName
         self.colorHex = colorHex
@@ -100,6 +103,7 @@ struct DraftCategory: Codable, Identifiable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(String.self, forKey: .id)
         self.name = try container.decode(String.self, forKey: .name)
+        self.isDefault = try container.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
         self.kind = try container.decode(DraftEntryKind.self, forKey: .kind)
         self.iconName = try container.decodeIfPresent(String.self, forKey: .iconName) ?? ""
         self.colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? ""
@@ -174,6 +178,7 @@ final class DraftBookkeepingStore: ObservableObject {
         self.lastDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
 
         normalizeDefaultNames()
+        normalizeDefaultSelections()
         persistAccounts()
         persistCategories()
     }
@@ -262,6 +267,18 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
     }
 
+    func setDefaultAccount(id: String) {
+        guard accounts.contains(where: { $0.id == id }) else { return }
+
+        accounts = accounts.map { account in
+            var updated = account
+            updated.isDefault = account.id == id
+            return updated
+        }
+        persistAccounts()
+        messageKey = "management.account.defaultSet"
+    }
+
     func deleteAccount(id: String) -> Bool {
         guard accounts.count > 1 else {
             messageKey = "management.account.error.lastItem"
@@ -269,6 +286,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         accounts.removeAll { $0.id == id }
+        normalizeDefaultAccounts()
         persistAccounts()
         normalizeLastDraftAfterAccountDeletion(id: id)
         messageKey = "management.account.deleted"
@@ -322,6 +340,20 @@ final class DraftBookkeepingStore: ObservableObject {
         persistCategories()
     }
 
+    func setDefaultCategory(id: String) {
+        guard let selectedCategory = categories.first(where: { $0.id == id }) else { return }
+
+        categories = categories.map { category in
+            var updated = category
+            if category.kind == selectedCategory.kind {
+                updated.isDefault = category.id == id
+            }
+            return updated
+        }
+        persistCategories()
+        messageKey = "management.category.defaultSet"
+    }
+
     func deleteCategory(id: String) -> Bool {
         guard let category = categories.first(where: { $0.id == id }) else { return false }
         guard categories(for: category.kind).count > 1 else {
@@ -330,6 +362,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         categories.removeAll { $0.id == id }
+        normalizeDefaultCategories(kind: category.kind)
         persistCategories()
         normalizeLastDraftAfterCategoryDeletion(id: id)
         messageKey = "management.category.deleted"
@@ -388,6 +421,40 @@ final class DraftBookkeepingStore: ObservableObject {
 
             normalized.name = Self.localized(key)
             return normalizedCategoryMetadata(normalized)
+        }
+    }
+
+    private func normalizeDefaultSelections() {
+        normalizeDefaultAccounts()
+        for kind in [DraftEntryKind.expense, .income] {
+            normalizeDefaultCategories(kind: kind)
+        }
+    }
+
+    private func normalizeDefaultAccounts() {
+        let selectedDefaultId = accounts.first { $0.isDefault }?.id ?? accounts.first?.id
+
+        accounts = accounts.map { account in
+            var normalized = account
+            normalized.isDefault = account.id == selectedDefaultId
+            return normalized
+        }
+    }
+
+    private func normalizeDefaultCategories(kind: DraftEntryKind) {
+        let categoryIds = categories.filter { $0.kind == kind }.map(\.id)
+        guard let fallbackId = categoryIds.first else { return }
+
+        let selectedDefaultId = categories.first { category in
+            category.kind == kind && category.isDefault
+        }?.id ?? fallbackId
+
+        categories = categories.map { category in
+            var normalized = category
+            if category.kind == kind {
+                normalized.isDefault = category.id == selectedDefaultId
+            }
+            return normalized
         }
     }
 
