@@ -69,37 +69,43 @@ final class ProfileStore: ObservableObject {
         }
     }
 
-    func backupNow(configuration: SyncConfiguration, secrets: SyncSecrets) async {
+    @discardableResult
+    func backupNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
         guard configuration.backupEnabled else {
             messageKey = "profile.sync.error.backupDisabled"
-            return
+            return false
         }
 
         do {
             try await syncService.backup(profile: profile, configuration: configuration, secrets: secrets)
             messageKey = "profile.sync.backupSucceeded"
+            return true
         } catch {
             messageKey = "profile.sync.error.backupFailed"
+            return false
         }
     }
 
-    func importNow(configuration: SyncConfiguration, secrets: SyncSecrets) async {
+    @discardableResult
+    func importNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
         guard configuration.backupEnabled else {
             messageKey = "profile.sync.error.backupDisabled"
-            return
+            return false
         }
 
         do {
             guard let remoteProfile = try await syncService.importProfile(configuration: configuration, secrets: secrets) else {
                 messageKey = "profile.sync.importNoRemoteProfile"
-                return
+                return true
             }
 
             try repository.save(remoteProfile)
             profile = remoteProfile
             messageKey = "profile.sync.importSucceeded"
+            return true
         } catch {
             messageKey = "profile.sync.error.importFailed"
+            return false
         }
     }
 
@@ -191,7 +197,7 @@ struct ProfileSyncService {
     private let profilePath = "KKBookKeep/v1/profile/personal-profile.json"
 
     func backup(profile: PersonalProfile, configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
-        let storage = try storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
+        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
         var data = try Self.encoder.encode(PersonalProfileSyncDocument(profile: profile))
 
         if configuration.encryptionEnabled {
@@ -202,7 +208,7 @@ struct ProfileSyncService {
     }
 
     func importProfile(configuration: SyncConfiguration, secrets: SyncSecrets) async throws -> PersonalProfile? {
-        let storage = try storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
+        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
 
         do {
             let remoteData = try await storage.readFile(at: profilePath)
@@ -214,28 +220,10 @@ struct ProfileSyncService {
     }
 
     func testConnection(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
-        let storage = try storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
+        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
         let testPath = "KKBookKeep/v1/profile/.connection-test.json"
         try await storage.writeFileAtomic(Data("{\"ok\":true}".utf8), to: testPath)
         try await storage.deleteFile(at: testPath)
-    }
-
-    private func storage(for configuration: SyncConfiguration, webDAVSecret: String) throws -> any SyncStorage {
-        switch configuration.provider {
-        case .iCloudDrive:
-            throw SyncStorageError.providerUnavailable
-        case .webDAV:
-            guard !configuration.webDAVServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw SyncStorageError.webDAVNotConfigured
-            }
-
-            return WebDAVSyncStorage(
-                serverURL: configuration.webDAVServerURL,
-                authentication: configuration.webDAVAuthentication,
-                username: configuration.webDAVUsername,
-                secret: webDAVSecret
-            )
-        }
     }
 
     private static let encoder: JSONEncoder = {

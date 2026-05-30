@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SyncSettingsPage: View {
     @EnvironmentObject private var profileStore: ProfileStore
+    @EnvironmentObject private var draftBookkeepingStore: DraftBookkeepingStore
     @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
 
     @State private var backupEnabled = false
@@ -159,7 +160,7 @@ struct SyncSettingsPage: View {
                 }
                 .disabled(isRunningSyncAction)
             } footer: {
-                if let messageKey = settingsMessageKey ?? profileStore.messageKey {
+                if let messageKey = settingsMessageKey ?? profileStore.messageKey ?? draftBookkeepingStore.messageKey {
                     Text(LocalizedStringKey(messageKey))
                 }
             }
@@ -246,12 +247,14 @@ struct SyncSettingsPage: View {
             try syncSettingsStore.save(draft)
 
             if configuration.backupEnabled {
-                await profileStore.backupNow(
+                let secrets = currentSyncSecrets()
+                let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
+                let metadataBackedUp = await draftBookkeepingStore.backupMetadataNow(
                     configuration: configuration,
-                    secrets: currentSyncSecrets()
+                    secrets: secrets
                 )
 
-                if profileStore.messageKey == "profile.sync.backupSucceeded" {
+                if profileBackedUp, metadataBackedUp {
                     try? syncSettingsStore.markBackupCompleted()
                     showSettingsMessage("sync.settings.savedAndBackedUp")
                 } else {
@@ -278,23 +281,33 @@ struct SyncSettingsPage: View {
 
     private func backupProfileNow() async {
         await runSyncAction {
-            await profileStore.backupNow(
-                configuration: savedOrCurrentConfiguration(),
-                secrets: currentSyncSecrets()
+            let configuration = savedOrCurrentConfiguration()
+            let secrets = currentSyncSecrets()
+            let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
+            let metadataBackedUp = await draftBookkeepingStore.backupMetadataNow(
+                configuration: configuration,
+                secrets: secrets
             )
 
-            if profileStore.messageKey == "profile.sync.backupSucceeded" {
+            if profileBackedUp, metadataBackedUp {
                 try? syncSettingsStore.markBackupCompleted()
+                showSettingsMessage("sync.backup.succeeded")
+            } else {
+                showSettingsMessage("sync.backup.error.failed")
             }
         }
     }
 
     private func importProfileNow() async {
         await runSyncAction {
-            await profileStore.importNow(
-                configuration: savedOrCurrentConfiguration(),
-                secrets: currentSyncSecrets()
+            let configuration = savedOrCurrentConfiguration()
+            let secrets = currentSyncSecrets()
+            let profileImported = await profileStore.importNow(configuration: configuration, secrets: secrets)
+            let metadataImported = await draftBookkeepingStore.importMetadataNow(
+                configuration: configuration,
+                secrets: secrets
             )
+            showSettingsMessage(profileImported && metadataImported ? "sync.import.completed" : "sync.import.error.failed")
         }
     }
 

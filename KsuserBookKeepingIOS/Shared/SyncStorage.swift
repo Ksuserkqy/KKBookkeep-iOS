@@ -16,6 +16,26 @@ enum SyncStorageError: Error {
     case unexpectedHTTPStatus(Int)
 }
 
+enum SyncStorageFactory {
+    static func storage(for configuration: SyncConfiguration, webDAVSecret: String) throws -> any SyncStorage {
+        switch configuration.provider {
+        case .iCloudDrive:
+            throw SyncStorageError.providerUnavailable
+        case .webDAV:
+            guard !configuration.webDAVServerURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw SyncStorageError.webDAVNotConfigured
+            }
+
+            return WebDAVSyncStorage(
+                serverURL: configuration.webDAVServerURL,
+                authentication: configuration.webDAVAuthentication,
+                username: configuration.webDAVUsername,
+                secret: webDAVSecret
+            )
+        }
+    }
+}
+
 struct WebDAVSyncStorage: SyncStorage {
     let serverURL: String
     let authentication: WebDAVAuthentication

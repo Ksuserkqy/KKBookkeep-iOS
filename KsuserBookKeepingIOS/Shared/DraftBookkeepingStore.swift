@@ -189,28 +189,54 @@ final class DraftBookkeepingStore: ObservableObject {
     @Published private(set) var categories: [DraftCategory]
     @Published private(set) var lastDraft: DraftTransaction?
     @Published private(set) var messageKey: String?
+    @Published private(set) var localMetadataChangeToken = 0
 
     private let defaults: UserDefaults
+    private let syncService: BookkeepingMetadataSyncService
+    private var metadataRevision: Int
+    private var metadataUpdatedAt: Date
+    private var metadataUpdatedByDeviceId: String
 
     private enum DefaultsKey {
         static let accounts = "draftBookkeeping.accounts"
         static let categories = "draftBookkeeping.categories"
         static let lastDraft = "draftBookkeeping.lastDraft"
+        static let metadataRevision = "draftBookkeeping.metadata.revision"
+        static let metadataUpdatedAt = "draftBookkeeping.metadata.updatedAt"
+        static let metadataUpdatedByDeviceId = "draftBookkeeping.metadata.updatedByDeviceId"
     }
 
     private static let maxCategoryDepth = 3
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = .standard, syncService: BookkeepingMetadataSyncService = BookkeepingMetadataSyncService()) {
         self.defaults = defaults
+        self.syncService = syncService
+        let hasStoredAccounts = defaults.data(forKey: DefaultsKey.accounts) != nil
+        let hasStoredCategories = defaults.data(forKey: DefaultsKey.categories) != nil
+        let hasStoredMetadata = defaults.object(forKey: DefaultsKey.metadataRevision) != nil
         self.accounts = Self.load([DraftAccount].self, forKey: DefaultsKey.accounts, from: defaults) ?? Self.defaultAccounts
         self.categories = Self.load([DraftCategory].self, forKey: DefaultsKey.categories, from: defaults) ?? Self.defaultCategories
         self.lastDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
+        if hasStoredMetadata {
+            self.metadataRevision = defaults.integer(forKey: DefaultsKey.metadataRevision)
+            self.metadataUpdatedAt = defaults.object(forKey: DefaultsKey.metadataUpdatedAt) as? Date ?? Date(timeIntervalSince1970: 0)
+            self.metadataUpdatedByDeviceId = defaults.string(forKey: DefaultsKey.metadataUpdatedByDeviceId) ?? DeviceIdentity.currentDeviceId
+        } else if hasStoredAccounts || hasStoredCategories {
+            self.metadataRevision = 1
+            self.metadataUpdatedAt = Date()
+            self.metadataUpdatedByDeviceId = DeviceIdentity.currentDeviceId
+        } else {
+            self.metadataRevision = 0
+            self.metadataUpdatedAt = Date(timeIntervalSince1970: 0)
+            self.metadataUpdatedByDeviceId = DeviceIdentity.currentDeviceId
+        }
 
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
         persistAccounts()
         persistCategories()
+        persistMetadata()
     }
 
     func clearMessage() {
@@ -306,6 +332,64 @@ final class DraftBookkeepingStore: ObservableObject {
         messageKey = "record.draft.saved"
     }
 
+    func backupMetadataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.metadata.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            try await syncService.backup(
+                document: makeMetadataDocument(),
+                configuration: configuration,
+                secrets: secrets
+            )
+            messageKey = "bookkeeping.metadata.sync.backupSucceeded"
+            return true
+        } catch {
+            messageKey = "bookkeeping.metadata.sync.error.backupFailed"
+            return false
+        }
+    }
+
+    func importMetadataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.metadata.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            guard let remoteDocument = try await syncService.importDocument(configuration: configuration, secrets: secrets) else {
+                messageKey = "bookkeeping.metadata.sync.importNoRemoteMetadata"
+                return true
+            }
+
+            applyRemoteMetadata(remoteDocument)
+            messageKey = "bookkeeping.metadata.sync.importSucceeded"
+            return true
+        } catch {
+            messageKey = "bookkeeping.metadata.sync.error.importFailed"
+            return false
+        }
+    }
+
+    func importIfRemoteMetadataIsNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
+        guard configuration.backupEnabled else { return }
+
+        do {
+            guard let remoteDocument = try await syncService.importDocument(configuration: configuration, secrets: secrets) else {
+                return
+            }
+
+            guard remoteDocument.isNewer(than: makeMetadataDocument()) else { return }
+
+            applyRemoteMetadata(remoteDocument)
+            messageKey = "bookkeeping.metadata.sync.importSucceeded"
+        } catch {
+            return
+        }
+    }
+
     func addAccount(name: String, type: DraftAccountType, iconName: String, colorHex: String, balanceText: String, note: String) -> Bool {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return false }
@@ -325,6 +409,7 @@ final class DraftBookkeepingStore: ObservableObject {
             note: note.trimmingCharacters(in: .whitespacesAndNewlines)
         ))
         persistAccounts()
+        markMetadataChanged()
         messageKey = "management.account.saved"
         return true
     }
@@ -345,6 +430,7 @@ final class DraftBookkeepingStore: ObservableObject {
         accounts[index].balanceText = normalizedBalanceText
         accounts[index].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
         persistAccounts()
+        markMetadataChanged()
         messageKey = "management.account.saved"
         return true
     }
@@ -352,6 +438,7 @@ final class DraftBookkeepingStore: ObservableObject {
     func moveAccounts(from source: IndexSet, to destination: Int) {
         accounts.move(fromOffsets: source, toOffset: destination)
         persistAccounts()
+        markMetadataChanged()
     }
 
     func setDefaultAccount(id: String) {
@@ -363,6 +450,7 @@ final class DraftBookkeepingStore: ObservableObject {
             return updated
         }
         persistAccounts()
+        markMetadataChanged()
         messageKey = "management.account.defaultSet"
     }
 
@@ -376,6 +464,7 @@ final class DraftBookkeepingStore: ObservableObject {
         normalizeDefaultAccounts()
         persistAccounts()
         normalizeLastDraftAfterAccountDeletion(id: id)
+        markMetadataChanged()
         messageKey = "management.account.deleted"
         return true
     }
@@ -398,6 +487,7 @@ final class DraftBookkeepingStore: ObservableObject {
             colorHex: colorHex
         ))
         persistCategories()
+        markMetadataChanged()
         messageKey = "management.category.saved"
         return true
     }
@@ -422,6 +512,7 @@ final class DraftBookkeepingStore: ObservableObject {
         categories[index].colorHex = colorHex
         normalizeDefaultCategories(kind: kind)
         persistCategories()
+        markMetadataChanged()
         messageKey = "management.category.saved"
         return true
     }
@@ -431,7 +522,8 @@ final class DraftBookkeepingStore: ObservableObject {
         let movedCategories = source.compactMap { index in
             visibleCategories.indices.contains(index) ? visibleCategories[index] : nil
         }
-        guard let parentId = movedCategories.first?.parentId else { return }
+        guard let firstMovedCategory = movedCategories.first else { return }
+        let parentId = firstMovedCategory.parentId
         guard movedCategories.allSatisfy({ $0.parentId == parentId }) else { return }
 
         var reorderedVisibleCategories = visibleCategories
@@ -456,6 +548,7 @@ final class DraftBookkeepingStore: ObservableObject {
             return categoriesById[reorderedId] ?? category
         }
         persistCategories()
+        markMetadataChanged()
     }
 
     func setDefaultCategory(id: String) {
@@ -470,6 +563,7 @@ final class DraftBookkeepingStore: ObservableObject {
             return updated
         }
         persistCategories()
+        markMetadataChanged()
         messageKey = "management.category.defaultSet"
     }
 
@@ -489,6 +583,7 @@ final class DraftBookkeepingStore: ObservableObject {
         normalizeDefaultCategories(kind: category.kind)
         persistCategories()
         normalizeLastDraftAfterCategoryDeletion(ids: deletedIds)
+        markMetadataChanged()
         messageKey = "management.category.deleted"
         return true
     }
@@ -516,6 +611,69 @@ final class DraftBookkeepingStore: ObservableObject {
         draft.categoryId = nil
         lastDraft = draft
         persistLastDraft()
+    }
+
+    private func makeMetadataDocument() -> BookkeepingMetadataSyncDocument {
+        BookkeepingMetadataSyncDocument(
+            revision: metadataRevision,
+            updatedAt: metadataUpdatedAt,
+            updatedByDeviceId: metadataUpdatedByDeviceId,
+            accounts: accounts,
+            categories: categories
+        )
+    }
+
+    private func applyRemoteMetadata(_ document: BookkeepingMetadataSyncDocument) {
+        accounts = document.accounts.isEmpty ? Self.defaultAccounts : document.accounts
+        categories = document.categories.isEmpty ? Self.defaultCategories : document.categories
+        metadataRevision = document.revision
+        metadataUpdatedAt = document.updatedAt
+        metadataUpdatedByDeviceId = document.updatedByDeviceId
+
+        normalizeDefaultNames()
+        normalizeCategoryHierarchy()
+        normalizeDefaultSelections()
+        normalizeLastDraftAfterMetadataImport()
+        persistAccounts()
+        persistCategories()
+        persistLastDraft()
+        persistMetadata()
+    }
+
+    private func markMetadataChanged(at date: Date = Date()) {
+        metadataRevision += 1
+        metadataUpdatedAt = date
+        metadataUpdatedByDeviceId = DeviceIdentity.currentDeviceId
+        persistMetadata()
+        localMetadataChangeToken += 1
+    }
+
+    private func persistMetadata() {
+        defaults.set(metadataRevision, forKey: DefaultsKey.metadataRevision)
+        defaults.set(metadataUpdatedAt, forKey: DefaultsKey.metadataUpdatedAt)
+        defaults.set(metadataUpdatedByDeviceId, forKey: DefaultsKey.metadataUpdatedByDeviceId)
+    }
+
+    private func normalizeLastDraftAfterMetadataImport() {
+        guard var draft = lastDraft else { return }
+
+        let accountIds = Set(accounts.map(\.id))
+        let categoryIds = Set(categories.map(\.id))
+
+        if let accountId = draft.accountId, !accountIds.contains(accountId) {
+            draft.accountId = nil
+        }
+        if let fromAccountId = draft.fromAccountId, !accountIds.contains(fromAccountId) {
+            draft.fromAccountId = nil
+        }
+        if let toAccountId = draft.toAccountId, !accountIds.contains(toAccountId) {
+            draft.toAccountId = nil
+        }
+        if let categoryId = draft.categoryId, !categoryIds.contains(categoryId) {
+            draft.categoryId = nil
+        }
+
+        lastDraft = draft
     }
 
     private func hierarchyItems(from category: DraftCategory, depth: Int, visitedIds: Set<String>) -> [DraftCategoryHierarchyItem] {
