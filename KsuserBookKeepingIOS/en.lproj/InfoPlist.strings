@@ -1,3 +1,4 @@
 "CFBundleDisplayName" = "KKBookkeep";
 "CFBundleName" = "KKBookkeep";
 "NSFaceIDUsageDescription" = "Used to unlock KKBookkeep.";
+"NSLocationWhenInUseUsageDescription" = "Used to record your current location when you choose to add it to an entry.";

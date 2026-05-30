@@ -3,6 +3,7 @@ import SwiftUI
 struct RecordPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @Binding var selectedTab: AppTab
+    @StateObject private var locationProvider = CurrentLocationProvider()
 
     @State private var selectedKind = DraftEntryKind.expense
     @State private var amountText = ""
@@ -13,6 +14,9 @@ struct RecordPage: View {
     @State private var selectedToAccountId = ""
     @State private var date = Date()
     @State private var note = ""
+    @State private var location: DraftLocation?
+    @State private var isLocating = false
+    @State private var locationMessageKey: String?
     @State private var errorKey: String?
 
     var body: some View {
@@ -184,12 +188,64 @@ struct RecordPage: View {
 
     private var detailSection: some View {
         Section {
-            DatePicker("record.date", selection: $date, displayedComponents: [.date])
+            DatePicker("record.dateTime", selection: $date, displayedComponents: [.date, .hourAndMinute])
+
+            locationRow
 
             TextField("record.note.placeholder", text: $note, axis: .vertical)
                 .lineLimit(2...4)
         } header: {
             Text("record.section.detail")
+        }
+    }
+
+    @ViewBuilder
+    private var locationRow: some View {
+        if let location {
+            VStack(alignment: .leading, spacing: 8) {
+                Label {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(location.displayName)
+                            .foregroundStyle(.primary)
+
+                        Text(location.coordinateText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "location.fill")
+                        .foregroundStyle(.tint)
+                }
+
+                Button(role: .destructive) {
+                    self.location = nil
+                    locationMessageKey = nil
+                } label: {
+                    Label("record.location.remove", systemImage: "xmark.circle")
+                }
+                .font(.subheadline)
+            }
+        } else {
+            Button {
+                captureLocation()
+            } label: {
+                HStack {
+                    Label("record.location.capture", systemImage: "location")
+
+                    Spacer()
+
+                    if isLocating {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(isLocating)
+        }
+
+        if let locationMessageKey {
+            Text(LocalizedStringKey(locationMessageKey))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -236,12 +292,15 @@ struct RecordPage: View {
     }
 
     private func categorySelectionItems(for kind: DraftEntryKind) -> [RecordVisualSelectionItem] {
-        draftStore.categories(for: kind).map { category in
-            RecordVisualSelectionItem(
+        draftStore.categoryHierarchyItems(for: kind).map { item in
+            let category = item.category
+
+            return RecordVisualSelectionItem(
                 id: category.id,
                 name: category.name,
                 iconName: category.iconName,
-                colorHex: category.colorHex
+                colorHex: category.colorHex,
+                depth: item.depth
             )
         }
     }
@@ -251,7 +310,16 @@ struct RecordPage: View {
     }
 
     private func categorySelectionItem(for id: String) -> RecordVisualSelectionItem {
-        categorySelectionItems(for: selectedKind).first { $0.id == id } ?? Self.unselectedSelectionItem
+        guard let category = draftStore.categories.first(where: { $0.id == id }) else {
+            return Self.unselectedSelectionItem
+        }
+
+        return RecordVisualSelectionItem(
+            id: category.id,
+            name: draftStore.categoryDisplayName(for: category.id),
+            iconName: category.iconName,
+            colorHex: category.colorHex
+        )
     }
 
     private static var unselectedSelectionItem: RecordVisualSelectionItem {
@@ -259,7 +327,8 @@ struct RecordPage: View {
             id: "",
             name: NSLocalizedString("record.picker.unselected", comment: ""),
             iconName: "circle-question",
-            colorHex: "#64748B"
+            colorHex: "#64748B",
+            depth: 1
         )
     }
 
@@ -315,12 +384,33 @@ struct RecordPage: View {
             toAccountId: selectedKind == .transfer ? selectedToAccountId : nil,
             date: date,
             note: trimmedNote,
+            location: location,
             createdAt: Date()
         )
 
         draftStore.saveDraft(draft)
         errorKey = nil
         selectedTab = .transactions
+    }
+
+    private func captureLocation() {
+        guard !isLocating else { return }
+
+        isLocating = true
+        locationMessageKey = "record.location.locating"
+
+        Task {
+            do {
+                location = try await locationProvider.captureLocation()
+                locationMessageKey = nil
+            } catch CurrentLocationProvider.ProviderError.denied {
+                locationMessageKey = "record.location.error.denied"
+            } catch {
+                locationMessageKey = "record.location.error.unavailable"
+            }
+
+            isLocating = false
+        }
     }
 
     private func isPositiveAmount(_ text: String) -> Bool {
@@ -344,6 +434,7 @@ private struct RecordVisualSelectionItem: Identifiable, Equatable {
     let name: String
     let iconName: String
     let colorHex: String
+    var depth: Int = 1
 }
 
 private struct RecordVisualSelectionRow: View {
@@ -381,6 +472,9 @@ private struct RecordVisualSelectionPage: View {
                 dismiss()
             } label: {
                 HStack(spacing: 12) {
+                    Spacer()
+                        .frame(width: CGFloat(item.depth - 1) * 24)
+
                     DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex)
 
                     Text(item.name)

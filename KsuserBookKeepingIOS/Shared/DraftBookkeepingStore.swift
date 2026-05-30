@@ -80,6 +80,7 @@ struct DraftCategory: Codable, Identifiable, Equatable {
     var name: String
     var isDefault: Bool
     var kind: DraftEntryKind
+    var parentId: String?
     var iconName: String
     var colorHex: String
 
@@ -88,6 +89,7 @@ struct DraftCategory: Codable, Identifiable, Equatable {
         name: String,
         isDefault: Bool = false,
         kind: DraftEntryKind,
+        parentId: String? = nil,
         iconName: String = "tag",
         colorHex: String = "#F6C343"
     ) {
@@ -95,6 +97,7 @@ struct DraftCategory: Codable, Identifiable, Equatable {
         self.name = name
         self.isDefault = isDefault
         self.kind = kind
+        self.parentId = parentId
         self.iconName = iconName
         self.colorHex = colorHex
     }
@@ -105,8 +108,18 @@ struct DraftCategory: Codable, Identifiable, Equatable {
         self.name = try container.decode(String.self, forKey: .name)
         self.isDefault = try container.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
         self.kind = try container.decode(DraftEntryKind.self, forKey: .kind)
+        self.parentId = try container.decodeIfPresent(String.self, forKey: .parentId)
         self.iconName = try container.decodeIfPresent(String.self, forKey: .iconName) ?? ""
         self.colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? ""
+    }
+}
+
+struct DraftCategoryHierarchyItem: Identifiable, Equatable {
+    let category: DraftCategory
+    let depth: Int
+
+    var id: String {
+        category.id
     }
 }
 
@@ -153,7 +166,21 @@ struct DraftTransaction: Codable, Identifiable, Equatable {
     var toAccountId: String?
     var date: Date
     var note: String
+    var location: DraftLocation?
     var createdAt: Date
+}
+
+struct DraftLocation: Codable, Equatable {
+    var displayName: String
+    var address: String
+    var latitude: Double
+    var longitude: Double
+    var horizontalAccuracy: Double
+    var capturedAt: Date
+
+    var coordinateText: String {
+        String(format: "%.5f, %.5f", latitude, longitude)
+    }
 }
 
 @MainActor
@@ -171,6 +198,8 @@ final class DraftBookkeepingStore: ObservableObject {
         static let lastDraft = "draftBookkeeping.lastDraft"
     }
 
+    private static let maxCategoryDepth = 3
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.accounts = Self.load([DraftAccount].self, forKey: DefaultsKey.accounts, from: defaults) ?? Self.defaultAccounts
@@ -178,6 +207,7 @@ final class DraftBookkeepingStore: ObservableObject {
         self.lastDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
 
         normalizeDefaultNames()
+        normalizeCategoryHierarchy()
         normalizeDefaultSelections()
         persistAccounts()
         persistCategories()
@@ -189,6 +219,59 @@ final class DraftBookkeepingStore: ObservableObject {
 
     func categories(for kind: DraftEntryKind) -> [DraftCategory] {
         categories.filter { $0.kind == kind }
+    }
+
+    func categoryHierarchyItems(for kind: DraftEntryKind) -> [DraftCategoryHierarchyItem] {
+        categories
+            .filter { $0.kind == kind && $0.parentId == nil }
+            .flatMap { hierarchyItems(from: $0, depth: 1, visitedIds: []) }
+    }
+
+    func childCategories(of id: String) -> [DraftCategory] {
+        categories.filter { $0.parentId == id }
+    }
+
+    func hasChildCategories(id: String) -> Bool {
+        categories.contains { $0.parentId == id }
+    }
+
+    func selectableParentItems(for kind: DraftEntryKind, excluding categoryId: String?) -> [DraftCategoryHierarchyItem] {
+        categoryHierarchyItems(for: kind).filter { item in
+            canUseParent(item.category.id, for: categoryId, kind: kind)
+        }
+    }
+
+    func canUseParent(_ parentId: String?, for categoryId: String?, kind: DraftEntryKind) -> Bool {
+        guard let parentId else {
+            return true
+        }
+
+        guard let parent = categories.first(where: { $0.id == parentId }) else {
+            return false
+        }
+        guard parent.kind == kind else {
+            return false
+        }
+        guard parent.id != categoryId else {
+            return false
+        }
+
+        let parentDepth = categoryDepth(for: parent.id)
+        guard parentDepth < Self.maxCategoryDepth else {
+            return false
+        }
+
+        if let categoryId {
+            guard !categoryDescendantIds(for: categoryId).contains(parent.id) else {
+                return false
+            }
+
+            let targetDepth = parentDepth + 1
+            let deepestMovedDepth = targetDepth + maxRelativeDescendantDepth(from: categoryId) - 1
+            return deepestMovedDepth <= Self.maxCategoryDepth
+        }
+
+        return true
     }
 
     func accountName(for id: String?) -> String {
@@ -203,14 +286,18 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     func categoryName(for id: String?) -> String {
+        categoryDisplayName(for: id)
+    }
+
+    func categoryDisplayName(for id: String?) -> String {
         guard
             let id,
-            let category = categories.first(where: { $0.id == id })
+            categories.contains(where: { $0.id == id })
         else {
             return NSLocalizedString("draft.item.missing", comment: "")
         }
 
-        return category.name
+        return categoryPath(for: id).map(\.name).joined(separator: " / ")
     }
 
     func saveDraft(_ draft: DraftTransaction) {
@@ -293,60 +380,92 @@ final class DraftBookkeepingStore: ObservableObject {
         return true
     }
 
-    func addCategory(name: String, kind: DraftEntryKind, iconName: String, colorHex: String) {
+    @discardableResult
+    func addCategory(name: String, kind: DraftEntryKind, parentId: String?, iconName: String, colorHex: String) -> Bool {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
+        guard !trimmedName.isEmpty else { return false }
+        guard canUseParent(parentId, for: nil, kind: kind) else {
+            messageKey = "management.category.error.invalidParent"
+            return false
+        }
 
         categories.append(DraftCategory(
             id: UUID().uuidString,
             name: trimmedName,
             kind: kind,
+            parentId: parentId,
             iconName: iconName,
             colorHex: colorHex
         ))
         persistCategories()
         messageKey = "management.category.saved"
+        return true
     }
 
-    func updateCategory(id: String, name: String, iconName: String, colorHex: String) {
+    @discardableResult
+    func updateCategory(id: String, name: String, parentId: String?, iconName: String, colorHex: String) -> Bool {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
+        guard !trimmedName.isEmpty else { return false }
 
-        guard let index = categories.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = categories.firstIndex(where: { $0.id == id }) else { return false }
+        let kind = categories[index].kind
+        guard canUseParent(parentId, for: id, kind: kind) else {
+            messageKey = "management.category.error.invalidParent"
+            return false
+        }
         categories[index].name = trimmedName
+        categories[index].parentId = parentId
+        if parentId != nil {
+            categories[index].isDefault = false
+        }
         categories[index].iconName = iconName
         categories[index].colorHex = colorHex
+        normalizeDefaultCategories(kind: kind)
         persistCategories()
         messageKey = "management.category.saved"
+        return true
     }
 
     func moveCategories(kind: DraftEntryKind, from source: IndexSet, to destination: Int) {
-        var visibleCategories = categories(for: kind)
-        visibleCategories.move(fromOffsets: source, toOffset: destination)
-
-        var reorderedCategories: [DraftCategory] = []
-        var movedCategoryIndex = visibleCategories.startIndex
-
-        for category in categories {
-            if category.kind == kind {
-                reorderedCategories.append(visibleCategories[movedCategoryIndex])
-                movedCategoryIndex = visibleCategories.index(after: movedCategoryIndex)
-            } else {
-                reorderedCategories.append(category)
-            }
+        let visibleCategories = categoryHierarchyItems(for: kind).map(\.category)
+        let movedCategories = source.compactMap { index in
+            visibleCategories.indices.contains(index) ? visibleCategories[index] : nil
         }
+        guard let parentId = movedCategories.first?.parentId else { return }
+        guard movedCategories.allSatisfy({ $0.parentId == parentId }) else { return }
 
-        categories = reorderedCategories
+        var reorderedVisibleCategories = visibleCategories
+        reorderedVisibleCategories.move(fromOffsets: source, toOffset: destination)
+
+        let reorderedSiblingIds = reorderedVisibleCategories
+            .filter { $0.kind == kind && $0.parentId == parentId }
+            .map(\.id)
+        let categoriesById = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
+        var reorderedSiblingIndex = reorderedSiblingIds.startIndex
+
+        categories = categories.map { category in
+            guard category.kind == kind, category.parentId == parentId else {
+                return category
+            }
+            guard reorderedSiblingIndex < reorderedSiblingIds.endIndex else {
+                return category
+            }
+
+            let reorderedId = reorderedSiblingIds[reorderedSiblingIndex]
+            reorderedSiblingIndex = reorderedSiblingIds.index(after: reorderedSiblingIndex)
+            return categoriesById[reorderedId] ?? category
+        }
         persistCategories()
     }
 
     func setDefaultCategory(id: String) {
         guard let selectedCategory = categories.first(where: { $0.id == id }) else { return }
+        guard selectedCategory.parentId == nil else { return }
 
         categories = categories.map { category in
             var updated = category
             if category.kind == selectedCategory.kind {
-                updated.isDefault = category.id == id
+                updated.isDefault = category.parentId == nil && category.id == id
             }
             return updated
         }
@@ -356,15 +475,20 @@ final class DraftBookkeepingStore: ObservableObject {
 
     func deleteCategory(id: String) -> Bool {
         guard let category = categories.first(where: { $0.id == id }) else { return false }
-        guard categories(for: category.kind).count > 1 else {
+        let deletedIds = categoryDescendantIds(for: id).union([id])
+        let remainingRootCount = categories.filter { item in
+            item.kind == category.kind && item.parentId == nil && !deletedIds.contains(item.id)
+        }.count
+
+        guard remainingRootCount > 0 else {
             messageKey = "management.category.error.lastItem"
             return false
         }
 
-        categories.removeAll { $0.id == id }
+        categories.removeAll { deletedIds.contains($0.id) }
         normalizeDefaultCategories(kind: category.kind)
         persistCategories()
-        normalizeLastDraftAfterCategoryDeletion(id: id)
+        normalizeLastDraftAfterCategoryDeletion(ids: deletedIds)
         messageKey = "management.category.deleted"
         return true
     }
@@ -386,12 +510,82 @@ final class DraftBookkeepingStore: ObservableObject {
         persistLastDraft()
     }
 
-    private func normalizeLastDraftAfterCategoryDeletion(id: String) {
-        guard var draft = lastDraft, draft.categoryId == id else { return }
+    private func normalizeLastDraftAfterCategoryDeletion(ids: Set<String>) {
+        guard var draft = lastDraft, let categoryId = draft.categoryId, ids.contains(categoryId) else { return }
 
         draft.categoryId = nil
         lastDraft = draft
         persistLastDraft()
+    }
+
+    private func hierarchyItems(from category: DraftCategory, depth: Int, visitedIds: Set<String>) -> [DraftCategoryHierarchyItem] {
+        guard !visitedIds.contains(category.id), depth <= Self.maxCategoryDepth else {
+            return []
+        }
+
+        let nextVisitedIds = visitedIds.union([category.id])
+        let children = categories.filter { child in
+            child.kind == category.kind && child.parentId == category.id
+        }
+
+        return [DraftCategoryHierarchyItem(category: category, depth: depth)] + children.flatMap { child in
+            hierarchyItems(from: child, depth: depth + 1, visitedIds: nextVisitedIds)
+        }
+    }
+
+    private func categoryDepth(for id: String) -> Int {
+        categoryPath(for: id).count
+    }
+
+    private func categoryPath(for id: String) -> [DraftCategory] {
+        guard let category = categories.first(where: { $0.id == id }) else {
+            return []
+        }
+
+        var path = [category]
+        var visitedIds = Set([category.id])
+        var currentCategory = category
+
+        while
+            let parentId = currentCategory.parentId,
+            !visitedIds.contains(parentId),
+            let parent = categories.first(where: { $0.id == parentId && $0.kind == category.kind })
+        {
+            path.append(parent)
+            visitedIds.insert(parent.id)
+            currentCategory = parent
+        }
+
+        return path.reversed()
+    }
+
+    private func categoryDescendantIds(for id: String) -> Set<String> {
+        var descendantIds = Set<String>()
+        var pendingIds = [id]
+
+        while let parentId = pendingIds.popLast() {
+            let children = categories.filter { $0.parentId == parentId }
+            for child in children where !descendantIds.contains(child.id) {
+                descendantIds.insert(child.id)
+                pendingIds.append(child.id)
+            }
+        }
+
+        return descendantIds
+    }
+
+    private func maxRelativeDescendantDepth(from id: String, visitedIds: Set<String> = []) -> Int {
+        guard !visitedIds.contains(id) else {
+            return 1
+        }
+
+        let nextVisitedIds = visitedIds.union([id])
+        let children = childCategories(of: id)
+        guard !children.isEmpty else {
+            return 1
+        }
+
+        return 1 + (children.map { maxRelativeDescendantDepth(from: $0.id, visitedIds: nextVisitedIds) }.max() ?? 0)
     }
 
     private func normalizeDefaultNames() {
@@ -442,19 +636,35 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func normalizeDefaultCategories(kind: DraftEntryKind) {
-        let categoryIds = categories.filter { $0.kind == kind }.map(\.id)
+        let categoryIds = categories.filter { $0.kind == kind && $0.parentId == nil }.map(\.id)
         guard let fallbackId = categoryIds.first else { return }
 
         let selectedDefaultId = categories.first { category in
-            category.kind == kind && category.isDefault
+            category.kind == kind && category.parentId == nil && category.isDefault
         }?.id ?? fallbackId
 
         categories = categories.map { category in
             var normalized = category
             if category.kind == kind {
-                normalized.isDefault = category.id == selectedDefaultId
+                normalized.isDefault = category.parentId == nil && category.id == selectedDefaultId
             }
             return normalized
+        }
+    }
+
+    private func normalizeCategoryHierarchy() {
+        for index in categories.indices {
+            guard let parentId = categories[index].parentId else {
+                continue
+            }
+
+            if !canUseParent(parentId, for: categories[index].id, kind: categories[index].kind) {
+                categories[index].parentId = nil
+            }
+
+            if categories[index].parentId != nil {
+                categories[index].isDefault = false
+            }
         }
     }
 

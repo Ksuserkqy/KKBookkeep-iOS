@@ -1,3 +1,4 @@
 "CFBundleDisplayName" = "羊羊记账";
 "CFBundleName" = "羊羊记账";
 "NSFaceIDUsageDescription" = "用于解锁羊羊记账。";
+"NSLocationWhenInUseUsageDescription" = "用于在用户主动记账时录入当前位置。";

@@ -24,7 +24,11 @@ struct TransactionsPage: View {
                                 } else {
                                     DraftSummaryRow(titleKey: "transactions.draft.amount", value: draft.amountText)
                                 }
-                                DraftSummaryRow(titleKey: "transactions.draft.date", value: Self.dateFormatter.string(from: draft.date))
+                                DraftSummaryRow(titleKey: "transactions.draft.dateTime", value: Self.dateFormatter.string(from: draft.date))
+
+                                if let location = draft.location {
+                                    DraftSummaryRow(titleKey: "transactions.draft.location", value: location.displayName)
+                                }
 
                                 if draft.kind == .transfer {
                                     DraftVisualSummaryRow(
@@ -108,13 +112,17 @@ struct TransactionsPage: View {
             )
         }
 
-        return DraftVisualSummaryItem(name: category.name, iconName: category.iconName, colorHex: category.colorHex)
+        return DraftVisualSummaryItem(
+            name: draftStore.categoryDisplayName(for: category.id),
+            iconName: category.iconName,
+            colorHex: category.colorHex
+        )
     }
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
-        formatter.timeStyle = .none
+        formatter.timeStyle = .short
         return formatter
     }()
 }

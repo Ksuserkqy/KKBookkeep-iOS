@@ -39,15 +39,28 @@ struct CategoryManagementPage: View {
             }
 
             Section {
-                ForEach(draftStore.categories(for: selectedKind)) { category in
+                ForEach(draftStore.categoryHierarchyItems(for: selectedKind)) { item in
+                    let category = item.category
+
                     HStack(spacing: 12) {
+                        Spacer()
+                            .frame(width: CGFloat(item.depth - 1) * 24)
+
                         DraftVisualBadge(iconName: category.iconName, colorHex: category.colorHex)
 
-                        HStack(spacing: 6) {
-                            Text(category.name)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text(category.name)
 
-                            if category.isDefault {
-                                Text("management.defaultBadge")
+                                if category.isDefault {
+                                    Text("management.defaultBadge")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+
+                            if item.depth > 1 {
+                                Text(levelTitleKey(for: item.depth))
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(.secondary)
                             }
@@ -72,7 +85,7 @@ struct CategoryManagementPage: View {
                         }
                         .tint(.red)
 
-                        if !category.isDefault {
+                        if !category.isDefault, category.parentId == nil {
                             Button {
                                 draftStore.setDefaultCategory(id: category.id)
                             } label: {
@@ -108,6 +121,7 @@ struct CategoryManagementPage: View {
             CategoryEditorSheet(
                 isEditing: editingCategory != nil,
                 kind: selectedKind,
+                parentItems: draftStore.selectableParentItems(for: selectedKind, excluding: editingCategory?.id),
                 draft: $draft,
                 onCancel: {
                     isEditorPresented = false
@@ -137,8 +151,19 @@ struct CategoryManagementPage: View {
                 deletingCategory = nil
             }
         } message: {
-            Text("management.category.delete.confirm.message")
+            Text(deleteConfirmationMessageKey)
         }
+    }
+
+    private var deleteConfirmationMessageKey: LocalizedStringKey {
+        guard
+            let deletingCategory,
+            draftStore.hasChildCategories(id: deletingCategory.id)
+        else {
+            return "management.category.delete.confirm.message"
+        }
+
+        return "management.category.delete.confirm.message.withChildren"
     }
 
     private func beginAdding() {
@@ -155,22 +180,26 @@ struct CategoryManagementPage: View {
 
     private func saveCategory() {
         if let editingCategory {
-            draftStore.updateCategory(
+            if draftStore.updateCategory(
                 id: editingCategory.id,
                 name: draft.name,
+                parentId: draft.parentId,
                 iconName: draft.iconName,
                 colorHex: draft.colorHex
-            )
+            ) {
+                isEditorPresented = false
+            }
         } else {
-            draftStore.addCategory(
+            if draftStore.addCategory(
                 name: draft.name,
                 kind: selectedKind,
+                parentId: draft.parentId,
                 iconName: draft.iconName,
                 colorHex: draft.colorHex
-            )
+            ) {
+                isEditorPresented = false
+            }
         }
-
-        isEditorPresented = false
     }
 
     private func deletePendingCategory() {
@@ -181,35 +210,53 @@ struct CategoryManagementPage: View {
         _ = draftStore.deleteCategory(id: deletingCategory.id)
         self.deletingCategory = nil
     }
+
+    private func levelTitleKey(for depth: Int) -> LocalizedStringKey {
+        switch depth {
+        case 2:
+            return "management.category.level.second"
+        case 3:
+            return "management.category.level.third"
+        default:
+            return "management.category.level.first"
+        }
+    }
 }
 
 private struct CategoryEditorDraft {
     var name: String
+    var parentId: String?
     var iconName: String
     var colorHex: String
 
     static let empty = CategoryEditorDraft(
         name: "",
+        parentId: nil,
         iconName: DraftCustomizationOptions.categoryIcons[0],
         colorHex: DraftCustomizationOptions.colors[0]
     )
 
-    init(name: String, iconName: String, colorHex: String) {
+    init(name: String, parentId: String?, iconName: String, colorHex: String) {
         self.name = name
+        self.parentId = parentId
         self.iconName = iconName
         self.colorHex = colorHex
     }
 
     init(category: DraftCategory) {
         self.name = category.name
+        self.parentId = category.parentId
         self.iconName = category.iconName
         self.colorHex = category.colorHex
     }
 }
 
 private struct CategoryEditorSheet: View {
+    @EnvironmentObject private var draftStore: DraftBookkeepingStore
+
     let isEditing: Bool
     let kind: DraftEntryKind
+    let parentItems: [DraftCategoryHierarchyItem]
     @Binding var draft: CategoryEditorDraft
     let onCancel: () -> Void
     let onSave: () -> Void
@@ -231,6 +278,20 @@ private struct CategoryEditorSheet: View {
                     }
                 } header: {
                     Text("management.category.section.basic")
+                }
+
+                Section {
+                    Picker("management.category.parent", selection: $draft.parentId) {
+                        Text("management.category.parent.none")
+                            .tag(Optional<String>.none)
+
+                        ForEach(parentItems) { item in
+                            Text(parentOptionTitle(for: item))
+                                .tag(Optional(item.category.id))
+                        }
+                    }
+                } footer: {
+                    Text("management.category.parent.footer")
                 }
 
                 Section {
@@ -269,6 +330,10 @@ private struct CategoryEditorSheet: View {
                 }
             }
         }
+    }
+
+    private func parentOptionTitle(for item: DraftCategoryHierarchyItem) -> String {
+        String(repeating: "  ", count: max(item.depth - 1, 0)) + draftStore.categoryDisplayName(for: item.category.id)
     }
 }
 
