@@ -65,6 +65,18 @@ struct ProfilePage: View {
 
                 Section {
                     NavigationLink {
+                        AccountManagementPage()
+                    } label: {
+                        Label("management.account.title", systemImage: "creditcard.fill")
+                    }
+
+                    NavigationLink {
+                        CategoryManagementPage()
+                    } label: {
+                        Label("management.category.title", systemImage: "tag.fill")
+                    }
+
+                    NavigationLink {
                         AppSettingsPage()
                     } label: {
                         Label("profile.settings", systemImage: "gearshape.fill")

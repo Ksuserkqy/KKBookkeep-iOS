@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var isPrivacyCovered = false
     @State private var isImportingProfile = false
     @State private var lastProfileImportAt: Date?
+    @State private var selectedTab = AppTab.dashboard
 
     private var activeLocaleIdentifier: String {
         AppLanguage(rawValue: language)?.localeIdentifier ?? Locale.current.identifier
@@ -24,31 +25,36 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            TabView {
+            TabView(selection: $selectedTab) {
                 DashboardPage()
                 .tabItem {
                     Label("tab.dashboard", systemImage: "house.fill")
                 }
+                .tag(AppTab.dashboard)
 
                 TransactionsPage()
                 .tabItem {
                     Label("tab.transactions", systemImage: "list.bullet.rectangle")
                 }
+                .tag(AppTab.transactions)
 
-                RecordPage()
+                RecordPage(selectedTab: $selectedTab)
                 .tabItem {
                     Label("tab.record", systemImage: "plus.circle.fill")
                 }
+                .tag(AppTab.record)
 
                 ReportsPage()
                 .tabItem {
                     Label("tab.reports", systemImage: "chart.pie.fill")
                 }
+                .tag(AppTab.reports)
 
                 ProfilePage()
                 .tabItem {
                     Label("tab.profile", systemImage: "person.crop.circle")
                 }
+                .tag(AppTab.profile)
             }
 
             if appLock.isLocked {
@@ -110,8 +116,17 @@ struct ContentView: View {
     }
 }
 
+enum AppTab: Hashable {
+    case dashboard
+    case transactions
+    case record
+    case reports
+    case profile
+}
+
 #Preview {
     ContentView()
         .environmentObject(ProfileStore())
         .environmentObject(SyncSettingsStore())
+        .environmentObject(DraftBookkeepingStore())
 }
