@@ -1,24 +1,31 @@
+import PhotosUI
 import SwiftUI
+import UIKit
 
 struct ProfileEditPage: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var profileStore: ProfileStore
+    @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
+
     @State private var displayName = ""
     @State private var email = ""
-    @State private var phone = ""
+    @State private var avatarImageDataBase64: String?
     @State private var currency = ProfileCurrency.cny
     @State private var timeZone = ProfileTimeZone.shanghai
     @State private var note = ""
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var isSaving = false
 
     var body: some View {
         Form {
             Section {
                 VStack(spacing: 12) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 76))
-                        .foregroundStyle(.tint)
+                    ProfileAvatarView(imageDataBase64: avatarImageDataBase64, size: 86)
 
-                    Button("profile.edit.avatar") {}
-                        .buttonStyle(.bordered)
-                        .disabled(true)
+                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                        Text("profile.edit.avatar")
+                    }
+                    .buttonStyle(.bordered)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
@@ -32,9 +39,6 @@ struct ProfileEditPage: View {
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-
-                TextField("profile.edit.phone.placeholder", text: $phone)
-                    .keyboardType(.phonePad)
             } header: {
                 Text("profile.edit.section.basic")
             }
@@ -61,6 +65,14 @@ struct ProfileEditPage: View {
             } header: {
                 Text("profile.edit.section.note")
             }
+
+            if let messageKey = profileStore.messageKey {
+                Section {
+                    Text(LocalizedStringKey(messageKey))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .navigationTitle(Text("profile.edit.title"))
         .navigationBarTitleDisplayMode(.inline)
@@ -71,50 +83,89 @@ struct ProfileEditPage: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button("common.save") {}
-                    .disabled(true)
+                Button {
+                    Task {
+                        await saveProfile()
+                    }
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Text("common.save")
+                    }
+                }
+                .disabled(isSaving)
+            }
+        }
+        .task {
+            loadProfile()
+        }
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            Task {
+                await loadAvatar(from: newItem)
             }
         }
     }
-}
 
-private enum ProfileCurrency: String, CaseIterable, Identifiable {
-    case cny
-    case usd
-    case eur
-    case jpy
+    private func loadProfile() {
+        let profile = profileStore.profile
+        displayName = profile.displayName
+        email = profile.email
+        avatarImageDataBase64 = profile.avatarImageDataBase64
+        currency = profile.currency
+        timeZone = profile.timeZone
+        note = profile.note
+    }
 
-    var id: String { rawValue }
+    private func saveProfile() async {
+        isSaving = true
+        let configuration = syncSettingsStore.configuration
+        let secrets = syncSettingsStore.secrets(for: configuration)
 
-    var titleKey: LocalizedStringKey {
-        switch self {
-        case .cny:
-            return "profile.edit.currency.cny"
-        case .usd:
-            return "profile.edit.currency.usd"
-        case .eur:
-            return "profile.edit.currency.eur"
-        case .jpy:
-            return "profile.edit.currency.jpy"
+        let didSave = await profileStore.save(
+            displayName: displayName,
+            email: email,
+            avatarImageDataBase64: avatarImageDataBase64,
+            currency: currency,
+            timeZone: timeZone,
+            note: note,
+            syncConfiguration: configuration,
+            syncSecrets: secrets
+        )
+
+        isSaving = false
+
+        if didSave {
+            dismiss()
         }
+    }
+
+    private func loadAvatar(from item: PhotosPickerItem?) async {
+        guard
+            let item,
+            let data = try? await item.loadTransferable(type: Data.self),
+            let image = UIImage(data: data),
+            let compressedData = image
+                .scaledToFit(maxPixelLength: 512)
+                .jpegData(compressionQuality: 0.82)
+        else {
+            return
+        }
+
+        avatarImageDataBase64 = compressedData.base64EncodedString()
     }
 }
 
-private enum ProfileTimeZone: String, CaseIterable, Identifiable {
-    case shanghai
-    case current
-    case utc
+private extension UIImage {
+    func scaledToFit(maxPixelLength: CGFloat) -> UIImage {
+        let maxLength = max(size.width, size.height)
+        guard maxLength > maxPixelLength else { return self }
 
-    var id: String { rawValue }
+        let scale = maxPixelLength / maxLength
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
 
-    var titleKey: LocalizedStringKey {
-        switch self {
-        case .shanghai:
-            return "profile.edit.timeZone.shanghai"
-        case .current:
-            return "profile.edit.timeZone.current"
-        case .utc:
-            return "profile.edit.timeZone.utc"
+        return UIGraphicsImageRenderer(size: newSize).image { _ in
+            draw(in: CGRect(origin: .zero, size: newSize))
         }
     }
 }

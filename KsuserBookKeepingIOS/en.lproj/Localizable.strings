@@ -6,6 +6,7 @@
 
 "common.back" = "Back";
 "common.cancel" = "Cancel";
+"common.ok" = "OK";
 "common.save" = "Save";
 
 "dashboard.placeholder" = "View balances, budgets, and this month's cash flow.";
@@ -30,7 +31,6 @@
 "profile.edit.section.note" = "Note";
 "profile.edit.displayName.placeholder" = "Nickname";
 "profile.edit.email.placeholder" = "Email";
-"profile.edit.phone.placeholder" = "Phone";
 "profile.edit.currency" = "Default Currency";
 "profile.edit.currency.cny" = "Chinese Yuan CNY";
 "profile.edit.currency.usd" = "US Dollar USD";
@@ -41,6 +41,18 @@
 "profile.edit.timeZone.current" = "Follow System";
 "profile.edit.timeZone.utc" = "Coordinated Universal Time";
 "profile.edit.note.placeholder" = "Personal note";
+"profile.sync.savedLocally" = "Profile saved on this device.";
+"profile.sync.savedAndBackedUp" = "Profile saved and backed up to the selected file location.";
+"profile.sync.backupSucceeded" = "Profile backup completed.";
+"profile.sync.importSucceeded" = "Profile imported from the selected file location.";
+"profile.sync.importNoRemoteProfile" = "No remote profile file was found.";
+"profile.sync.importAlreadyCurrent" = "The local profile is already current.";
+"profile.sync.testSucceeded" = "Backup location is reachable.";
+"profile.sync.error.saveFailed" = "Could not save the profile. Please try again.";
+"profile.sync.error.backupDisabled" = "Enable file backup before syncing profile data.";
+"profile.sync.error.backupFailed" = "Could not back up the profile. Check the WebDAV address, password, and credentials.";
+"profile.sync.error.importFailed" = "Could not import the profile. Check the WebDAV address, password, and credentials.";
+"profile.sync.error.testFailed" = "Could not reach the WebDAV backup location.";
 
 "sync.title" = "Backup & Sync";
 "sync.section.status" = "Backup Status";
@@ -57,6 +69,7 @@
 "sync.backupEnabled" = "Enable File Backup";
 "sync.provider" = "File Location";
 "sync.provider.iCloudDrive" = "iCloud Drive";
+"sync.provider.iCloudDrive.unavailable" = "iCloud Drive is kept in the UI for a later version. Profile sync currently uses WebDAV only.";
 "sync.provider.webDAV" = "WebDAV";
 "sync.webDAV.server.placeholder" = "Server URL";
 "sync.webDAV.authentication" = "Authentication";
@@ -72,7 +85,7 @@
 "sync.backupInterval.oneMinute" = "1 minute";
 "sync.backupInterval.fiveMinutes" = "5 minutes";
 "sync.backupInterval.tenMinutes" = "10 minutes";
-"sync.behavior.footer" = "Changes are backed up as soon as possible; background checks depend on system scheduling.";
+"sync.behavior.footer" = "Changes are backed up as soon as possible; background checks depend on system scheduling. Manual profile import overwrites the local profile.";
 "sync.encryption.enabled" = "Encrypt Backup Files";
 "sync.encryption.password.placeholder" = "Sync password";
 "sync.encryption.confirm.placeholder" = "Confirm sync password";
@@ -81,7 +94,15 @@
 "sync.encryption.footer" = "The sync password derives the file encryption key and will later be stored in system secure storage.";
 "sync.action.testConnection" = "Test Backup Location";
 "sync.action.backupNow" = "Back Up Now";
-"sync.action.importNow" = "Import Now";
+"sync.action.importNow" = "Import Profile";
+"sync.settings.saved" = "Sync settings saved.";
+"sync.settings.savedAndBackedUp" = "Sync settings saved and profile backup completed.";
+"sync.settings.savedButBackupFailed" = "Sync settings saved, but the profile backup failed. Check the WebDAV address, password, and credentials.";
+"sync.settings.message.title" = "Sync Settings";
+"sync.settings.error.saveFailed" = "Could not save sync settings. Please try again.";
+"sync.settings.error.providerUnavailable" = "iCloud Drive sync is not available yet. Use WebDAV for now.";
+"sync.settings.error.encryptionPasswordRequired" = "Enter a sync password before enabling encrypted backup.";
+"sync.settings.error.encryptionPasswordMismatch" = "The sync passwords do not match.";
 
 "settings.title" = "App Settings";
 "settings.language" = "Language";

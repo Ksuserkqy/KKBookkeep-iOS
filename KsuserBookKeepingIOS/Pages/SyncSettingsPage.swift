@@ -1,8 +1,11 @@
 import SwiftUI
 
 struct SyncSettingsPage: View {
+    @EnvironmentObject private var profileStore: ProfileStore
+    @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
+
     @State private var backupEnabled = false
-    @State private var provider = SyncProvider.iCloudDrive
+    @State private var provider = SyncProvider.webDAV
     @State private var webDAVAuthentication = WebDAVAuthentication.password
     @State private var serverURL = ""
     @State private var username = ""
@@ -14,17 +17,37 @@ struct SyncSettingsPage: View {
     @State private var encryptionEnabled = true
     @State private var encryptionPassword = ""
     @State private var encryptionPasswordConfirmation = ""
+    @State private var isSaving = false
+    @State private var isRunningSyncAction = false
+    @State private var settingsMessageKey: String?
+    @State private var isShowingSettingsMessage = false
 
     var body: some View {
         Form {
+            if let messageKey = settingsMessageKey {
+                Section {
+                    Label {
+                        Text(LocalizedStringKey(messageKey))
+                    } icon: {
+                        Image(systemName: isErrorMessage(messageKey) ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                    }
+                    .foregroundStyle(isErrorMessage(messageKey) ? .red : .green)
+                }
+            }
+
             Section {
                 LabeledContent("sync.status") {
-                    Text("sync.status.localOnly")
-                        .foregroundStyle(.secondary)
+                    if backupEnabled {
+                        Text(provider.titleKey)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("sync.status.localOnly")
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 LabeledContent("sync.lastSync") {
-                    Text("sync.lastSync.never")
+                    Text(lastBackupText)
                         .foregroundStyle(.secondary)
                 }
 
@@ -42,10 +65,15 @@ struct SyncSettingsPage: View {
                 Picker("sync.provider", selection: $provider) {
                     ForEach(SyncProvider.allCases) { option in
                         Text(option.titleKey).tag(option)
+                            .disabled(!option.isAvailable)
                     }
                 }
             } header: {
                 Text("sync.section.provider")
+            } footer: {
+                if provider == .iCloudDrive {
+                    Text("sync.provider.iCloudDrive.unavailable")
+                }
             }
 
             if provider == .webDAV {
@@ -110,14 +138,30 @@ struct SyncSettingsPage: View {
             }
 
             Section {
-                Button("sync.action.testConnection") {}
-                    .disabled(true)
+                Button("sync.action.testConnection") {
+                    Task {
+                        await testConnection()
+                    }
+                }
+                .disabled(isRunningSyncAction)
 
-                Button("sync.action.backupNow") {}
-                    .disabled(true)
+                Button("sync.action.backupNow") {
+                    Task {
+                        await backupProfileNow()
+                    }
+                }
+                .disabled(isRunningSyncAction)
 
-                Button("sync.action.importNow") {}
-                    .disabled(true)
+                Button("sync.action.importNow") {
+                    Task {
+                        await importProfileNow()
+                    }
+                }
+                .disabled(isRunningSyncAction)
+            } footer: {
+                if let messageKey = settingsMessageKey ?? profileStore.messageKey {
+                    Text(LocalizedStringKey(messageKey))
+                }
             }
         }
         .navigationTitle(Text("sync.title"))
@@ -129,60 +173,195 @@ struct SyncSettingsPage: View {
             }
 
             ToolbarItem(placement: .topBarTrailing) {
-                Button("common.save") {}
-                    .disabled(true)
+                Button {
+                    Task {
+                        await saveSettings()
+                    }
+                } label: {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Text("common.save")
+                    }
+                }
+                .disabled(isSaving)
+            }
+        }
+        .task {
+            loadSettings()
+        }
+        .alert(Text("sync.settings.message.title"), isPresented: $isShowingSettingsMessage) {
+            Button("common.ok", role: .cancel) {}
+        } message: {
+            if let messageKey = settingsMessageKey {
+                Text(LocalizedStringKey(messageKey))
             }
         }
     }
-}
 
-private enum SyncProvider: String, CaseIterable, Identifiable {
-    case iCloudDrive
-    case webDAV
+    private func loadSettings() {
+        let draft = syncSettingsStore.makeDraft()
+        backupEnabled = draft.configuration.backupEnabled
+        provider = draft.configuration.provider
+        webDAVAuthentication = draft.configuration.webDAVAuthentication
+        serverURL = draft.configuration.webDAVServerURL
+        username = draft.configuration.webDAVUsername
+        password = draft.password
+        accessToken = draft.accessToken
+        backupOnChange = draft.configuration.backupOnChange
+        autoImport = draft.configuration.autoImport
+        backupInterval = draft.configuration.backupInterval
+        encryptionEnabled = draft.configuration.encryptionEnabled
+        encryptionPassword = draft.encryptionPassword
+        encryptionPasswordConfirmation = draft.encryptionPassword
+    }
 
-    var id: String { rawValue }
+    private func saveSettings() async {
+        if backupEnabled, provider == .iCloudDrive {
+            showSettingsMessage("sync.settings.error.providerUnavailable")
+            return
+        }
 
-    var titleKey: LocalizedStringKey {
-        switch self {
-        case .iCloudDrive:
-            return "sync.provider.iCloudDrive"
-        case .webDAV:
-            return "sync.provider.webDAV"
+        if backupEnabled, encryptionEnabled, encryptionPassword.isEmpty {
+            showSettingsMessage("sync.settings.error.encryptionPasswordRequired")
+            return
+        }
+
+        if backupEnabled, encryptionEnabled, encryptionPassword != encryptionPasswordConfirmation {
+            showSettingsMessage("sync.settings.error.encryptionPasswordMismatch")
+            return
+        }
+
+        isSaving = true
+
+        let configuration = makeConfiguration()
+        let draft = SyncSettingsDraft(
+            configuration: configuration,
+            password: password,
+            accessToken: accessToken,
+            encryptionPassword: encryptionEnabled ? encryptionPassword : ""
+        )
+
+        do {
+            try syncSettingsStore.save(draft)
+
+            if configuration.backupEnabled {
+                await profileStore.backupNow(
+                    configuration: configuration,
+                    secrets: currentSyncSecrets()
+                )
+
+                if profileStore.messageKey == "profile.sync.backupSucceeded" {
+                    try? syncSettingsStore.markBackupCompleted()
+                    showSettingsMessage("sync.settings.savedAndBackedUp")
+                } else {
+                    showSettingsMessage("sync.settings.savedButBackupFailed")
+                }
+            } else {
+                showSettingsMessage("sync.settings.saved")
+            }
+        } catch {
+            showSettingsMessage("sync.settings.error.saveFailed")
+        }
+
+        isSaving = false
+    }
+
+    private func testConnection() async {
+        await runSyncAction {
+            await profileStore.testSyncLocation(
+                configuration: savedOrCurrentConfiguration(),
+                secrets: currentSyncSecrets()
+            )
         }
     }
-}
 
-private enum WebDAVAuthentication: String, CaseIterable, Identifiable {
-    case password
-    case token
+    private func backupProfileNow() async {
+        await runSyncAction {
+            await profileStore.backupNow(
+                configuration: savedOrCurrentConfiguration(),
+                secrets: currentSyncSecrets()
+            )
 
-    var id: String { rawValue }
+            if profileStore.messageKey == "profile.sync.backupSucceeded" {
+                try? syncSettingsStore.markBackupCompleted()
+            }
+        }
+    }
 
-    var titleKey: LocalizedStringKey {
-        switch self {
+    private func importProfileNow() async {
+        await runSyncAction {
+            await profileStore.importNow(
+                configuration: savedOrCurrentConfiguration(),
+                secrets: currentSyncSecrets()
+            )
+        }
+    }
+
+    private func runSyncAction(_ action: @escaping () async -> Void) async {
+        settingsMessageKey = nil
+        isRunningSyncAction = true
+        await action()
+        isRunningSyncAction = false
+    }
+
+    private func savedOrCurrentConfiguration() -> SyncConfiguration {
+        let current = makeConfiguration()
+        if current == syncSettingsStore.configuration {
+            return syncSettingsStore.configuration
+        }
+
+        return current
+    }
+
+    private func makeConfiguration() -> SyncConfiguration {
+        SyncConfiguration(
+            backupEnabled: backupEnabled,
+            provider: provider,
+            webDAVAuthentication: webDAVAuthentication,
+            webDAVServerURL: serverURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            webDAVUsername: username.trimmingCharacters(in: .whitespacesAndNewlines),
+            backupOnChange: backupOnChange,
+            autoImport: autoImport,
+            backupInterval: backupInterval,
+            encryptionEnabled: encryptionEnabled,
+            lastBackupAt: syncSettingsStore.configuration.lastBackupAt
+        )
+    }
+
+    private func currentSyncSecrets() -> SyncSecrets {
+        SyncSecrets(
+            webDAVSecret: currentWebDAVSecret(),
+            encryptionPassword: encryptionPassword
+        )
+    }
+
+    private func currentWebDAVSecret() -> String {
+        switch webDAVAuthentication {
         case .password:
-            return "sync.webDAV.authentication.password"
+            return password
         case .token:
-            return "sync.webDAV.authentication.token"
+            return accessToken
         }
     }
-}
 
-private enum BackupInterval: String, CaseIterable, Identifiable {
-    case oneMinute
-    case fiveMinutes
-    case tenMinutes
+    private func showSettingsMessage(_ key: String) {
+        settingsMessageKey = key
+        isShowingSettingsMessage = true
+    }
 
-    var id: String { rawValue }
+    private func isErrorMessage(_ key: String) -> Bool {
+        key.contains(".error.")
+    }
 
-    var titleKey: LocalizedStringKey {
-        switch self {
-        case .oneMinute:
-            return "sync.backupInterval.oneMinute"
-        case .fiveMinutes:
-            return "sync.backupInterval.fiveMinutes"
-        case .tenMinutes:
-            return "sync.backupInterval.tenMinutes"
+    private var lastBackupText: String {
+        guard let lastBackupAt = syncSettingsStore.configuration.lastBackupAt else {
+            return String(localized: "sync.lastSync.never")
         }
+
+        return lastBackupAt.formatted(
+            date: .abbreviated,
+            time: .shortened
+        )
     }
 }

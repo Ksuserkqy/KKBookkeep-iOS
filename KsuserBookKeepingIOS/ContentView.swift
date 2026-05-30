@@ -9,10 +9,14 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var profileStore: ProfileStore
+    @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
     @StateObject private var appLock = AppLockManager()
     @State private var isPrivacyCovered = false
+    @State private var isImportingProfile = false
+    @State private var lastProfileImportAt: Date?
 
     private var activeLocaleIdentifier: String {
         AppLanguage(rawValue: language)?.localeIdentifier ?? Locale.current.identifier
@@ -61,11 +65,17 @@ struct ContentView: View {
         .environment(\.locale, Locale(identifier: activeLocaleIdentifier))
         .environmentObject(appLock)
         .preferredColorScheme(AppTheme(rawValue: theme)?.colorScheme)
+        .task {
+            await importRemoteProfileIfNeeded(force: true)
+        }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
                 isPrivacyCovered = false
                 appLock.refreshConfiguration()
+                Task {
+                    await importRemoteProfileIfNeeded()
+                }
             case .inactive:
                 isPrivacyCovered = appLock.isPasswordEnabled && !appLock.isLocked
             case .background:
@@ -76,8 +86,32 @@ struct ContentView: View {
             }
         }
     }
+
+    private func importRemoteProfileIfNeeded(force: Bool = false) async {
+        let configuration = syncSettingsStore.configuration
+        guard configuration.backupEnabled, configuration.autoImport else { return }
+        guard !isImportingProfile else { return }
+
+        if
+            !force,
+            let lastProfileImportAt,
+            Date().timeIntervalSince(lastProfileImportAt) < 60
+        {
+            return
+        }
+
+        isImportingProfile = true
+        await profileStore.importIfRemoteProfileIsNewer(
+            configuration: configuration,
+            secrets: syncSettingsStore.secrets(for: configuration)
+        )
+        lastProfileImportAt = Date()
+        isImportingProfile = false
+    }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(ProfileStore())
+        .environmentObject(SyncSettingsStore())
 }

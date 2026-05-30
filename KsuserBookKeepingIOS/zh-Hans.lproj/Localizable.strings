@@ -6,6 +6,7 @@
 
 "common.back" = "返回";
 "common.cancel" = "取消";
+"common.ok" = "确定";
 "common.save" = "保存";
 
 "dashboard.placeholder" = "查看账户余额、预算进度和本月收支。";
@@ -30,7 +31,6 @@
 "profile.edit.section.note" = "备注";
 "profile.edit.displayName.placeholder" = "昵称";
 "profile.edit.email.placeholder" = "邮箱";
-"profile.edit.phone.placeholder" = "手机号";
 "profile.edit.currency" = "默认币种";
 "profile.edit.currency.cny" = "人民币 CNY";
 "profile.edit.currency.usd" = "美元 USD";
@@ -41,6 +41,18 @@
 "profile.edit.timeZone.current" = "跟随系统";
 "profile.edit.timeZone.utc" = "协调世界时";
 "profile.edit.note.placeholder" = "个人备注";
+"profile.sync.savedLocally" = "个人信息已保存到本机。";
+"profile.sync.savedAndBackedUp" = "个人信息已保存，并备份到选定的文件位置。";
+"profile.sync.backupSucceeded" = "个人信息备份完成。";
+"profile.sync.importSucceeded" = "已从选定的文件位置导入个人信息。";
+"profile.sync.importNoRemoteProfile" = "没有找到远端个人信息文件。";
+"profile.sync.importAlreadyCurrent" = "本机个人信息已是最新。";
+"profile.sync.testSucceeded" = "备份位置可以访问。";
+"profile.sync.error.saveFailed" = "个人信息保存失败，请稍后重试。";
+"profile.sync.error.backupDisabled" = "请先启用文件备份，再同步个人信息。";
+"profile.sync.error.backupFailed" = "个人信息备份失败，请检查 WebDAV 地址、同步密码和凭据。";
+"profile.sync.error.importFailed" = "个人信息导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+"profile.sync.error.testFailed" = "无法访问 WebDAV 备份位置。";
 
 "sync.title" = "备份与同步";
 "sync.section.status" = "备份状态";
@@ -57,6 +69,7 @@
 "sync.backupEnabled" = "启用文件备份";
 "sync.provider" = "文件位置";
 "sync.provider.iCloudDrive" = "iCloud云盘";
+"sync.provider.iCloudDrive.unavailable" = "iCloud云盘入口先保留给后续版本；当前个人信息同步只使用 WebDAV。";
 "sync.provider.webDAV" = "WebDAV";
 "sync.webDAV.server.placeholder" = "服务器地址";
 "sync.webDAV.authentication" = "鉴权方式";
@@ -72,7 +85,7 @@
 "sync.backupInterval.oneMinute" = "1 分钟";
 "sync.backupInterval.fiveMinutes" = "5 分钟";
 "sync.backupInterval.tenMinutes" = "10 分钟";
-"sync.behavior.footer" = "有修改时会尽快备份；后台定期检查受系统调度影响。";
+"sync.behavior.footer" = "有修改时会尽快备份；后台定期检查受系统调度影响。手动导入个人信息会覆盖本机个人信息。";
 "sync.encryption.enabled" = "加密备份文件";
 "sync.encryption.password.placeholder" = "同步密码";
 "sync.encryption.confirm.placeholder" = "确认同步密码";
@@ -81,7 +94,15 @@
 "sync.encryption.footer" = "同步密码用于派生文件加密密钥，后续将保存到系统安全存储。";
 "sync.action.testConnection" = "测试备份位置";
 "sync.action.backupNow" = "立即备份";
-"sync.action.importNow" = "立即导入";
+"sync.action.importNow" = "导入个人信息";
+"sync.settings.saved" = "同步设置已保存。";
+"sync.settings.savedAndBackedUp" = "同步设置已保存，个人信息备份完成。";
+"sync.settings.savedButBackupFailed" = "同步设置已保存，但个人信息备份失败。请检查 WebDAV 地址、同步密码和凭据。";
+"sync.settings.message.title" = "同步设置";
+"sync.settings.error.saveFailed" = "同步设置保存失败，请稍后重试。";
+"sync.settings.error.providerUnavailable" = "iCloud云盘同步暂不可用，请先使用 WebDAV。";
+"sync.settings.error.encryptionPasswordRequired" = "启用加密备份前，请先填写同步密码。";
+"sync.settings.error.encryptionPasswordMismatch" = "两次同步密码不一致。";
 
 "settings.title" = "应用设置";
 "settings.language" = "语言";

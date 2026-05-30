@@ -1,34 +1,50 @@
 import SwiftUI
 
 struct ProfilePage: View {
+    @EnvironmentObject private var profileStore: ProfileStore
+
     var body: some View {
         NavigationStack {
             List {
                 Section {
                     HStack(spacing: 14) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.accentColor.opacity(0.16))
-                                .frame(width: 58, height: 58)
-
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 42))
-                                .foregroundStyle(.tint)
-                        }
+                        ProfileAvatarView(
+                            imageDataBase64: profileStore.profile.avatarImageDataBase64,
+                            size: 58
+                        )
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("profile.displayName.placeholder")
-                                .font(.headline)
+                            if profileStore.profile.displayName.isEmpty {
+                                Text("profile.displayName.placeholder")
+                            } else {
+                                Text(profileStore.profile.displayName)
+                            }
 
-                            Text("profile.placeholder")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
+                            if profileStore.profile.email.isEmpty {
+                                Text("profile.placeholder")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            } else {
+                                Text(profileStore.profile.email)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
                         }
+                        .font(.headline)
 
                         Spacer()
                     }
                     .padding(.vertical, 8)
+                }
+
+                if let messageKey = profileStore.messageKey {
+                    Section {
+                        Text(LocalizedStringKey(messageKey))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section {
