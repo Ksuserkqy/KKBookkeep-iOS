@@ -59,6 +59,8 @@
 "management.icon.more" = "更多图标";
 "management.icon.all" = "全部图标";
 "management.icon.search.placeholder" = "搜索图标名称或关键词";
+"management.icon.notice.version" = "当前内置 Font Awesome Free %@ 图标库。";
+"management.icon.notice.link" = "去 Font Awesome 官网查找图标";
 "management.icon.category" = "分类";
 "management.icon.category.all" = "全部分类";
 "management.icon.category.brands" = "品牌";

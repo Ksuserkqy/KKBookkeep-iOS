@@ -59,6 +59,8 @@
 "management.icon.more" = "More Icons";
 "management.icon.all" = "All Icons";
 "management.icon.search.placeholder" = "Search icon name or keyword";
+"management.icon.notice.version" = "This picker includes Font Awesome Free %@.";
+"management.icon.notice.link" = "Find icons on Font Awesome";
 "management.icon.category" = "Category";
 "management.icon.category.all" = "All Categories";
 "management.icon.category.brands" = "Brands";

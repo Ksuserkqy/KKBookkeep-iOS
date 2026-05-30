@@ -122,6 +122,8 @@ struct FontAwesomeIconCategoryMetadata: Codable, Identifiable {
 }
 
 enum FontAwesomeIconCatalog {
+    static let version = "7.2.0"
+    static let websiteURL = URL(string: "https://fontawesome.com/search?m=free&o=r")!
     static let allCategoryId = ""
     static let brandCategoryId = "__brands"
     static let fallbackName = "tag"

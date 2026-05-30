@@ -538,6 +538,31 @@ private struct FontAwesomeIconSearchSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(
+                            String(
+                                format: NSLocalizedString("management.icon.notice.version", comment: ""),
+                                FontAwesomeIconCatalog.version
+                            )
+                        )
+                        .font(.subheadline.weight(.semibold))
+
+                        Link("management.icon.notice.link", destination: FontAwesomeIconCatalog.websiteURL)
+                            .font(.caption.weight(.semibold))
+                    }
+
+                    Spacer()
+                }
+                .padding(12)
+                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 4)
+
                 HStack {
                     Text("management.icon.category")
                         .font(.subheadline.weight(.semibold))
