@@ -7,14 +7,14 @@ struct TransactionsPage: View {
     @EnvironmentObject private var profileStore: ProfileStore
     @State private var editingTransaction: DraftTransaction?
     @State private var deletingTransaction: DraftTransaction?
-    @State private var selectedMonth = Date()
+    @State private var dateFilter = TransactionDateFilter()
     @State private var selectedAccountId: String?
     @State private var selectedCategoryId: String?
-    @State private var hasInitializedMonth = false
+    @State private var hasInitializedDateFilter = false
 
     private var filteredTransactions: [DraftTransaction] {
         draftStore.transactions.filter { transaction in
-            guard Calendar.current.isDate(transaction.date, equalTo: selectedMonth, toGranularity: .month) else {
+            guard dateFilter.contains(transaction.date) else {
                 return false
             }
 
@@ -67,10 +67,10 @@ struct TransactionsPage: View {
                     }
                 } else {
                     Section {
-                        TransactionMonthHeader(
-                            selectedMonth: $selectedMonth,
-                            onPreviousMonth: { shiftMonth(by: -1) },
-                            onNextMonth: { shiftMonth(by: 1) }
+                        TransactionDateHeader(
+                            dateFilter: $dateFilter,
+                            onPrevious: { dateFilter.shift(by: -1) },
+                            onNext: { dateFilter.shift(by: 1) }
                         )
 
                         TransactionFilterBar(
@@ -148,10 +148,10 @@ struct TransactionsPage: View {
             .listStyle(.insetGrouped)
             .navigationTitle(Text("tab.transactions"))
             .onAppear {
-                initializeSelectedMonthIfNeeded()
+                initializeDateFilterIfNeeded()
             }
             .onChange(of: draftStore.transactions) { _, _ in
-                initializeSelectedMonthIfNeeded()
+                initializeDateFilterIfNeeded()
             }
             .sheet(item: $editingTransaction) { transaction in
                 TransactionEditorPage(transaction: transaction)
@@ -186,16 +186,12 @@ struct TransactionsPage: View {
         }
     }
 
-    private func initializeSelectedMonthIfNeeded() {
-        guard !hasInitializedMonth else { return }
+    private func initializeDateFilterIfNeeded() {
+        guard !hasInitializedDateFilter else { return }
         if let latestTransaction = draftStore.transactions.first {
-            selectedMonth = latestTransaction.date
+            dateFilter.setReference(latestTransaction.date)
         }
-        hasInitializedMonth = true
-    }
-
-    private func shiftMonth(by value: Int) {
-        selectedMonth = Calendar.current.date(byAdding: .month, value: value, to: selectedMonth) ?? selectedMonth
+        hasInitializedDateFilter = true
     }
 
     private func resetFilters() {
@@ -311,26 +307,206 @@ private struct TransactionDayGroup: Identifiable {
     var id: Date { date }
 }
 
-private struct TransactionMonthHeader: View {
-    @Binding var selectedMonth: Date
-    let onPreviousMonth: () -> Void
-    let onNextMonth: () -> Void
+private enum TransactionDateFilterMode: String, CaseIterable, Identifiable {
+    case day
+    case month
+    case year
+    case range
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .day:
+            return "transactions.date.mode.day"
+        case .month:
+            return "transactions.date.mode.month"
+        case .year:
+            return "transactions.date.mode.year"
+        case .range:
+            return "transactions.date.mode.range"
+        }
+    }
+
+    var component: Calendar.Component {
+        switch self {
+        case .day, .range:
+            return .day
+        case .month:
+            return .month
+        case .year:
+            return .year
+        }
+    }
+}
+
+private enum TransactionDateRangeUnit: String, CaseIterable, Identifiable {
+    case day
+    case month
+    case year
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .day:
+            return "transactions.date.rangeUnit.day"
+        case .month:
+            return "transactions.date.rangeUnit.month"
+        case .year:
+            return "transactions.date.rangeUnit.year"
+        }
+    }
+
+    var component: Calendar.Component {
+        switch self {
+        case .day:
+            return .day
+        case .month:
+            return .month
+        case .year:
+            return .year
+        }
+    }
+}
+
+private struct TransactionDateFilter: Equatable {
+    var mode: TransactionDateFilterMode = .month
+    var rangeUnit: TransactionDateRangeUnit = .day
+    var referenceDate: Date = Date()
+    var rangeStart: Date = Date()
+    var rangeEnd: Date = Date()
+
+    func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
+        switch mode {
+        case .day:
+            return calendar.isDate(date, inSameDayAs: referenceDate)
+        case .month:
+            return calendar.isDate(date, equalTo: referenceDate, toGranularity: .month)
+        case .year:
+            return calendar.isDate(date, equalTo: referenceDate, toGranularity: .year)
+        case .range:
+            let interval = normalizedRangeInterval(calendar: calendar)
+            return date >= interval.start && date < interval.end
+        }
+    }
+
+    mutating func setReference(_ date: Date) {
+        referenceDate = date
+        rangeStart = date
+        rangeEnd = date
+    }
+
+    mutating func shift(by value: Int, calendar: Calendar = .current) {
+        switch mode {
+        case .day:
+            referenceDate = calendar.date(byAdding: .day, value: value, to: referenceDate) ?? referenceDate
+        case .month:
+            referenceDate = calendar.date(byAdding: .month, value: value, to: referenceDate) ?? referenceDate
+        case .year:
+            referenceDate = calendar.date(byAdding: .year, value: value, to: referenceDate) ?? referenceDate
+        case .range:
+            let component = rangeUnit.component
+            rangeStart = calendar.date(byAdding: component, value: value, to: rangeStart) ?? rangeStart
+            rangeEnd = calendar.date(byAdding: component, value: value, to: rangeEnd) ?? rangeEnd
+        }
+    }
+
+    func summaryText(calendar: Calendar = .current) -> String {
+        switch mode {
+        case .day:
+            return Self.dayFormatter.string(from: referenceDate)
+        case .month:
+            return Self.monthFormatter.string(from: referenceDate)
+        case .year:
+            return Self.yearFormatter.string(from: referenceDate)
+        case .range:
+            let interval = normalizedRangeBounds(calendar: calendar)
+            return "\(rangeText(for: interval.start, unit: rangeUnit)) - \(rangeText(for: interval.end, unit: rangeUnit))"
+        }
+    }
+
+    private func rangeText(for date: Date, unit: TransactionDateRangeUnit) -> String {
+        switch unit {
+        case .day:
+            return Self.dayFormatter.string(from: date)
+        case .month:
+            return Self.monthFormatter.string(from: date)
+        case .year:
+            return Self.yearFormatter.string(from: date)
+        }
+    }
+
+    private func normalizedRangeBounds(calendar: Calendar) -> (start: Date, end: Date) {
+        if rangeStart <= rangeEnd {
+            return (rangeStart, rangeEnd)
+        }
+
+        return (rangeEnd, rangeStart)
+    }
+
+    private func normalizedRangeInterval(calendar: Calendar) -> (start: Date, end: Date) {
+        let bounds = normalizedRangeBounds(calendar: calendar)
+        let start = startOfPeriod(for: bounds.start, component: rangeUnit.component, calendar: calendar)
+        let endStart = startOfPeriod(for: bounds.end, component: rangeUnit.component, calendar: calendar)
+        let end = calendar.date(byAdding: rangeUnit.component, value: 1, to: endStart) ?? endStart
+        return (start, end)
+    }
+
+    private func startOfPeriod(for date: Date, component: Calendar.Component, calendar: Calendar) -> Date {
+        switch component {
+        case .day:
+            return calendar.startOfDay(for: date)
+        case .month:
+            let components = calendar.dateComponents([.year, .month], from: date)
+            return calendar.date(from: components) ?? date
+        case .year:
+            let components = calendar.dateComponents([.year], from: date)
+            return calendar.date(from: components) ?? date
+        default:
+            return date
+        }
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMd", options: 0, locale: .current)
+        return formatter
+    }()
+
+    private static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMM", options: 0, locale: .current)
+        return formatter
+    }()
+
+    private static let yearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "y", options: 0, locale: .current)
+        return formatter
+    }()
+}
+
+private struct TransactionDateHeader: View {
+    @Binding var dateFilter: TransactionDateFilter
+    let onPrevious: () -> Void
+    let onNext: () -> Void
     @State private var isDatePickerPresented = false
 
     var body: some View {
         HStack(spacing: 10) {
-            Button(action: onPreviousMonth) {
+            Button(action: onPrevious) {
                 Image(systemName: "chevron.left")
                     .font(.body.weight(.semibold))
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(Text("transactions.date.previousMonth"))
+            .accessibilityLabel(Text("transactions.date.previous"))
 
             Button {
                 isDatePickerPresented = true
             } label: {
-                Text(Self.monthFormatter.string(from: selectedMonth))
+                Text(dateFilter.summaryText())
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -340,45 +516,85 @@ private struct TransactionMonthHeader: View {
                     .background(Capsule().fill(Color.secondary.opacity(0.12)))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(Text("transactions.date.month"))
+            .accessibilityLabel(Text("transactions.date.filter"))
 
-            Button(action: onNextMonth) {
+            Button(action: onNext) {
                 Image(systemName: "chevron.right")
                     .font(.body.weight(.semibold))
                     .frame(width: 36, height: 36)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(Text("transactions.date.nextMonth"))
+            .accessibilityLabel(Text("transactions.date.next"))
         }
         .padding(.vertical, 4)
         .sheet(isPresented: $isDatePickerPresented) {
-            NavigationStack {
-                DatePicker(
-                    "transactions.date.month",
-                    selection: $selectedMonth,
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.graphical)
-                .padding()
-                .navigationTitle(Text("transactions.date.month"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("common.done") {
-                            isDatePickerPresented = false
+            TransactionDateFilterSheet(dateFilter: $dateFilter)
+                .presentationDetents([.large])
+        }
+    }
+}
+
+private struct TransactionDateFilterSheet: View {
+    @Binding var dateFilter: TransactionDateFilter
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("transactions.date.mode", selection: $dateFilter.mode) {
+                        ForEach(TransactionDateFilterMode.allCases) { mode in
+                            Text(mode.titleKey).tag(mode)
                         }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if dateFilter.mode == .range {
+                    Section {
+                        Picker("transactions.date.rangeUnit", selection: $dateFilter.rangeUnit) {
+                            ForEach(TransactionDateRangeUnit.allCases) { unit in
+                                Text(unit.titleKey).tag(unit)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Section {
+                        DatePicker(
+                            "transactions.date.rangeStart",
+                            selection: $dateFilter.rangeStart,
+                            displayedComponents: .date
+                        )
+
+                        DatePicker(
+                            "transactions.date.rangeEnd",
+                            selection: $dateFilter.rangeEnd,
+                            displayedComponents: .date
+                        )
+                    }
+                } else {
+                    Section {
+                        DatePicker(
+                            "transactions.date.value",
+                            selection: $dateFilter.referenceDate,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
                     }
                 }
             }
-            .presentationDetents([.medium])
+            .navigationTitle(Text("transactions.date.filter"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("common.done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
-
-    private static let monthFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMM", options: 0, locale: .current)
-        return formatter
-    }()
 }
 
 private struct TransactionFilterBar: View {
