@@ -3,22 +3,23 @@ import SwiftUI
 
 struct ReportsPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
-    @State private var selectedPeriod = ReportPeriod.month
+    @State private var dateFilter = TransactionDateFilter()
+    @State private var hasInitializedDateFilter = false
 
     private var reportData: ReportData {
-        makeReportData(for: selectedPeriod)
+        makeReportData(for: dateFilter)
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    periodPicker
+                    dateFilterSection
                     periodContext
                     summaryGrid
                     trendSection
                     paceSection
-                    categorySection
+                    breakdownOptionsSection
                     insightsSection
                 }
                 .padding(.horizontal, 16)
@@ -26,16 +27,53 @@ struct ReportsPage: View {
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle(Text("tab.reports"))
+            .onAppear {
+                initializeDateFilterIfNeeded()
+            }
+            .onChange(of: draftStore.transactions) { _, _ in
+                initializeDateFilterIfNeeded()
+            }
         }
     }
 
-    private var periodPicker: some View {
-        Picker("reports.period.title", selection: $selectedPeriod) {
-            ForEach(ReportPeriod.allCases) { period in
-                Text(period.titleKey).tag(period)
+    private var dateFilterSection: some View {
+        ReportCard {
+            TransactionDateHeader(
+                dateFilter: $dateFilter,
+                onPrevious: { dateFilter.shift(by: -1) },
+                onNext: { dateFilter.shift(by: 1) }
+            )
+        }
+    }
+
+    private var breakdownOptionsSection: some View {
+        ReportCard {
+            VStack(alignment: .leading, spacing: 16) {
+                ReportSectionHeader(
+                    titleKey: "reports.breakdown.title",
+                    subtitleKey: "reports.breakdown.subtitle",
+                    systemImage: "square.grid.2x2.fill"
+                )
+
+                VStack(spacing: 0) {
+                    ForEach(reportData.rankingSections.indices, id: \.self) { index in
+                        let section = reportData.rankingSections[index]
+
+                        NavigationLink {
+                            ReportRankingDetailPage(section: section)
+                        } label: {
+                            ReportRankingOptionRow(section: section)
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < reportData.rankingSections.count - 1 {
+                            Divider()
+                                .padding(.leading, 42)
+                        }
+                    }
+                }
             }
         }
-        .pickerStyle(.segmented)
     }
 
     private var periodContext: some View {
@@ -58,7 +96,7 @@ struct ReportsPage: View {
             VStack(alignment: .leading, spacing: 16) {
                 ReportSectionHeader(
                     titleKey: "reports.trend.title",
-                    subtitleKey: selectedPeriod.trendSubtitleKey,
+                    subtitleKey: "reports.trend.subtitle.filtered",
                     systemImage: "chart.xyaxis.line"
                 )
 
@@ -146,76 +184,6 @@ struct ReportsPage: View {
         }
     }
 
-    private var categorySection: some View {
-        ReportCard {
-            VStack(alignment: .leading, spacing: 16) {
-                ReportSectionHeader(
-                    titleKey: "reports.category.title",
-                    subtitleKey: "reports.category.subtitle",
-                    systemImage: "chart.pie.fill"
-                )
-
-                if reportData.categorySlices.isEmpty {
-                    ReportEmptyState(
-                        systemImage: "chart.pie",
-                        titleKey: "reports.empty.category.title",
-                        subtitleKey: "reports.empty.category.subtitle"
-                    )
-                } else {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .center, spacing: 18) {
-                            categoryDonutChart
-                            categoryTotalSummary
-                        }
-
-                        VStack(alignment: .leading, spacing: 14) {
-                            categoryDonutChart
-                                .frame(maxWidth: .infinity, alignment: .center)
-                            categoryTotalSummary
-                        }
-                    }
-
-                    VStack(spacing: 12) {
-                        ForEach(reportData.categorySlices) { slice in
-                            CategoryRankRow(slice: slice, totalAmount: reportData.totalExpense)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var categoryDonutChart: some View {
-        Chart(reportData.categorySlices) { slice in
-            SectorMark(
-                angle: .value(Self.localizedChartLabel("reports.chart.axis.amount"), slice.amount),
-                innerRadius: .ratio(0.62),
-                angularInset: 1.5
-            )
-            .foregroundStyle(Color(hex: slice.colorHex).gradient)
-        }
-        .chartLegend(.hidden)
-        .frame(width: 132, height: 132)
-    }
-
-    private var categoryTotalSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("reports.category.totalExpense")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text(Self.currencyText(from: reportData.totalExpense))
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Text(reportData.topCategoryNote)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private var insightsSection: some View {
         ReportCard {
             VStack(alignment: .leading, spacing: 14) {
@@ -252,31 +220,57 @@ struct ReportsPage: View {
         }
     }
 
-    private func makeReportData(for period: ReportPeriod) -> ReportData {
+    private func initializeDateFilterIfNeeded() {
+        guard !hasInitializedDateFilter else { return }
+        if let latestTransaction = draftStore.transactions.first {
+            dateFilter.setReference(latestTransaction.date)
+        }
+        hasInitializedDateFilter = true
+    }
+
+    private func makeReportData(for dateFilter: TransactionDateFilter) -> ReportData {
         let calendar = Calendar.current
         let now = Date()
-        let interval = period.dateInterval(containing: now, calendar: calendar)
-        let previousInterval = period.previousDateInterval(before: interval, calendar: calendar)
+        let interval = dateFilter.dateInterval(calendar: calendar)
+        let previousInterval = dateFilter.previousDateInterval(calendar: calendar)
+        let periodName = dateFilter.summaryText(calendar: calendar)
         var income = Decimal(0)
         var expense = Decimal(0)
         var previousExpense = Decimal(0)
         var previousIncome = Decimal(0)
-        var categoryTotals: [String: Decimal] = [:]
         var dailyExpenses: [Date: Decimal] = [:]
         var entryCount = 0
         var transferCount = 0
-        var trendBuckets = period.makeTrendBuckets(in: interval, calendar: calendar)
+        var accountOutflowTotals: [String: Decimal] = [:]
+        var accountExpenseTotals: [String: Decimal] = [:]
+        var primaryExpenseCategoryTotals: [String: Decimal] = [:]
+        var secondaryExpenseCategoryTotals: [String: Decimal] = [:]
+        var accountInflowTotals: [String: Decimal] = [:]
+        var accountIncomeTotals: [String: Decimal] = [:]
+        var primaryIncomeCategoryTotals: [String: Decimal] = [:]
+        var secondaryIncomeCategoryTotals: [String: Decimal] = [:]
+        var trendBuckets = makeTrendBuckets(in: interval, calendar: calendar)
 
         for transaction in draftStore.transactions {
-            if interval.contains(transaction.date) {
+            if contains(transaction.date, in: interval) {
                 switch transaction.kind {
                 case .expense:
                     let amount = decimalValue(from: transaction.amountText)
                     expense += amount
                     entryCount += 1
 
+                    if let accountId = transaction.accountId {
+                        accountOutflowTotals[accountId, default: 0] += amount
+                        accountExpenseTotals[accountId, default: 0] += amount
+                    }
+
                     if let categoryId = transaction.categoryId {
-                        categoryTotals[categoryId, default: 0] += amount
+                        if let primaryCategoryId = primaryCategoryId(for: categoryId) {
+                            primaryExpenseCategoryTotals[primaryCategoryId, default: 0] += amount
+                        }
+                        if let secondaryCategoryId = secondaryCategoryId(for: categoryId) {
+                            secondaryExpenseCategoryTotals[secondaryCategoryId, default: 0] += amount
+                        }
                     }
 
                     dailyExpenses[calendar.startOfDay(for: transaction.date), default: 0] += amount
@@ -285,11 +279,34 @@ struct ReportsPage: View {
                     let amount = decimalValue(from: transaction.amountText)
                     income += amount
                     entryCount += 1
+
+                    if let accountId = transaction.accountId {
+                        accountInflowTotals[accountId, default: 0] += amount
+                        accountIncomeTotals[accountId, default: 0] += amount
+                    }
+
+                    if let categoryId = transaction.categoryId {
+                        if let primaryCategoryId = primaryCategoryId(for: categoryId) {
+                            primaryIncomeCategoryTotals[primaryCategoryId, default: 0] += amount
+                        }
+                        if let secondaryCategoryId = secondaryCategoryId(for: categoryId) {
+                            secondaryIncomeCategoryTotals[secondaryCategoryId, default: 0] += amount
+                        }
+                    }
+
                     add(amount, kind: .income, transactionDate: transaction.date, to: &trendBuckets)
                 case .transfer:
+                    let outAmount = decimalValue(from: transaction.amountText)
+                    let inAmount = decimalValue(from: transaction.transferInAmountText ?? transaction.amountText)
+                    if let fromAccountId = transaction.fromAccountId {
+                        accountOutflowTotals[fromAccountId, default: 0] += outAmount
+                    }
+                    if let toAccountId = transaction.toAccountId {
+                        accountInflowTotals[toAccountId, default: 0] += inAmount
+                    }
                     transferCount += 1
                 }
-            } else if previousInterval.contains(transaction.date) {
+            } else if contains(transaction.date, in: previousInterval) {
                 switch transaction.kind {
                 case .expense:
                     previousExpense += decimalValue(from: transaction.amountText)
@@ -302,53 +319,23 @@ struct ReportsPage: View {
         }
 
         let balance = income - expense
-        let sortedCategoryTotals = categoryTotals.sorted { lhs, rhs in
-            if lhs.value == rhs.value {
-                return categoryDisplayName(for: lhs.key) < categoryDisplayName(for: rhs.key)
-            }
-
-            return lhs.value > rhs.value
-        }
-        let topCategoryTotals = sortedCategoryTotals.prefix(5)
-        let remainingCategoryTotal = sortedCategoryTotals.dropFirst(5).reduce(Decimal(0)) { partialResult, item in
-            partialResult + item.value
-        }
-        var categorySlices = topCategoryTotals.map { categoryId, amount in
-            let category = draftStore.categories.first { $0.id == categoryId }
-            return ReportCategorySlice(
-                id: categoryId,
-                title: categoryDisplayName(for: categoryId),
-                amount: doubleValue(from: amount),
-                colorHex: normalizedColorHex(category?.colorHex),
-                iconName: normalizedIconName(category?.iconName)
-            )
-        }
-
-        if remainingCategoryTotal > 0 {
-            categorySlices.append(
-                ReportCategorySlice(
-                    id: "__other",
-                    title: NSLocalizedString("reports.category.other", comment: ""),
-                    amount: doubleValue(from: remainingCategoryTotal),
-                    colorHex: "#8E8E93",
-                    iconName: "ellipsis"
-                )
-            )
-        }
-
-        let topCategory = categorySlices.first
-        let topCategoryNote = topCategory.map {
-            String(
-                format: NSLocalizedString("reports.category.topNoteFormat", comment: ""),
-                $0.title,
-                percentText(part: Decimal($0.amount), total: expense)
-            )
-        } ?? NSLocalizedString("reports.category.noTopNote", comment: "")
+        let primaryExpenseItems = makeCategoryRankingItems(from: primaryExpenseCategoryTotals)
+        let topCategory = primaryExpenseItems.first
+        let rankingSections = makeRankingSections(
+            accountOutflowTotals: accountOutflowTotals,
+            accountExpenseTotals: accountExpenseTotals,
+            primaryExpenseCategoryItems: primaryExpenseItems,
+            secondaryExpenseCategoryTotals: secondaryExpenseCategoryTotals,
+            accountInflowTotals: accountInflowTotals,
+            accountIncomeTotals: accountIncomeTotals,
+            primaryIncomeCategoryTotals: primaryIncomeCategoryTotals,
+            secondaryIncomeCategoryTotals: secondaryIncomeCategoryTotals
+        )
 
         let summaryMetrics = [
             ReportSummaryMetric(
                 id: "expense",
-                titleKey: period.expenseTitleKey,
+                titleKey: "reports.summary.expense.filtered",
                 value: Self.currencyText(from: expense),
                 caption: changeCaption(current: expense, previous: previousExpense),
                 systemImage: "arrow.down.circle.fill",
@@ -356,7 +343,7 @@ struct ReportsPage: View {
             ),
             ReportSummaryMetric(
                 id: "income",
-                titleKey: period.incomeTitleKey,
+                titleKey: "reports.summary.income.filtered",
                 value: Self.currencyText(from: income),
                 caption: changeCaption(current: income, previous: previousIncome),
                 systemImage: "arrow.up.circle.fill",
@@ -364,7 +351,7 @@ struct ReportsPage: View {
             ),
             ReportSummaryMetric(
                 id: "balance",
-                titleKey: period.balanceTitleKey,
+                titleKey: "reports.summary.balance.filtered",
                 value: Self.currencyText(from: balance),
                 caption: balanceCaption(for: balance),
                 systemImage: "equal.circle.fill",
@@ -385,7 +372,14 @@ struct ReportsPage: View {
             value: 1,
             to: calendar.startOfDay(for: elapsedEndDate)
         ) ?? interval.end
-        let dayCount = max(1, calendar.dateComponents([.day], from: interval.start, to: minDate(elapsedDayEnd, interval.end)).day ?? 1)
+        let dayCount = max(
+            1,
+            calendar.dateComponents(
+                [.day],
+                from: interval.start,
+                to: minDate(elapsedDayEnd, interval.end)
+            ).day ?? 1
+        )
         let activeExpenseDays = dailyExpenses.values.filter { $0 > 0 }.count
         let averageDailyExpense = expense / Decimal(dayCount)
         let averageActiveDayExpense = activeExpenseDays > 0 ? expense / Decimal(activeExpenseDays) : Decimal(0)
@@ -397,7 +391,7 @@ struct ReportsPage: View {
             return lhs.value < rhs.value
         }
         let paceHighlights = makePaceHighlights(
-            period: period,
+            periodName: periodName,
             averageDailyExpense: averageDailyExpense,
             averageActiveDayExpense: averageActiveDayExpense,
             activeExpenseDays: activeExpenseDays,
@@ -408,10 +402,10 @@ struct ReportsPage: View {
         return ReportData(
             summaryMetrics: summaryMetrics,
             trendPoints: trendBuckets.map { $0.point },
-            categorySlices: categorySlices,
+            rankingSections: rankingSections,
             paceHighlights: paceHighlights,
             insights: makeInsights(
-                period: period,
+                periodName: periodName,
                 expense: expense,
                 income: income,
                 balance: balance,
@@ -420,8 +414,6 @@ struct ReportsPage: View {
                 averageDailyExpense: averageDailyExpense,
                 maxDailyExpense: maxDailyExpense
             ),
-            totalExpense: doubleValue(from: expense),
-            topCategoryNote: topCategoryNote,
             periodRangeText: periodRangeText(for: interval),
             periodSummaryText: periodSummaryText(
                 entryCount: entryCount,
@@ -433,7 +425,7 @@ struct ReportsPage: View {
     }
 
     private func add(_ amount: Decimal, kind: DraftEntryKind, transactionDate: Date, to buckets: inout [ReportTrendBucket]) {
-        guard let index = buckets.firstIndex(where: { $0.interval.contains(transactionDate) }) else { return }
+        guard let index = buckets.firstIndex(where: { contains(transactionDate, in: $0.interval) }) else { return }
 
         switch kind {
         case .expense:
@@ -445,13 +437,197 @@ struct ReportsPage: View {
         }
     }
 
+    private func contains(_ date: Date, in interval: DateInterval) -> Bool {
+        date >= interval.start && date < interval.end
+    }
+
+    private func makeRankingSections(
+        accountOutflowTotals: [String: Decimal],
+        accountExpenseTotals: [String: Decimal],
+        primaryExpenseCategoryItems: [ReportRankingItem],
+        secondaryExpenseCategoryTotals: [String: Decimal],
+        accountInflowTotals: [String: Decimal],
+        accountIncomeTotals: [String: Decimal],
+        primaryIncomeCategoryTotals: [String: Decimal],
+        secondaryIncomeCategoryTotals: [String: Decimal]
+    ) -> [ReportRankingSection] {
+        [
+            ReportRankingSection(
+                id: "account-outflow",
+                titleKey: "reports.rank.accountOutflow.title",
+                subtitleKey: "reports.rank.accountOutflow.subtitle",
+                emptyTitleKey: "reports.rank.accountOutflow.empty.title",
+                emptySubtitleKey: "reports.rank.accountOutflow.empty.subtitle",
+                systemImage: "arrow.up.right.circle.fill",
+                totalAmount: doubleValue(from: totalAmount(in: accountOutflowTotals)),
+                items: makeAccountRankingItems(from: accountOutflowTotals)
+            ),
+            ReportRankingSection(
+                id: "account-expense",
+                titleKey: "reports.rank.accountExpense.title",
+                subtitleKey: "reports.rank.accountExpense.subtitle",
+                emptyTitleKey: "reports.rank.accountExpense.empty.title",
+                emptySubtitleKey: "reports.rank.accountExpense.empty.subtitle",
+                systemImage: "creditcard.fill",
+                totalAmount: doubleValue(from: totalAmount(in: accountExpenseTotals)),
+                items: makeAccountRankingItems(from: accountExpenseTotals)
+            ),
+            ReportRankingSection(
+                id: "primary-expense-category",
+                titleKey: "reports.rank.primaryExpenseCategory.title",
+                subtitleKey: "reports.rank.primaryExpenseCategory.subtitle",
+                emptyTitleKey: "reports.rank.primaryExpenseCategory.empty.title",
+                emptySubtitleKey: "reports.rank.primaryExpenseCategory.empty.subtitle",
+                systemImage: "chart.pie.fill",
+                totalAmount: totalAmount(in: primaryExpenseCategoryItems),
+                items: primaryExpenseCategoryItems
+            ),
+            ReportRankingSection(
+                id: "secondary-expense-category",
+                titleKey: "reports.rank.secondaryExpenseCategory.title",
+                subtitleKey: "reports.rank.secondaryExpenseCategory.subtitle",
+                emptyTitleKey: "reports.rank.secondaryExpenseCategory.empty.title",
+                emptySubtitleKey: "reports.rank.secondaryExpenseCategory.empty.subtitle",
+                systemImage: "square.stack.3d.up.fill",
+                totalAmount: doubleValue(from: totalAmount(in: secondaryExpenseCategoryTotals)),
+                items: makeCategoryRankingItems(from: secondaryExpenseCategoryTotals)
+            ),
+            ReportRankingSection(
+                id: "account-inflow",
+                titleKey: "reports.rank.accountInflow.title",
+                subtitleKey: "reports.rank.accountInflow.subtitle",
+                emptyTitleKey: "reports.rank.accountInflow.empty.title",
+                emptySubtitleKey: "reports.rank.accountInflow.empty.subtitle",
+                systemImage: "arrow.down.left.circle.fill",
+                totalAmount: doubleValue(from: totalAmount(in: accountInflowTotals)),
+                items: makeAccountRankingItems(from: accountInflowTotals)
+            ),
+            ReportRankingSection(
+                id: "account-income",
+                titleKey: "reports.rank.accountIncome.title",
+                subtitleKey: "reports.rank.accountIncome.subtitle",
+                emptyTitleKey: "reports.rank.accountIncome.empty.title",
+                emptySubtitleKey: "reports.rank.accountIncome.empty.subtitle",
+                systemImage: "banknote.fill",
+                totalAmount: doubleValue(from: totalAmount(in: accountIncomeTotals)),
+                items: makeAccountRankingItems(from: accountIncomeTotals)
+            ),
+            ReportRankingSection(
+                id: "primary-income-category",
+                titleKey: "reports.rank.primaryIncomeCategory.title",
+                subtitleKey: "reports.rank.primaryIncomeCategory.subtitle",
+                emptyTitleKey: "reports.rank.primaryIncomeCategory.empty.title",
+                emptySubtitleKey: "reports.rank.primaryIncomeCategory.empty.subtitle",
+                systemImage: "chart.pie.fill",
+                totalAmount: doubleValue(from: totalAmount(in: primaryIncomeCategoryTotals)),
+                items: makeCategoryRankingItems(from: primaryIncomeCategoryTotals)
+            ),
+            ReportRankingSection(
+                id: "secondary-income-category",
+                titleKey: "reports.rank.secondaryIncomeCategory.title",
+                subtitleKey: "reports.rank.secondaryIncomeCategory.subtitle",
+                emptyTitleKey: "reports.rank.secondaryIncomeCategory.empty.title",
+                emptySubtitleKey: "reports.rank.secondaryIncomeCategory.empty.subtitle",
+                systemImage: "square.stack.3d.up.fill",
+                totalAmount: doubleValue(from: totalAmount(in: secondaryIncomeCategoryTotals)),
+                items: makeCategoryRankingItems(from: secondaryIncomeCategoryTotals)
+            )
+        ]
+    }
+
+    private func makeAccountRankingItems(from totals: [String: Decimal]) -> [ReportRankingItem] {
+        makeRankingItems(from: totals) { accountId, amount in
+            let account = draftStore.accounts.first { $0.id == accountId }
+            return ReportRankingItem(
+                id: accountId,
+                title: accountDisplayName(for: accountId),
+                amount: doubleValue(from: amount),
+                colorHex: normalizedColorHex(account?.colorHex),
+                iconName: normalizedIconName(account?.iconName, fallback: "wallet")
+            )
+        }
+    }
+
+    private func makeCategoryRankingItems(from totals: [String: Decimal]) -> [ReportRankingItem] {
+        makeRankingItems(from: totals) { categoryId, amount in
+            let category = draftStore.categories.first { $0.id == categoryId }
+            return ReportRankingItem(
+                id: categoryId,
+                title: categoryDisplayName(for: categoryId),
+                amount: doubleValue(from: amount),
+                colorHex: normalizedColorHex(category?.colorHex),
+                iconName: normalizedIconName(category?.iconName, fallback: "tag")
+            )
+        }
+    }
+
+    private func makeRankingItems(
+        from totals: [String: Decimal],
+        item: (String, Decimal) -> ReportRankingItem
+    ) -> [ReportRankingItem] {
+        totals
+            .filter { $0.value > 0 }
+            .map { key, value in
+                item(key, value)
+            }
+            .sorted { lhs, rhs in
+                if lhs.amount == rhs.amount {
+                    return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+                }
+
+                return lhs.amount > rhs.amount
+            }
+    }
+
+    private func totalAmount(in totals: [String: Decimal]) -> Decimal {
+        totals.values.reduce(Decimal(0), +)
+    }
+
+    private func totalAmount(in items: [ReportRankingItem]) -> Double {
+        items.reduce(0) { partialResult, item in
+            partialResult + item.amount
+        }
+    }
+
+    private func primaryCategoryId(for categoryId: String) -> String? {
+        categoryPath(for: categoryId).first?.id ?? categoryId
+    }
+
+    private func secondaryCategoryId(for categoryId: String) -> String? {
+        let path = categoryPath(for: categoryId)
+        guard path.count >= 2 else { return nil }
+        return path[1].id
+    }
+
+    private func categoryPath(for categoryId: String) -> [DraftCategory] {
+        guard let category = draftStore.categories.first(where: { $0.id == categoryId }) else {
+            return []
+        }
+
+        var path = [category]
+        var visitedIds = Set([category.id])
+        var currentCategory = category
+
+        while
+            let parentId = currentCategory.parentId,
+            !visitedIds.contains(parentId),
+            let parent = draftStore.categories.first(where: { $0.id == parentId && $0.kind == category.kind })
+        {
+            path.append(parent)
+            visitedIds.insert(parent.id)
+            currentCategory = parent
+        }
+
+        return path.reversed()
+    }
+
     private func makeInsights(
-        period: ReportPeriod,
+        periodName: String,
         expense: Decimal,
         income: Decimal,
         balance: Decimal,
         entryCount: Int,
-        topCategory: ReportCategorySlice?,
+        topCategory: ReportRankingItem?,
         averageDailyExpense: Decimal,
         maxDailyExpense: (key: Date, value: Decimal)?
     ) -> [ReportInsight] {
@@ -510,7 +686,7 @@ struct ReportsPage: View {
                     title: NSLocalizedString("reports.insight.pace.title", comment: ""),
                     subtitle: String(
                         format: NSLocalizedString("reports.insight.pace.subtitleFormat", comment: ""),
-                        period.localizedName,
+                        periodName,
                         Self.currencyText(from: averageDailyExpense)
                     ),
                     systemImage: "calendar.badge.clock",
@@ -541,7 +717,7 @@ struct ReportsPage: View {
                 title: NSLocalizedString("reports.insight.activity.title", comment: ""),
                 subtitle: String(
                     format: NSLocalizedString("reports.insight.activity.subtitleFormat", comment: ""),
-                    period.localizedName,
+                    periodName,
                     entryCount,
                     Self.currencyText(from: income),
                     Self.currencyText(from: expense)
@@ -567,7 +743,7 @@ struct ReportsPage: View {
     }
 
     private func makePaceHighlights(
-        period: ReportPeriod,
+        periodName: String,
         averageDailyExpense: Decimal,
         averageActiveDayExpense: Decimal,
         activeExpenseDays: Int,
@@ -583,7 +759,7 @@ struct ReportsPage: View {
                 value: Self.currencyText(from: averageDailyExpense),
                 caption: String(
                     format: NSLocalizedString("reports.pace.averageDaily.captionFormat", comment: ""),
-                    period.localizedName
+                    periodName
                 ),
                 systemImage: "divide.circle.fill",
                 color: .accentColor
@@ -659,8 +835,17 @@ struct ReportsPage: View {
         return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
     }
 
-    private func normalizedIconName(_ iconName: String?) -> String {
-        guard let iconName, !iconName.isEmpty else { return "tag" }
+    private func accountDisplayName(for id: String) -> String {
+        guard let account = draftStore.accounts.first(where: { $0.id == id }) else {
+            return NSLocalizedString("draft.item.missing", comment: "")
+        }
+
+        guard account.isArchived else { return account.name }
+        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), account.name)
+    }
+
+    private func normalizedIconName(_ iconName: String?, fallback: String) -> String {
+        guard let iconName, !iconName.isEmpty else { return fallback }
         return iconName
     }
 
@@ -718,6 +903,63 @@ struct ReportsPage: View {
         lhs > rhs ? lhs : rhs
     }
 
+    private func makeTrendBuckets(in interval: DateInterval, calendar: Calendar) -> [ReportTrendBucket] {
+        let monthCount = calendar.dateComponents([.month], from: interval.start, to: interval.end).month ?? 0
+        if monthCount >= 2 {
+            return makeMonthBuckets(in: interval, calendar: calendar)
+        }
+
+        return makeDayBuckets(in: interval, calendar: calendar, maxBucketCount: 8)
+    }
+
+    private func makeDayBuckets(in interval: DateInterval, calendar: Calendar, maxBucketCount: Int) -> [ReportTrendBucket] {
+        let dayCount = calendar.dateComponents([.day], from: interval.start, to: interval.end).day ?? 0
+        let bucketSize = max(1, Int(ceil(Double(max(dayCount, 1)) / Double(maxBucketCount))))
+        var buckets: [ReportTrendBucket] = []
+        var start = interval.start
+
+        while start < interval.end {
+            let end = minDate(calendar.date(byAdding: .day, value: bucketSize, to: start) ?? interval.end, interval.end)
+            let startDay = calendar.component(.day, from: start)
+            let endDay = calendar.component(.day, from: calendar.date(byAdding: .day, value: -1, to: end) ?? start)
+            let label = startDay == endDay ? "\(startDay)" : "\(startDay)-\(endDay)"
+            buckets.append(
+                ReportTrendBucket(
+                    label: label,
+                    interval: DateInterval(start: start, end: end)
+                )
+            )
+            start = end
+        }
+
+        return buckets
+    }
+
+    private func makeMonthBuckets(in interval: DateInterval, calendar: Calendar) -> [ReportTrendBucket] {
+        var buckets: [ReportTrendBucket] = []
+        var start = startOfMonth(for: interval.start, calendar: calendar)
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("MMM")
+
+        while start < interval.end {
+            let end = minDate(calendar.date(byAdding: .month, value: 1, to: start) ?? interval.end, interval.end)
+            buckets.append(
+                ReportTrendBucket(
+                    label: formatter.string(from: start),
+                    interval: DateInterval(start: start, end: end)
+                )
+            )
+            start = end
+        }
+
+        return buckets
+    }
+
+    private func startOfMonth(for date: Date, calendar: Calendar) -> Date {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        return calendar.date(from: components) ?? date
+    }
+
     fileprivate static func currencyText(from decimal: Decimal) -> String {
         DraftAmountFormatter.currencyText(from: NSDecimalNumber(decimal: decimal).stringValue)
     }
@@ -754,185 +996,12 @@ struct ReportsPage: View {
     }
 }
 
-private enum ReportPeriod: String, CaseIterable, Identifiable {
-    case month
-    case quarter
-    case year
-
-    var id: String { rawValue }
-
-    var titleKey: LocalizedStringKey {
-        switch self {
-        case .month:
-            return "reports.period.month"
-        case .quarter:
-            return "reports.period.quarter"
-        case .year:
-            return "reports.period.year"
-        }
-    }
-
-    var localizedName: String {
-        NSLocalizedString(titleKeyString, comment: "")
-    }
-
-    var titleKeyString: String {
-        switch self {
-        case .month:
-            return "reports.period.month"
-        case .quarter:
-            return "reports.period.quarter"
-        case .year:
-            return "reports.period.year"
-        }
-    }
-
-    var expenseTitleKey: LocalizedStringKey {
-        switch self {
-        case .month:
-            return "reports.summary.expense.month"
-        case .quarter:
-            return "reports.summary.expense.quarter"
-        case .year:
-            return "reports.summary.expense.year"
-        }
-    }
-
-    var incomeTitleKey: LocalizedStringKey {
-        switch self {
-        case .month:
-            return "reports.summary.income.month"
-        case .quarter:
-            return "reports.summary.income.quarter"
-        case .year:
-            return "reports.summary.income.year"
-        }
-    }
-
-    var balanceTitleKey: LocalizedStringKey {
-        switch self {
-        case .month:
-            return "reports.summary.balance.month"
-        case .quarter:
-            return "reports.summary.balance.quarter"
-        case .year:
-            return "reports.summary.balance.year"
-        }
-    }
-
-    var trendSubtitleKey: LocalizedStringKey {
-        switch self {
-        case .month:
-            return "reports.trend.subtitle.month"
-        case .quarter:
-            return "reports.trend.subtitle.quarter"
-        case .year:
-            return "reports.trend.subtitle.year"
-        }
-    }
-
-    func dateInterval(containing date: Date, calendar: Calendar) -> DateInterval {
-        switch self {
-        case .month:
-            return calendar.dateInterval(of: .month, for: date) ?? fallbackInterval(endingAt: date, days: 30, calendar: calendar)
-        case .quarter:
-            let month = calendar.component(.month, from: date)
-            let quarterStartMonth = ((month - 1) / 3) * 3 + 1
-            var components = calendar.dateComponents([.year], from: date)
-            components.month = quarterStartMonth
-            components.day = 1
-            let start = calendar.date(from: components) ?? date
-            let end = calendar.date(byAdding: .month, value: 3, to: start) ?? date
-            return DateInterval(start: start, end: end)
-        case .year:
-            return calendar.dateInterval(of: .year, for: date) ?? fallbackInterval(endingAt: date, days: 365, calendar: calendar)
-        }
-    }
-
-    func previousDateInterval(before interval: DateInterval, calendar: Calendar) -> DateInterval {
-        let component: Calendar.Component
-        let value: Int
-
-        switch self {
-        case .month:
-            component = .month
-            value = -1
-        case .quarter:
-            component = .month
-            value = -3
-        case .year:
-            component = .year
-            value = -1
-        }
-
-        let start = calendar.date(byAdding: component, value: value, to: interval.start) ?? interval.start
-        let end = calendar.date(byAdding: component, value: value, to: interval.end) ?? interval.start
-        return DateInterval(start: start, end: end)
-    }
-
-    func makeTrendBuckets(in interval: DateInterval, calendar: Calendar) -> [ReportTrendBucket] {
-        switch self {
-        case .month:
-            return makeDayBuckets(in: interval, calendar: calendar, maxBucketCount: 8)
-        case .quarter:
-            return makeMonthBuckets(in: interval, calendar: calendar)
-        case .year:
-            return makeMonthBuckets(in: interval, calendar: calendar)
-        }
-    }
-
-    private func makeDayBuckets(in interval: DateInterval, calendar: Calendar, maxBucketCount: Int) -> [ReportTrendBucket] {
-        let dayCount = calendar.dateComponents([.day], from: interval.start, to: interval.end).day ?? 0
-        let bucketSize = max(1, Int(ceil(Double(dayCount) / Double(maxBucketCount))))
-        var buckets: [ReportTrendBucket] = []
-        var start = interval.start
-
-        while start < interval.end {
-            let end = minDate(calendar.date(byAdding: .day, value: bucketSize, to: start) ?? interval.end, interval.end)
-            let startDay = calendar.component(.day, from: start)
-            let endDay = calendar.component(.day, from: calendar.date(byAdding: .day, value: -1, to: end) ?? start)
-            let label = startDay == endDay ? "\(startDay)" : "\(startDay)-\(endDay)"
-            buckets.append(ReportTrendBucket(label: label, interval: DateInterval(start: start, end: end)))
-            start = end
-        }
-
-        return buckets
-    }
-
-    private func makeMonthBuckets(in interval: DateInterval, calendar: Calendar) -> [ReportTrendBucket] {
-        var buckets: [ReportTrendBucket] = []
-        var start = interval.start
-        let formatter = DateFormatter()
-        formatter.setLocalizedDateFormatFromTemplate("MMM")
-
-        while start < interval.end {
-            let end = minDate(calendar.date(byAdding: .month, value: 1, to: start) ?? interval.end, interval.end)
-            buckets.append(ReportTrendBucket(label: formatter.string(from: start), interval: DateInterval(start: start, end: end)))
-            start = end
-        }
-
-        return buckets
-    }
-
-    private func fallbackInterval(endingAt date: Date, days: Int, calendar: Calendar) -> DateInterval {
-        let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
-        let start = calendar.date(byAdding: .day, value: -days, to: end) ?? date
-        return DateInterval(start: start, end: end)
-    }
-
-    private func minDate(_ lhs: Date, _ rhs: Date) -> Date {
-        lhs < rhs ? lhs : rhs
-    }
-}
-
 private struct ReportData {
     let summaryMetrics: [ReportSummaryMetric]
     let trendPoints: [ReportTrendPoint]
-    let categorySlices: [ReportCategorySlice]
+    let rankingSections: [ReportRankingSection]
     let paceHighlights: [ReportHighlight]
     let insights: [ReportInsight]
-    let totalExpense: Double
-    let topCategoryNote: String
     let periodRangeText: String
     let periodSummaryText: String
 }
@@ -964,7 +1033,31 @@ private struct ReportTrendPoint: Identifiable {
     let income: Double
 }
 
-private struct ReportCategorySlice: Identifiable {
+private struct ReportRankingSection: Identifiable {
+    let id: String
+    let titleKey: LocalizedStringKey
+    let subtitleKey: LocalizedStringKey
+    let emptyTitleKey: LocalizedStringKey
+    let emptySubtitleKey: LocalizedStringKey
+    let systemImage: String
+    let totalAmount: Double
+    let items: [ReportRankingItem]
+
+    var itemCount: Int {
+        items.count
+    }
+
+    var topItem: ReportRankingItem? {
+        items.first
+    }
+
+    var topItemShare: Double {
+        guard totalAmount > 0, let topItem else { return 0 }
+        return topItem.amount / totalAmount
+    }
+}
+
+private struct ReportRankingItem: Identifiable {
     let id: String
     let title: String
     let amount: Double
@@ -1000,7 +1093,10 @@ private struct ReportCard<Content: View>: View {
         content
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(
+                Color(.secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
     }
 }
 
@@ -1031,7 +1127,10 @@ private struct ReportContextBar: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(
+            Color(.secondarySystemGroupedBackground),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
     }
 }
 
@@ -1175,34 +1274,264 @@ private struct ReportEmptyState: View {
     }
 }
 
-private struct CategoryRankRow: View {
-    let slice: ReportCategorySlice
+private struct ReportRankingOptionRow: View {
+    let section: ReportRankingSection
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: section.systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 30, height: 30)
+                .background(Color.accentColor.opacity(0.14), in: Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text(section.titleKey)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if section.itemCount > 0 {
+                        Text(String(format: NSLocalizedString("reports.breakdown.itemCountFormat", comment: ""), section.itemCount))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                    }
+                }
+
+                Text(subtitleText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(ReportsPage.currencyText(from: section.totalAmount))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
+
+    private var subtitleText: String {
+        guard let topItem = section.topItem else {
+            return NSLocalizedString("reports.breakdown.noData", comment: "")
+        }
+
+        let shareText = Self.percentFormatter.string(from: section.topItemShare as NSNumber) ?? "0%"
+        return String(
+            format: NSLocalizedString("reports.breakdown.topItemFormat", comment: ""),
+            topItem.title,
+            shareText
+        )
+    }
+
+    private static let percentFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .percent
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
+}
+
+private struct ReportRankingDetailPage: View {
+    let section: ReportRankingSection
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                ReportCard {
+                    VStack(alignment: .leading, spacing: 16) {
+                        ReportSectionHeader(
+                            titleKey: section.titleKey,
+                            subtitleKey: section.subtitleKey,
+                            systemImage: section.systemImage
+                        )
+
+                        if section.items.isEmpty {
+                            ReportEmptyState(
+                                systemImage: section.systemImage,
+                                titleKey: section.emptyTitleKey,
+                                subtitleKey: section.emptySubtitleKey
+                            )
+                        } else {
+                            ViewThatFits(in: .horizontal) {
+                                HStack(alignment: .center, spacing: 18) {
+                                    rankingPieChart
+                                    rankingSummary
+                                }
+
+                                VStack(alignment: .leading, spacing: 14) {
+                                    rankingPieChart
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                    rankingSummary
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if !section.items.isEmpty {
+                    ReportCard {
+                        VStack(alignment: .leading, spacing: 14) {
+                            ReportSectionHeader(
+                                titleKey: "reports.breakdown.ranking.title",
+                                subtitleKey: "reports.breakdown.ranking.subtitle",
+                                systemImage: "list.number"
+                            )
+
+                            VStack(spacing: 12) {
+                                ForEach(section.items) { item in
+                                    ReportRankingRow(item: item, totalAmount: section.totalAmount)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle(Text(section.titleKey))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var rankingPieChart: some View {
+        Chart(section.items) { item in
+            SectorMark(
+                angle: .value(Self.localizedChartLabel("reports.chart.axis.amount"), item.amount),
+                innerRadius: .ratio(0.62),
+                angularInset: 1.5
+            )
+            .foregroundStyle(Color(hex: item.colorHex).gradient)
+        }
+        .chartLegend(.hidden)
+        .frame(width: 148, height: 148)
+    }
+
+    private var rankingSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("reports.breakdown.total")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Text(ReportsPage.currencyText(from: section.totalAmount))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .monospacedDigit()
+
+            HStack(spacing: 10) {
+                ReportBreakdownSummaryBadge(
+                    titleKey: "reports.breakdown.itemCount",
+                    value: String(section.itemCount),
+                    systemImage: "number.circle.fill"
+                )
+
+                ReportBreakdownSummaryBadge(
+                    titleKey: "reports.breakdown.topShare",
+                    value: Self.percentFormatter.string(from: section.topItemShare as NSNumber) ?? "0%",
+                    systemImage: "chart.pie.fill"
+                )
+            }
+
+            if let topItem = section.topItem {
+                Text(
+                    String(
+                        format: NSLocalizedString("reports.breakdown.topItemFormat", comment: ""),
+                        topItem.title,
+                        Self.percentFormatter.string(from: section.topItemShare as NSNumber) ?? "0%"
+                    )
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private static let percentFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .percent
+        formatter.maximumFractionDigits = 0
+        return formatter
+    }()
+
+    private static func localizedChartLabel(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
+}
+
+private struct ReportBreakdownSummaryBadge: View {
+    let titleKey: LocalizedStringKey
+    let value: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(titleKey)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct ReportRankingRow: View {
+    let item: ReportRankingItem
     let totalAmount: Double
 
     private var percentage: Double {
         guard totalAmount > 0 else { return 0 }
-        return slice.amount / totalAmount
+        return item.amount / totalAmount
     }
 
     var body: some View {
         HStack(spacing: 12) {
-            DraftVisualBadge(iconName: slice.iconName, colorHex: slice.colorHex, size: 30)
+            DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 30)
 
             VStack(alignment: .leading, spacing: 7) {
                 HStack {
-                    Text(slice.title)
+                    Text(item.title)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
 
                     Spacer()
 
-                    Text(ReportsPage.currencyText(from: slice.amount))
+                    Text(ReportsPage.currencyText(from: item.amount))
                         .font(.subheadline)
                         .monospacedDigit()
                 }
 
                 ProgressView(value: percentage)
-                    .tint(Color(hex: slice.colorHex))
+                    .tint(Color(hex: item.colorHex))
             }
 
             Text(Self.percentFormatter.string(from: percentage as NSNumber) ?? "")

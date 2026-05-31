@@ -22,6 +22,14 @@ struct RecordPage: View {
     @State private var locationMessageKey: String?
     @State private var errorKey: String?
 
+    private var availableTemplates: [DraftTransactionTemplate] {
+        return draftStore.transactionTemplates.filter { template in
+            template.kind == selectedKind &&
+                draftStore.accounts.contains { $0.id == template.accountId && !$0.isArchived } &&
+                draftStore.categories.contains { $0.id == template.categoryId && $0.kind == selectedKind && !$0.isArchived }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -33,6 +41,8 @@ struct RecordPage: View {
                     }
                     .pickerStyle(.segmented)
                 }
+
+                templateSection
 
                 if selectedKind == .transfer {
                     transferAmountSection
@@ -184,6 +194,38 @@ struct RecordPage: View {
         }
     }
 
+    @ViewBuilder
+    private var templateSection: some View {
+        if !availableTemplates.isEmpty {
+            Section {
+                NavigationLink {
+                    RecordTemplateSelectionPage(
+                        templates: availableTemplates,
+                        categoryItem: { categorySelectionItem(for: $0) },
+                        categoryName: { draftStore.categoryDisplayName(for: $0) },
+                        accountName: { draftStore.accountName(for: $0) },
+                        onSelect: { applyTemplate($0) }
+                    )
+                } label: {
+                    HStack(spacing: 12) {
+                        Label("record.templates.choose", systemImage: "doc.text.magnifyingglass")
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        Text(String(format: NSLocalizedString("record.templates.countFormat", comment: ""), availableTemplates.count))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("record.templates.section")
+            } footer: {
+                Text("record.templates.footer")
+            }
+        }
+    }
+
     private var transferAccountSection: some View {
         Section {
             NavigationLink {
@@ -315,6 +357,20 @@ struct RecordPage: View {
 
     private func defaultCategoryId(in categories: [DraftCategory]) -> String {
         categories.first { $0.isDefault }?.id ?? categories.first?.id ?? ""
+    }
+
+    private func applyTemplate(_ template: DraftTransactionTemplate) {
+        selectedKind = template.kind
+        amountText = template.amountText
+        transferInAmountText = ""
+        selectedCategoryId = template.categoryId
+        selectedAccountId = template.accountId
+        note = template.note
+        date = Date()
+        location = nil
+        locationMessageKey = nil
+        errorKey = nil
+        normalizeSelections()
     }
 
     private var accountSelectionItems: [RecordVisualSelectionItem] {
@@ -506,6 +562,111 @@ private struct RecordVisualSelectionItem: Identifiable, Equatable {
     let colorHex: String
     var subtitle: String = ""
     var depth: Int = 1
+}
+
+private struct RecordTemplateSelectionPage: View {
+    let templates: [DraftTransactionTemplate]
+    let categoryItem: (String) -> RecordVisualSelectionItem
+    let categoryName: (String?) -> String
+    let accountName: (String?) -> String
+    let onSelect: (DraftTransactionTemplate) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private var filteredTemplates: [DraftTransactionTemplate] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return templates }
+
+        return templates.filter { template in
+            template.name.localizedCaseInsensitiveContains(query)
+                || template.note.localizedCaseInsensitiveContains(query)
+                || categoryName(template.categoryId).localizedCaseInsensitiveContains(query)
+                || accountName(template.accountId).localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var body: some View {
+        List {
+            if filteredTemplates.isEmpty {
+                ContentUnavailableView(
+                    "record.templates.search.empty.title",
+                    systemImage: "magnifyingglass",
+                    description: Text("record.templates.search.empty.subtitle")
+                )
+            } else {
+                ForEach(filteredTemplates) { template in
+                    Button {
+                        onSelect(template)
+                        dismiss()
+                    } label: {
+                        RecordTemplateRow(
+                            template: template,
+                            categoryItem: categoryItem(template.categoryId),
+                            accountName: accountName(template.accountId)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .navigationTitle(Text("record.templates.choose.title"))
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("record.templates.search.placeholder"))
+    }
+}
+
+private struct RecordTemplateRow: View {
+    let template: DraftTransactionTemplate
+    let categoryItem: RecordVisualSelectionItem
+    let accountName: String
+
+    private var amountText: String {
+        switch template.kind {
+        case .expense:
+            return "-\(DraftAmountFormatter.currencyText(from: template.amountText))"
+        case .income:
+            return "+\(DraftAmountFormatter.currencyText(from: template.amountText))"
+        case .transfer:
+            return DraftAmountFormatter.currencyText(from: template.amountText)
+        }
+    }
+
+    private var amountColor: Color {
+        template.kind == .expense ? .red : .green
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            DraftVisualBadge(iconName: categoryItem.iconName, colorHex: categoryItem.colorHex, size: 30)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(template.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    Text(categoryItem.name)
+
+                    Text("·")
+
+                    Text(accountName)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(amountText)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(amountColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 3)
+    }
 }
 
 struct RecordAmountInputRow: View {

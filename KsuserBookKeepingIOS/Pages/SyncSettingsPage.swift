@@ -327,7 +327,11 @@ struct SyncSettingsPage: View {
                 configuration: configuration,
                 secrets: secrets
             )
-            if profileImported, metadataImported, transactionsImported {
+            let templatesImported = await draftBookkeepingStore.importTemplatesNow(
+                configuration: configuration,
+                secrets: secrets
+            )
+            if profileImported, metadataImported, transactionsImported, templatesImported {
                 do {
                     try syncSettingsStore.save(
                         SyncSettingsDraft(
@@ -343,7 +347,7 @@ struct SyncSettingsPage: View {
                 }
                 syncSettingsStore.completeInitialSetup(.syncSpace)
             }
-            showSettingsMessage(profileImported && metadataImported && transactionsImported ? "sync.import.completed" : "sync.import.error.failed")
+            showSettingsMessage(profileImported && metadataImported && transactionsImported && templatesImported ? "sync.import.completed" : "sync.import.error.failed")
         }
     }
 

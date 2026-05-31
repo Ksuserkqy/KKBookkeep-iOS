@@ -165,6 +165,10 @@ struct ContentView: View {
             configuration: configuration,
             secrets: secrets
         )
+        await draftBookkeepingStore.importIfRemoteTemplatesAreNewer(
+            configuration: configuration,
+            secrets: secrets
+        )
         lastRemoteDataImportAt = Date()
         isImportingRemoteData = false
     }

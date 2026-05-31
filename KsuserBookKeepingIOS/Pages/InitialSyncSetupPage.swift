@@ -370,8 +370,12 @@ struct InitialSyncSetupPage: View {
             configuration: configuration,
             secrets: secrets
         )
+        let templatesImported = await draftBookkeepingStore.importTemplatesNow(
+            configuration: configuration,
+            secrets: secrets
+        )
 
-        if profileImported, metadataImported, transactionsImported {
+        if profileImported, metadataImported, transactionsImported, templatesImported {
             let draft = SyncSettingsDraft(
                 configuration: configuration,
                 password: password,

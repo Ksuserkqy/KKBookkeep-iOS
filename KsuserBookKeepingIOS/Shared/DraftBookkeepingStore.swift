@@ -186,6 +186,18 @@ struct DraftTransaction: Codable, Identifiable, Equatable {
     var createdAt: Date
 }
 
+struct DraftTransactionTemplate: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var kind: DraftEntryKind
+    var amountText: String
+    var categoryId: String
+    var accountId: String
+    var note: String
+    var createdAt: Date
+    var updatedAt: Date
+}
+
 struct DraftLocation: Codable, Equatable {
     var displayName: String
     var address: String
@@ -204,14 +216,17 @@ final class DraftBookkeepingStore: ObservableObject {
     @Published private(set) var accounts: [DraftAccount]
     @Published private(set) var categories: [DraftCategory]
     @Published private(set) var transactions: [DraftTransaction]
+    @Published private(set) var transactionTemplates: [DraftTransactionTemplate]
     @Published private(set) var lastDraft: DraftTransaction?
     @Published private(set) var messageKey: String?
     @Published private(set) var localMetadataChangeToken = 0
     @Published private(set) var localTransactionsChangeToken = 0
+    @Published private(set) var localTemplatesChangeToken = 0
 
     private let defaults: UserDefaults
     private let syncService: BookkeepingMetadataSyncService
     private let transactionsSyncService: BookkeepingTransactionsSyncService
+    private let templatesSyncService: BookkeepingTemplatesSyncService
     private var metadataRevision: Int
     private var metadataUpdatedAt: Date
     private var metadataUpdatedByDeviceId: String
@@ -235,11 +250,19 @@ final class DraftBookkeepingStore: ObservableObject {
     private var deletedTransactionOpSortKeysById: [String: TransactionOpSortKey]
     private var accountBaseBalanceTextById: [String: String]
     private var didImportLegacyTransactionsSeed: Bool
+    private var nextTemplateOpSeq: Int
+    private var localTemplateOps: [BookkeepingTemplateOp]
+    private var uploadedTemplateOpIds: Set<String>
+    private var processedTemplateOpIds: Set<String>
+    private var importedTemplateSeqByDeviceId: [String: Int]
+    private var templateOpSortKeysById: [String: TemplateOpSortKey]
+    private var deletedTemplateOpSortKeysById: [String: TemplateOpSortKey]
 
     private enum DefaultsKey {
         static let accounts = "draftBookkeeping.accounts"
         static let categories = "draftBookkeeping.categories"
         static let transactions = "draftBookkeeping.transactions"
+        static let transactionTemplates = "draftBookkeeping.transactionTemplates"
         static let lastDraft = "draftBookkeeping.lastDraft"
         static let metadataRevision = "draftBookkeeping.metadata.revision"
         static let metadataUpdatedAt = "draftBookkeeping.metadata.updatedAt"
@@ -264,6 +287,13 @@ final class DraftBookkeepingStore: ObservableObject {
         static let deletedTransactionOpSortKeysById = "draftBookkeeping.transactions.deletedOpSortKeysById"
         static let accountBaseBalanceTextById = "draftBookkeeping.accounts.baseBalanceTextById"
         static let didImportLegacyTransactionsSeed = "draftBookkeeping.transactions.didImportLegacySeed"
+        static let templateNextSeq = "draftBookkeeping.templates.nextSeq"
+        static let templateLocalOps = "draftBookkeeping.templates.localOps"
+        static let templateUploadedOpIds = "draftBookkeeping.templates.uploadedOpIds"
+        static let templateProcessedOpIds = "draftBookkeeping.templates.processedOpIds"
+        static let templateImportedSeqByDeviceId = "draftBookkeeping.templates.importedSeqByDeviceId"
+        static let templateOpSortKeysById = "draftBookkeeping.templates.opSortKeysById"
+        static let deletedTemplateOpSortKeysById = "draftBookkeeping.templates.deletedOpSortKeysById"
     }
 
     private static let maxCategoryDepth = 3
@@ -271,11 +301,13 @@ final class DraftBookkeepingStore: ObservableObject {
     init(
         defaults: UserDefaults = .standard,
         syncService: BookkeepingMetadataSyncService = BookkeepingMetadataSyncService(),
-        transactionsSyncService: BookkeepingTransactionsSyncService = BookkeepingTransactionsSyncService()
+        transactionsSyncService: BookkeepingTransactionsSyncService = BookkeepingTransactionsSyncService(),
+        templatesSyncService: BookkeepingTemplatesSyncService = BookkeepingTemplatesSyncService()
     ) {
         self.defaults = defaults
         self.syncService = syncService
         self.transactionsSyncService = transactionsSyncService
+        self.templatesSyncService = templatesSyncService
         let hasStoredAccounts = defaults.data(forKey: DefaultsKey.accounts) != nil
         let hasStoredCategories = defaults.data(forKey: DefaultsKey.categories) != nil
         let hasStoredMetadata = defaults.object(forKey: DefaultsKey.metadataRevision) != nil
@@ -283,6 +315,7 @@ final class DraftBookkeepingStore: ObservableObject {
         self.accounts = Self.load([DraftAccount].self, forKey: DefaultsKey.accounts, from: defaults) ?? Self.defaultAccounts
         self.categories = Self.load([DraftCategory].self, forKey: DefaultsKey.categories, from: defaults) ?? Self.defaultCategories
         let storedTransactions = Self.load([DraftTransaction].self, forKey: DefaultsKey.transactions, from: defaults) ?? []
+        self.transactionTemplates = Self.load([DraftTransactionTemplate].self, forKey: DefaultsKey.transactionTemplates, from: defaults) ?? []
         let legacyDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
         let initializedTransactions: [DraftTransaction]
         if storedTransactions.isEmpty, let legacyDraft {
@@ -337,20 +370,32 @@ final class DraftBookkeepingStore: ObservableObject {
         self.deletedTransactionOpSortKeysById = Self.load([String: TransactionOpSortKey].self, forKey: DefaultsKey.deletedTransactionOpSortKeysById, from: defaults) ?? [:]
         self.accountBaseBalanceTextById = Self.load([String: String].self, forKey: DefaultsKey.accountBaseBalanceTextById, from: defaults) ?? [:]
         self.didImportLegacyTransactionsSeed = defaults.bool(forKey: DefaultsKey.didImportLegacyTransactionsSeed)
+        let storedTemplateNextSeq = defaults.integer(forKey: DefaultsKey.templateNextSeq)
+        self.nextTemplateOpSeq = storedTemplateNextSeq > 0 ? storedTemplateNextSeq : 1
+        self.localTemplateOps = Self.load([BookkeepingTemplateOp].self, forKey: DefaultsKey.templateLocalOps, from: defaults) ?? []
+        self.uploadedTemplateOpIds = Set(Self.load([String].self, forKey: DefaultsKey.templateUploadedOpIds, from: defaults) ?? [])
+        self.processedTemplateOpIds = Set(Self.load([String].self, forKey: DefaultsKey.templateProcessedOpIds, from: defaults) ?? [])
+        self.importedTemplateSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.templateImportedSeqByDeviceId, from: defaults) ?? [:]
+        self.templateOpSortKeysById = Self.load([String: TemplateOpSortKey].self, forKey: DefaultsKey.templateOpSortKeysById, from: defaults) ?? [:]
+        self.deletedTemplateOpSortKeysById = Self.load([String: TemplateOpSortKey].self, forKey: DefaultsKey.deletedTemplateOpSortKeysById, from: defaults) ?? [:]
 
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
         normalizeTransactionsAfterMetadataChange()
+        normalizeTransactionTemplates()
+        initializeTemplateSyncStateIfNeeded()
         initializeTransactionSyncStateIfNeeded()
         recomputeAccountBalancesFromBase()
         persistAccounts()
         persistCategories()
         persistTransactions()
+        persistTransactionTemplates()
         persistMetadata()
         persistMetadataSyncState()
         persistTransactionsMetadata()
         persistTransactionSyncState()
+        persistTemplateSyncState()
     }
 
     func clearMessage() {
@@ -531,6 +576,95 @@ final class DraftBookkeepingStore: ObservableObject {
         return true
     }
 
+    @discardableResult
+    func addTransactionTemplate(
+        name: String,
+        kind: DraftEntryKind,
+        amountText: String,
+        categoryId: String,
+        accountId: String,
+        note: String
+    ) -> Bool {
+        guard kind != .transfer else { return false }
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return false }
+        guard let normalizedAmountText = Self.normalizedPositiveAmountText(amountText) else { return false }
+        guard isActiveCategory(id: categoryId, kind: kind), isActiveAccount(id: accountId) else { return false }
+
+        let now = Date()
+        let template = DraftTransactionTemplate(
+            id: UUID().uuidString,
+            name: trimmedName,
+            kind: kind,
+            amountText: normalizedAmountText,
+            categoryId: categoryId,
+            accountId: accountId,
+            note: trimmedNote,
+            createdAt: now,
+            updatedAt: now
+        )
+
+        initializeTemplateSyncStateIfNeeded()
+        transactionTemplates.insert(template, at: 0)
+        persistTransactionTemplates()
+        appendLocalTemplateOp(action: .create, template: template, occurredAt: template.createdAt)
+        messageKey = "templates.message.saved"
+        return true
+    }
+
+    @discardableResult
+    func updateTransactionTemplate(
+        id: String,
+        name: String,
+        kind: DraftEntryKind,
+        amountText: String,
+        categoryId: String,
+        accountId: String,
+        note: String
+    ) -> Bool {
+        guard kind != .transfer else { return false }
+        guard let index = transactionTemplates.firstIndex(where: { $0.id == id }) else { return false }
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return false }
+        guard let normalizedAmountText = Self.normalizedPositiveAmountText(amountText) else { return false }
+        guard isActiveCategory(id: categoryId, kind: kind), isActiveAccount(id: accountId) else { return false }
+
+        initializeTemplateSyncStateIfNeeded()
+        let updatedTemplate = DraftTransactionTemplate(
+            id: id,
+            name: trimmedName,
+            kind: kind,
+            amountText: normalizedAmountText,
+            categoryId: categoryId,
+            accountId: accountId,
+            note: trimmedNote,
+            createdAt: transactionTemplates[index].createdAt,
+            updatedAt: Date()
+        )
+        transactionTemplates[index] = updatedTemplate
+        transactionTemplates.sort(by: Self.transactionTemplateSort)
+        persistTransactionTemplates()
+        appendLocalTemplateOp(action: .update, template: updatedTemplate)
+        messageKey = "templates.message.saved"
+        return true
+    }
+
+    @discardableResult
+    func deleteTransactionTemplate(id: String) -> Bool {
+        guard let index = transactionTemplates.firstIndex(where: { $0.id == id }) else { return false }
+
+        initializeTemplateSyncStateIfNeeded()
+        let template = transactionTemplates.remove(at: index)
+        persistTransactionTemplates()
+        appendLocalTemplateOp(action: .delete, template: template)
+        messageKey = "templates.message.deleted"
+        return true
+    }
+
     func backupLedgerDataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
         guard configuration.backupEnabled else {
             messageKey = "bookkeeping.ledger.sync.error.backupDisabled"
@@ -540,6 +674,7 @@ final class DraftBookkeepingStore: ObservableObject {
         do {
             try await backupPendingMetadataOps(configuration: configuration, secrets: secrets)
             try await backupPendingTransactionOps(configuration: configuration, secrets: secrets)
+            try await backupPendingTemplateOps(configuration: configuration, secrets: secrets)
             messageKey = "bookkeeping.ledger.sync.backupSucceeded"
             return true
         } catch {
@@ -612,6 +747,49 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
+    func backupTemplatesNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.templates.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            try await backupPendingTemplateOps(configuration: configuration, secrets: secrets)
+            messageKey = "bookkeeping.templates.sync.backupSucceeded"
+            return true
+        } catch {
+            messageKey = "bookkeeping.templates.sync.error.backupFailed"
+            return false
+        }
+    }
+
+    func backupTemplatesAfterLocalChange(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else { return false }
+
+        do {
+            try await backupPendingTemplateOps(configuration: configuration, secrets: secrets)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func importTemplatesNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.templates.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            let didImport = try await importTemplateOps(configuration: configuration, secrets: secrets)
+            messageKey = didImport ? "bookkeeping.templates.sync.importSucceeded" : "bookkeeping.templates.sync.importNoRemoteTemplates"
+            return true
+        } catch {
+            messageKey = "bookkeeping.templates.sync.error.importFailed"
+            return false
+        }
+    }
+
     func importIfRemoteTransactionsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
         guard configuration.backupEnabled else { return }
 
@@ -619,6 +797,19 @@ final class DraftBookkeepingStore: ObservableObject {
             let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets, includeLegacySeed: false)
             if didImport {
                 messageKey = "bookkeeping.transactions.sync.importSucceeded"
+            }
+        } catch {
+            return
+        }
+    }
+
+    func importIfRemoteTemplatesAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
+        guard configuration.backupEnabled else { return }
+
+        do {
+            let didImport = try await importTemplateOps(configuration: configuration, secrets: secrets)
+            if didImport {
+                messageKey = "bookkeeping.templates.sync.importSucceeded"
             }
         } catch {
             return
@@ -1205,6 +1396,18 @@ final class DraftBookkeepingStore: ObservableObject {
         persistTransactionSyncState()
     }
 
+    private func backupPendingTemplateOps(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
+        initializeTemplateSyncStateIfNeeded()
+        let pendingOps = localTemplateOps.filter { !uploadedTemplateOpIds.contains($0.opId) }
+        guard !pendingOps.isEmpty else { return }
+
+        let pendingFileIndexes = Set(pendingOps.map(\.fileIndex))
+        let opsToWrite = localTemplateOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        try await templatesSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        uploadedTemplateOpIds.formUnion(pendingOps.map(\.opId))
+        persistTemplateSyncState()
+    }
+
     @discardableResult
     private func importTransactionOps(
         configuration: SyncConfiguration,
@@ -1264,6 +1467,31 @@ final class DraftBookkeepingStore: ObservableObject {
         return true
     }
 
+    @discardableResult
+    private func importTemplateOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets
+    ) async throws -> Bool {
+        initializeTemplateSyncStateIfNeeded()
+        let remoteOps = try await templatesSyncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let unappliedOps = remoteOps
+            .filter { !processedTemplateOpIds.contains($0.opId) }
+            .sorted(by: Self.templateOpReplaySort)
+
+        guard !unappliedOps.isEmpty else {
+            return false
+        }
+
+        for op in unappliedOps {
+            applyRemoteTemplateOp(op)
+        }
+
+        normalizeTransactionTemplates()
+        persistTransactionTemplates()
+        persistTemplateSyncState()
+        return true
+    }
+
     private func appendLocalTransactionOp(action: BookkeepingTransactionOpAction, transaction: DraftTransaction, occurredAt: Date = Date()) {
         let op = BookkeepingTransactionOp(
             deviceId: DeviceIdentity.currentDeviceId,
@@ -1280,6 +1508,24 @@ final class DraftBookkeepingStore: ObservableObject {
         applyTransactionOpState(op)
         markTransactionsChanged(at: occurredAt)
         persistTransactionSyncState()
+    }
+
+    private func appendLocalTemplateOp(action: BookkeepingTemplateOpAction, template: DraftTransactionTemplate, occurredAt: Date = Date()) {
+        let op = BookkeepingTemplateOp(
+            deviceId: DeviceIdentity.currentDeviceId,
+            seq: nextTemplateOpSeq,
+            entityId: template.id,
+            action: action,
+            occurredAt: occurredAt,
+            payload: action == .delete ? nil : normalizedTransactionTemplate(template)
+        )
+        nextTemplateOpSeq += 1
+        localTemplateOps.append(op)
+        processedTemplateOpIds.insert(op.opId)
+        importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyTemplateOpState(op)
+        markTemplatesChanged()
+        persistTemplateSyncState()
     }
 
     private func applyRemoteTransactionOp(_ op: BookkeepingTransactionOp) {
@@ -1336,6 +1582,65 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
+    private func applyRemoteTemplateOp(_ op: BookkeepingTemplateOp) {
+        guard op.schemaVersion == 1, op.entity == "transactionTemplate" else { return }
+        guard !processedTemplateOpIds.contains(op.opId) else { return }
+        guard shouldApplyTemplateOp(op) else {
+            processedTemplateOpIds.insert(op.opId)
+            importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            return
+        }
+
+        switch op.action {
+        case .create, .update:
+            guard let payload = op.payload else { break }
+            var normalized = normalizedTransactionTemplate(payload)
+            normalized.id = op.entityId
+            guard !normalized.name.isEmpty, normalized.kind != .transfer, Self.normalizedPositiveAmountText(normalized.amountText) != nil else {
+                processedTemplateOpIds.insert(op.opId)
+                importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+                return
+            }
+            if let index = transactionTemplates.firstIndex(where: { $0.id == op.entityId }) {
+                transactionTemplates[index] = normalized
+            } else {
+                transactionTemplates.append(normalized)
+            }
+        case .delete:
+            transactionTemplates.removeAll { $0.id == op.entityId }
+            deletedTemplateOpSortKeysById[op.entityId] = op.sortKey
+        }
+
+        processedTemplateOpIds.insert(op.opId)
+        importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyTemplateOpState(op)
+    }
+
+    private func shouldApplyTemplateOp(_ op: BookkeepingTemplateOp) -> Bool {
+        let incomingKey = op.sortKey
+        let currentKey = templateOpSortKeysById[op.entityId] ?? .zero
+        let deletedKey = deletedTemplateOpSortKeysById[op.entityId] ?? .zero
+
+        switch op.action {
+        case .create, .update:
+            guard incomingKey >= currentKey else { return false }
+            guard incomingKey > deletedKey else { return false }
+            return true
+        case .delete:
+            return incomingKey >= currentKey && incomingKey >= deletedKey
+        }
+    }
+
+    private func applyTemplateOpState(_ op: BookkeepingTemplateOp) {
+        switch op.action {
+        case .create, .update:
+            templateOpSortKeysById[op.entityId] = op.sortKey
+            deletedTemplateOpSortKeysById.removeValue(forKey: op.entityId)
+        case .delete:
+            deletedTemplateOpSortKeysById[op.entityId] = op.sortKey
+        }
+    }
+
     private func initializeTransactionSyncStateIfNeeded() {
         if !accountBaseBalanceTextById.isEmpty {
             initializeMissingBaseBalances()
@@ -1367,6 +1672,31 @@ final class DraftBookkeepingStore: ObservableObject {
             importedTransactionSeqByDeviceId[op.deviceId] = max(importedTransactionSeqByDeviceId[op.deviceId] ?? 0, op.seq)
             transactionOpSortKeysById[transaction.id] = op.sortKey
         }
+    }
+
+    private func initializeTemplateSyncStateIfNeeded() {
+        guard localTemplateOps.isEmpty, processedTemplateOpIds.isEmpty, !transactionTemplates.isEmpty else {
+            return
+        }
+
+        for template in transactionTemplates.sorted(by: { $0.createdAt < $1.createdAt }) {
+            let normalized = normalizedTransactionTemplate(template)
+            let op = BookkeepingTemplateOp(
+                deviceId: DeviceIdentity.currentDeviceId,
+                seq: nextTemplateOpSeq,
+                entityId: template.id,
+                action: .create,
+                occurredAt: template.createdAt,
+                createdAt: template.createdAt,
+                payload: normalized
+            )
+            nextTemplateOpSeq += 1
+            localTemplateOps.append(op)
+            processedTemplateOpIds.insert(op.opId)
+            importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            templateOpSortKeysById[template.id] = op.sortKey
+        }
+        persistTemplateSyncState()
     }
 
     private func initializeMissingBaseBalances() {
@@ -1429,6 +1759,10 @@ final class DraftBookkeepingStore: ObservableObject {
         localTransactionsChangeToken += 1
     }
 
+    private func markTemplatesChanged() {
+        localTemplatesChangeToken += 1
+    }
+
     private func updateTransactionsSyncMetadata(at date: Date, deviceId: String) {
         transactionsRevision += 1
         transactionsUpdatedAt = date
@@ -1471,8 +1805,42 @@ final class DraftBookkeepingStore: ObservableObject {
         defaults.set(didImportLegacyTransactionsSeed, forKey: DefaultsKey.didImportLegacyTransactionsSeed)
     }
 
+    private func persistTemplateSyncState() {
+        defaults.set(nextTemplateOpSeq, forKey: DefaultsKey.templateNextSeq)
+        Self.save(localTemplateOps, forKey: DefaultsKey.templateLocalOps, to: defaults)
+        Self.save(Array(uploadedTemplateOpIds), forKey: DefaultsKey.templateUploadedOpIds, to: defaults)
+        Self.save(Array(processedTemplateOpIds), forKey: DefaultsKey.templateProcessedOpIds, to: defaults)
+        Self.save(importedTemplateSeqByDeviceId, forKey: DefaultsKey.templateImportedSeqByDeviceId, to: defaults)
+        Self.save(templateOpSortKeysById, forKey: DefaultsKey.templateOpSortKeysById, to: defaults)
+        Self.save(deletedTemplateOpSortKeysById, forKey: DefaultsKey.deletedTemplateOpSortKeysById, to: defaults)
+    }
+
     private func normalizeTransactionsAfterMetadataChange() {
         lastDraft = transactions.first
+    }
+
+    private func normalizeTransactionTemplates() {
+        transactionTemplates = transactionTemplates
+            .filter { $0.kind != .transfer }
+            .map(normalizedTransactionTemplate)
+            .filter { !$0.name.isEmpty }
+            .sorted(by: Self.transactionTemplateSort)
+    }
+
+    private func normalizedTransactionTemplate(_ template: DraftTransactionTemplate) -> DraftTransactionTemplate {
+        var normalized = template
+        normalized.name = normalized.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        normalized.note = normalized.note.trimmingCharacters(in: .whitespacesAndNewlines)
+        normalized.amountText = DraftAmountFormatter.normalizedAmountText(template.amountText, allowNegative: false) ?? "0"
+        return normalized
+    }
+
+    private func isActiveAccount(id: String) -> Bool {
+        accounts.contains { $0.id == id && !$0.isArchived }
+    }
+
+    private func isActiveCategory(id: String, kind: DraftEntryKind) -> Bool {
+        categories.contains { $0.id == id && $0.kind == kind && !$0.isArchived }
     }
 
     private func hierarchyItems(from category: DraftCategory, depth: Int, visitedIds: Set<String>) -> [DraftCategoryHierarchyItem] {
@@ -1674,6 +2042,10 @@ final class DraftBookkeepingStore: ObservableObject {
         Self.save(transactions, forKey: DefaultsKey.transactions, to: defaults)
     }
 
+    private func persistTransactionTemplates() {
+        Self.save(transactionTemplates, forKey: DefaultsKey.transactionTemplates, to: defaults)
+    }
+
     private func persistLastDraft() {
         Self.save(lastDraft, forKey: DefaultsKey.lastDraft, to: defaults)
     }
@@ -1736,6 +2108,14 @@ final class DraftBookkeepingStore: ObservableObject {
         return lhs.date > rhs.date
     }
 
+    private static func transactionTemplateSort(_ lhs: DraftTransactionTemplate, _ rhs: DraftTransactionTemplate) -> Bool {
+        if lhs.updatedAt == rhs.updatedAt {
+            return lhs.createdAt > rhs.createdAt
+        }
+
+        return lhs.updatedAt > rhs.updatedAt
+    }
+
     private static func metadataOpReplaySort(_ lhs: BookkeepingMetadataOp, _ rhs: BookkeepingMetadataOp) -> Bool {
         if lhs.createdAt != rhs.createdAt {
             return lhs.createdAt < rhs.createdAt
@@ -1760,9 +2140,37 @@ final class DraftBookkeepingStore: ObservableObject {
         return lhs.seq < rhs.seq
     }
 
+    private static func templateOpReplaySort(_ lhs: BookkeepingTemplateOp, _ rhs: BookkeepingTemplateOp) -> Bool {
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        if lhs.deviceId != rhs.deviceId {
+            return lhs.deviceId < rhs.deviceId
+        }
+
+        return lhs.seq < rhs.seq
+    }
+
     private static func plainAmountText(from decimal: Decimal) -> String {
         let number = NSDecimalNumber(decimal: decimal)
         return plainAmountFormatter.string(from: number) ?? number.stringValue
+    }
+
+    private static func normalizedPositiveAmountText(_ text: String) -> String? {
+        let normalizedText = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+
+        guard
+            let amountText = DraftAmountFormatter.normalizedAmountText(normalizedText, allowNegative: false),
+            let decimal = Decimal(string: amountText, locale: Locale(identifier: "en_US_POSIX")),
+            decimal > 0
+        else {
+            return nil
+        }
+
+        return amountText
     }
 
     private static let plainAmountFormatter: NumberFormatter = {

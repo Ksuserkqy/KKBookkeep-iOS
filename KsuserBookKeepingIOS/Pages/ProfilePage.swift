@@ -77,6 +77,12 @@ struct ProfilePage: View {
                     }
 
                     NavigationLink {
+                        TransactionTemplateManagementPage()
+                    } label: {
+                        Label("templates.title", systemImage: "doc.text.fill")
+                    }
+
+                    NavigationLink {
                         AppSettingsPage()
                     } label: {
                         Label("profile.settings", systemImage: "gearshape.fill")
