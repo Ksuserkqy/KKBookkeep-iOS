@@ -554,9 +554,20 @@ private struct RecordVisualSelectionPage: View {
     let items: [RecordVisualSelectionItem]
     @Binding var selectedId: String
     @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private var filteredItems: [RecordVisualSelectionItem] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return items }
+
+        return items.filter { item in
+            item.name.localizedCaseInsensitiveContains(query)
+                || item.subtitle.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
-        List(items) { item in
+        List(filteredItems) { item in
             Button {
                 selectedId = item.id
                 dismiss()
@@ -591,6 +602,7 @@ private struct RecordVisualSelectionPage: View {
             .buttonStyle(.plain)
         }
         .navigationTitle(Text(titleKey))
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("record.selection.search.placeholder"))
     }
 }
 

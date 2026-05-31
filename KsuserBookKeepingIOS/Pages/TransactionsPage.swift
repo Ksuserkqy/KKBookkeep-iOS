@@ -78,6 +78,7 @@ struct TransactionsPage: View {
                             selectedCategoryId: $selectedCategoryId,
                             accounts: draftStore.accounts,
                             categories: draftStore.categories,
+                            categoryDisplayName: { draftStore.categoryDisplayName(for: $0) },
                             hasActiveFilters: hasActiveFilters,
                             resetFilters: resetFilters
                         )
@@ -596,47 +597,45 @@ private struct TransactionFilterBar: View {
     @Binding var selectedCategoryId: String?
     let accounts: [DraftAccount]
     let categories: [DraftCategory]
+    let categoryDisplayName: (String) -> String
     let hasActiveFilters: Bool
     let resetFilters: () -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                Menu {
-                    Button("transactions.filter.allAccounts") {
-                        selectedAccountId = nil
-                    }
-
-                    ForEach(accounts) { account in
-                        Button(archivedAwareName(account.name, isArchived: account.isArchived)) {
-                            selectedAccountId = account.id
-                        }
-                    }
+                NavigationLink {
+                    TransactionAccountFilterSelectionPage(
+                        accounts: accounts,
+                        selectedAccountId: $selectedAccountId
+                    )
                 } label: {
                     TransactionFilterPill(
                         title: accountTitle,
+                        iconName: selectedAccount?.iconName,
+                        colorHex: selectedAccount?.colorHex,
                         systemImage: "creditcard",
                         isActive: selectedAccountId != nil
                     )
                 }
+                .buttonStyle(.plain)
 
-                Menu {
-                    Button("transactions.filter.allCategories") {
-                        selectedCategoryId = nil
-                    }
-
-                    ForEach(categories) { category in
-                        Button(archivedAwareName(category.name, isArchived: category.isArchived)) {
-                            selectedCategoryId = category.id
-                        }
-                    }
+                NavigationLink {
+                    TransactionCategoryFilterSelectionPage(
+                        items: categoryHierarchyItems,
+                        selectedCategoryId: $selectedCategoryId,
+                        displayName: categoryDisplayName
+                    )
                 } label: {
                     TransactionFilterPill(
                         title: categoryTitle,
+                        iconName: selectedCategory?.iconName,
+                        colorHex: selectedCategory?.colorHex,
                         systemImage: "tag",
                         isActive: selectedCategoryId != nil
                     )
                 }
+                .buttonStyle(.plain)
 
                 if hasActiveFilters {
                     Button(action: resetFilters) {
@@ -654,10 +653,7 @@ private struct TransactionFilterBar: View {
     }
 
     private var accountTitle: String {
-        guard
-            let selectedAccountId,
-            let account = accounts.first(where: { $0.id == selectedAccountId })
-        else {
+        guard let account = selectedAccount else {
             return NSLocalizedString("transactions.filter.allAccounts", comment: "")
         }
 
@@ -665,14 +661,48 @@ private struct TransactionFilterBar: View {
     }
 
     private var categoryTitle: String {
-        guard
-            let selectedCategoryId,
-            let category = categories.first(where: { $0.id == selectedCategoryId })
-        else {
+        guard let category = selectedCategory else {
             return NSLocalizedString("transactions.filter.allCategories", comment: "")
         }
 
-        return archivedAwareName(category.name, isArchived: category.isArchived)
+        return archivedAwareName(categoryDisplayName(category.id), isArchived: category.isArchived)
+    }
+
+    private var selectedAccount: DraftAccount? {
+        guard let selectedAccountId else { return nil }
+        return accounts.first(where: { $0.id == selectedAccountId })
+    }
+
+    private var selectedCategory: DraftCategory? {
+        guard let selectedCategoryId else { return nil }
+        return categories.first(where: { $0.id == selectedCategoryId })
+    }
+
+    private var categoryHierarchyItems: [DraftCategoryHierarchyItem] {
+        DraftEntryKind.allCases.flatMap { kind in
+            let rootCategories = categories
+                .filter { $0.kind == kind && $0.parentId == nil }
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+            return rootCategories.flatMap { hierarchyItems(from: $0, depth: 1, visitedIds: []) }
+        }
+    }
+
+    private func hierarchyItems(
+        from category: DraftCategory,
+        depth: Int,
+        visitedIds: Set<String>
+    ) -> [DraftCategoryHierarchyItem] {
+        guard !visitedIds.contains(category.id) else { return [] }
+
+        let nextVisitedIds = visitedIds.union([category.id])
+        let children = categories
+            .filter { $0.parentId == category.id }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+        return [DraftCategoryHierarchyItem(category: category, depth: depth)] + children.flatMap { child in
+            hierarchyItems(from: child, depth: depth + 1, visitedIds: nextVisitedIds)
+        }
     }
 
     private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
@@ -683,13 +713,24 @@ private struct TransactionFilterBar: View {
 
 private struct TransactionFilterPill: View {
     let title: String
+    var iconName: String?
+    var colorHex: String?
     let systemImage: String
     let isActive: Bool
 
     var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
+        HStack(spacing: 7) {
+            if let iconName, let colorHex {
+                DraftVisualBadge(iconName: iconName, colorHex: colorHex, size: 22)
+            } else {
+                Image(systemName: systemImage)
+                    .font(.caption.weight(.semibold))
+            }
+
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+        }
             .foregroundStyle(isActive ? Color.accentColor : .primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
@@ -697,6 +738,246 @@ private struct TransactionFilterPill: View {
                 Capsule()
                     .fill(isActive ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.12))
             )
+    }
+}
+
+private struct TransactionAccountFilterSelectionPage: View {
+    let accounts: [DraftAccount]
+    @Binding var selectedAccountId: String?
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private var filteredAccounts: [DraftAccount] {
+        let query = normalized(searchText)
+        guard !query.isEmpty else { return accounts }
+
+        return accounts.filter { account in
+            normalized(account.name).localizedCaseInsensitiveContains(query)
+                || normalized(account.typeTitle).localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var body: some View {
+        List {
+            Button {
+                selectedAccountId = nil
+                dismiss()
+            } label: {
+                TransactionFilterSelectionRow(
+                    title: NSLocalizedString("transactions.filter.allAccounts", comment: ""),
+                    subtitle: "",
+                    iconName: "credit-card",
+                    colorHex: "#64748B",
+                    isSelected: selectedAccountId == nil
+                )
+            }
+            .buttonStyle(.plain)
+
+            ForEach(filteredAccounts) { account in
+                Button {
+                    selectedAccountId = account.id
+                    dismiss()
+                } label: {
+                    TransactionFilterSelectionRow(
+                        title: archivedAwareName(account.name, isArchived: account.isArchived),
+                        subtitle: account.filterSubtitle,
+                        iconName: account.iconName,
+                        colorHex: account.colorHex,
+                        isSelected: selectedAccountId == account.id
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .navigationTitle(Text("transactions.filter.accounts.title"))
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("transactions.filter.search.placeholder"))
+    }
+
+    private func normalized(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
+        guard isArchived else { return name }
+        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+    }
+}
+
+private struct TransactionCategoryFilterSelectionPage: View {
+    let items: [DraftCategoryHierarchyItem]
+    @Binding var selectedCategoryId: String?
+    let displayName: (String) -> String
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+
+    private var filteredItems: [DraftCategoryHierarchyItem] {
+        let query = normalized(searchText)
+        guard !query.isEmpty else { return items }
+
+        return items.filter { item in
+            let category = item.category
+            return normalized(displayName(category.id)).localizedCaseInsensitiveContains(query)
+                || normalized(category.name).localizedCaseInsensitiveContains(query)
+                || NSLocalizedString(category.kind.localizationKey, comment: "").localizedCaseInsensitiveContains(query)
+                || NSLocalizedString(levelTitleKey(for: item.depth), comment: "").localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var body: some View {
+        List {
+            Button {
+                selectedCategoryId = nil
+                dismiss()
+            } label: {
+                TransactionFilterSelectionRow(
+                    title: NSLocalizedString("transactions.filter.allCategories", comment: ""),
+                    subtitle: "",
+                    iconName: "tag",
+                    colorHex: "#64748B",
+                    isSelected: selectedCategoryId == nil
+                )
+            }
+            .buttonStyle(.plain)
+
+            ForEach(filteredItems) { item in
+                let category = item.category
+
+                Button {
+                    selectedCategoryId = category.id
+                    dismiss()
+                } label: {
+                    TransactionCategoryFilterSelectionRow(
+                        item: item,
+                        title: archivedAwareName(category.name, isArchived: category.isArchived),
+                        iconName: category.iconName,
+                        colorHex: category.colorHex,
+                        isSelected: selectedCategoryId == category.id
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .navigationTitle(Text("transactions.filter.categories.title"))
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: Text("transactions.filter.search.placeholder"))
+    }
+
+    private func normalized(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
+        guard isArchived else { return name }
+        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+    }
+
+    private func levelTitleKey(for depth: Int) -> String {
+        switch depth {
+        case 2:
+            return "management.category.level.second"
+        case 3:
+            return "management.category.level.third"
+        default:
+            return "management.category.level.first"
+        }
+    }
+}
+
+private struct TransactionFilterSelectionRow: View {
+    let title: String
+    let subtitle: String
+    let iconName: String
+    let colorHex: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            DraftVisualBadge(iconName: iconName, colorHex: colorHex)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.tint)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+private struct TransactionCategoryFilterSelectionRow: View {
+    let item: DraftCategoryHierarchyItem
+    let title: String
+    let iconName: String
+    let colorHex: String
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Spacer()
+                .frame(width: CGFloat(item.depth - 1) * 24)
+
+            DraftVisualBadge(iconName: iconName, colorHex: colorHex)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if item.depth > 1 {
+                    Text(levelTitleKey(for: item.depth))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.tint)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private func levelTitleKey(for depth: Int) -> LocalizedStringKey {
+        switch depth {
+        case 2:
+            return "management.category.level.second"
+        case 3:
+            return "management.category.level.third"
+        default:
+            return "management.category.level.first"
+        }
+    }
+}
+
+private extension DraftAccount {
+    var typeTitle: String {
+        NSLocalizedString(type.localizationKey, comment: "")
+    }
+
+    var filterSubtitle: String {
+        String(
+            format: NSLocalizedString("transactions.filter.accountBalanceFormat", comment: ""),
+            typeTitle,
+            DraftAmountFormatter.currencyText(from: balanceText)
+        )
     }
 }
 

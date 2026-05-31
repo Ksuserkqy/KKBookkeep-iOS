@@ -109,6 +109,7 @@
 "record.location.error.unavailable" = "暂时无法获取当前位置，本次记账不会录入位置。";
 "record.note.placeholder" = "备注";
 "record.picker.unselected" = "未选择";
+"record.selection.search.placeholder" = "搜索名称";
 "record.action.saveDraft" = "保存草稿";
 "record.action.saveTransaction" = "保存流水";
 "record.footer.draftOnly" = "当前只生成本机草稿，尚未正式写入账本。";
@@ -166,6 +167,10 @@
 "transactions.filter.allAccounts" = "全部账户";
 "transactions.filter.allCategories" = "全部分类";
 "transactions.filter.reset" = "清除筛选";
+"transactions.filter.accounts.title" = "选择账户";
+"transactions.filter.categories.title" = "选择分类";
+"transactions.filter.search.placeholder" = "搜索名称";
+"transactions.filter.accountBalanceFormat" = "%@ · 余额 %@";
 "transactions.empty.month" = "这个月份还没有流水。";
 "transactions.empty.filtered" = "没有符合筛选条件的流水。";
 "selection.category.todayFormat" = "今日收入 %@ · 支出 %@";

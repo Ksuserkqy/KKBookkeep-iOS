@@ -109,6 +109,7 @@
 "record.location.error.unavailable" = "Current location is unavailable. This entry will be saved without a location.";
 "record.note.placeholder" = "Note";
 "record.picker.unselected" = "Not selected";
+"record.selection.search.placeholder" = "Search name";
 "record.action.saveDraft" = "Save Draft";
 "record.action.saveTransaction" = "Save Transaction";
 "record.footer.draftOnly" = "This only creates a local draft and does not write to the ledger yet.";
@@ -166,6 +167,10 @@
 "transactions.filter.allAccounts" = "All Accounts";
 "transactions.filter.allCategories" = "All Categories";
 "transactions.filter.reset" = "Clear Filters";
+"transactions.filter.accounts.title" = "Choose Account";
+"transactions.filter.categories.title" = "Choose Category";
+"transactions.filter.search.placeholder" = "Search name";
+"transactions.filter.accountBalanceFormat" = "%@ · Balance %@";
 "transactions.empty.month" = "No transactions in this month.";
 "transactions.empty.filtered" = "No transactions match these filters.";
 "selection.category.todayFormat" = "Today income %@ · expense %@";
