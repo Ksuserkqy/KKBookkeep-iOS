@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RecordPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
+    @EnvironmentObject private var profileStore: ProfileStore
     @Binding var selectedTab: AppTab
     @Binding var requestedKind: DraftEntryKind?
     @StateObject private var locationProvider = CurrentLocationProvider()
@@ -106,8 +107,12 @@ struct RecordPage: View {
 
     private var amountSection: some View {
         Section {
-            TextField("record.amount.placeholder", text: $amountText)
-                .keyboardType(.decimalPad)
+            RecordAmountInputRow(
+                placeholderKey: "record.amount.placeholder",
+                amountText: $amountText,
+                currencySymbol: profileStore.profile.currency.symbol,
+                tint: amountTint
+            )
         } header: {
             Text("record.section.amount")
         }
@@ -115,15 +120,34 @@ struct RecordPage: View {
 
     private var transferAmountSection: some View {
         Section {
-            TextField("record.transferOutAmount.placeholder", text: $amountText)
-                .keyboardType(.decimalPad)
+            RecordAmountInputRow(
+                placeholderKey: "record.transferOutAmount.placeholder",
+                amountText: $amountText,
+                currencySymbol: profileStore.profile.currency.symbol,
+                tint: amountTint
+            )
 
-            TextField("record.transferInAmount.placeholder", text: $transferInAmountText)
-                .keyboardType(.decimalPad)
+            RecordAmountInputRow(
+                placeholderKey: "record.transferInAmount.placeholder",
+                amountText: $transferInAmountText,
+                currencySymbol: profileStore.profile.currency.symbol,
+                tint: amountTint
+            )
         } header: {
             Text("record.section.transferAmount")
         } footer: {
             Text("record.transferAmount.footer")
+        }
+    }
+
+    private var amountTint: Color {
+        switch selectedKind {
+        case .expense:
+            return .red
+        case .income:
+            return .green
+        case .transfer:
+            return .primary
         }
     }
 
@@ -298,7 +322,8 @@ struct RecordPage: View {
                 id: account.id,
                 name: account.name,
                 iconName: account.iconName,
-                colorHex: account.colorHex
+                colorHex: account.colorHex,
+                subtitle: draftStore.accountBalanceSummary(for: account.id)
             )
         }
     }
@@ -312,6 +337,7 @@ struct RecordPage: View {
                 name: category.name,
                 iconName: category.iconName,
                 colorHex: category.colorHex,
+                subtitle: draftStore.categoryTodaySummary(for: category.id),
                 depth: item.depth
             )
         }
@@ -330,7 +356,8 @@ struct RecordPage: View {
             id: category.id,
             name: draftStore.categoryDisplayName(for: category.id),
             iconName: category.iconName,
-            colorHex: category.colorHex
+            colorHex: category.colorHex,
+            subtitle: draftStore.categoryTodaySummary(for: category.id)
         )
     }
 
@@ -340,6 +367,7 @@ struct RecordPage: View {
             name: NSLocalizedString("record.picker.unselected", comment: ""),
             iconName: "circle-question",
             colorHex: "#64748B",
+            subtitle: "",
             depth: 1
         )
     }
@@ -446,7 +474,30 @@ private struct RecordVisualSelectionItem: Identifiable, Equatable {
     let name: String
     let iconName: String
     let colorHex: String
+    var subtitle: String = ""
     var depth: Int = 1
+}
+
+struct RecordAmountInputRow: View {
+    let placeholderKey: LocalizedStringKey
+    @Binding var amountText: String
+    let currencySymbol: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(currencySymbol)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(tint)
+
+            TextField(placeholderKey, text: $amountText)
+                .keyboardType(.decimalPad)
+                .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                .foregroundStyle(tint)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(.vertical, 6)
+    }
 }
 
 private struct RecordVisualSelectionRow: View {
@@ -463,10 +514,20 @@ private struct RecordVisualSelectionRow: View {
             HStack(spacing: 8) {
                 DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
 
-                Text(item.name)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(item.name)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    if !item.subtitle.isEmpty {
+                        Text(item.subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
+            .frame(maxWidth: 220, alignment: .trailing)
         }
     }
 }
@@ -489,8 +550,16 @@ private struct RecordVisualSelectionPage: View {
 
                     DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex)
 
-                    Text(item.name)
-                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.name)
+                            .foregroundStyle(.primary)
+
+                        if !item.subtitle.isEmpty {
+                            Text(item.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     Spacer()
 
@@ -514,4 +583,5 @@ private struct RecordVisualSelectionPage: View {
         requestedKind: .constant(nil)
     )
         .environmentObject(DraftBookkeepingStore())
+        .environmentObject(ProfileStore())
 }

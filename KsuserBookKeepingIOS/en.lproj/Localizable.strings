@@ -143,6 +143,8 @@
 "transactions.delete.confirm" = "Delete Transaction";
 "transactions.message.updated" = "Transaction updated.";
 "transactions.message.deleted" = "Transaction deleted.";
+"selection.category.todayFormat" = "Today income %@ · expense %@";
+"selection.account.balanceFormat" = "Balance %@";
 "draft.item.missing" = "Not selected";
 
 "management.action.rename" = "Rename";

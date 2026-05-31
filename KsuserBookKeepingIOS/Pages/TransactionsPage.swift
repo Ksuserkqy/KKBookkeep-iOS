@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TransactionsPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
+    @EnvironmentObject private var profileStore: ProfileStore
     @State private var editingTransaction: DraftTransaction?
     @State private var deletingTransaction: DraftTransaction?
 
@@ -69,6 +70,7 @@ struct TransactionsPage: View {
             .sheet(item: $editingTransaction) { transaction in
                 TransactionEditorPage(transaction: transaction)
                     .environmentObject(draftStore)
+                    .environmentObject(profileStore)
             }
             .confirmationDialog(
                 Text("transactions.delete.title"),
@@ -267,8 +269,95 @@ private struct DraftVisualSummaryItem {
     let colorHex: String
 }
 
+private struct TransactionVisualSelectionItem: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let iconName: String
+    let colorHex: String
+    var subtitle: String = ""
+    var depth: Int = 1
+}
+
+private struct TransactionVisualSelectionRow: View {
+    let titleKey: LocalizedStringKey
+    let item: TransactionVisualSelectionItem
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(titleKey)
+                .foregroundStyle(.primary)
+
+            Spacer(minLength: 16)
+
+            HStack(spacing: 8) {
+                DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(item.name)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    if !item.subtitle.isEmpty {
+                        Text(item.subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    }
+                }
+            }
+            .frame(maxWidth: 220, alignment: .trailing)
+        }
+    }
+}
+
+private struct TransactionVisualSelectionPage: View {
+    let titleKey: LocalizedStringKey
+    let items: [TransactionVisualSelectionItem]
+    @Binding var selectedId: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List(items) { item in
+            Button {
+                selectedId = item.id
+                dismiss()
+            } label: {
+                HStack(spacing: 12) {
+                    Spacer()
+                        .frame(width: CGFloat(item.depth - 1) * 24)
+
+                    DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.name)
+                            .foregroundStyle(.primary)
+
+                        if !item.subtitle.isEmpty {
+                            Text(item.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    if selectedId == item.id {
+                        Image(systemName: "checkmark")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.tint)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .navigationTitle(Text(titleKey))
+    }
+}
+
 private struct TransactionEditorPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
+    @EnvironmentObject private var profileStore: ProfileStore
     @Environment(\.dismiss) private var dismiss
 
     let transaction: DraftTransaction
@@ -306,49 +395,89 @@ private struct TransactionEditorPage: View {
 
                 if transaction.kind == .transfer {
                     Section {
-                        TextField("record.transferOutAmount.placeholder", text: $amountText)
-                            .keyboardType(.decimalPad)
+                        RecordAmountInputRow(
+                            placeholderKey: "record.transferOutAmount.placeholder",
+                            amountText: $amountText,
+                            currencySymbol: profileStore.profile.currency.symbol,
+                            tint: amountTint
+                        )
 
-                        TextField("record.transferInAmount.placeholder", text: $transferInAmountText)
-                            .keyboardType(.decimalPad)
+                        RecordAmountInputRow(
+                            placeholderKey: "record.transferInAmount.placeholder",
+                            amountText: $transferInAmountText,
+                            currencySymbol: profileStore.profile.currency.symbol,
+                            tint: amountTint
+                        )
                     } header: {
                         Text("record.section.transferAmount")
                     }
 
                     Section {
-                        Picker("record.fromAccount", selection: $selectedFromAccountId) {
-                            ForEach(draftStore.accounts) { account in
-                                Text(account.name).tag(account.id)
-                            }
+                        NavigationLink {
+                            TransactionVisualSelectionPage(
+                                titleKey: "record.fromAccount",
+                                items: accountSelectionItems,
+                                selectedId: $selectedFromAccountId
+                            )
+                        } label: {
+                            TransactionVisualSelectionRow(
+                                titleKey: "record.fromAccount",
+                                item: accountSelectionItem(for: selectedFromAccountId)
+                            )
                         }
 
-                        Picker("record.toAccount", selection: $selectedToAccountId) {
-                            ForEach(draftStore.accounts) { account in
-                                Text(account.name).tag(account.id)
-                            }
+                        NavigationLink {
+                            TransactionVisualSelectionPage(
+                                titleKey: "record.toAccount",
+                                items: accountSelectionItems,
+                                selectedId: $selectedToAccountId
+                            )
+                        } label: {
+                            TransactionVisualSelectionRow(
+                                titleKey: "record.toAccount",
+                                item: accountSelectionItem(for: selectedToAccountId)
+                            )
                         }
                     } header: {
                         Text("record.section.transfer")
                     }
                 } else {
                     Section {
-                        TextField("record.amount.placeholder", text: $amountText)
-                            .keyboardType(.decimalPad)
+                        RecordAmountInputRow(
+                            placeholderKey: "record.amount.placeholder",
+                            amountText: $amountText,
+                            currencySymbol: profileStore.profile.currency.symbol,
+                            tint: amountTint
+                        )
                     } header: {
                         Text("record.section.amount")
                     }
 
                     Section {
-                        Picker("record.category", selection: $selectedCategoryId) {
-                            ForEach(draftStore.categoryHierarchyItems(for: transaction.kind)) { item in
-                                Text(categoryTitle(for: item)).tag(item.category.id)
-                            }
+                        NavigationLink {
+                            TransactionVisualSelectionPage(
+                                titleKey: "record.category",
+                                items: categorySelectionItems(for: transaction.kind),
+                                selectedId: $selectedCategoryId
+                            )
+                        } label: {
+                            TransactionVisualSelectionRow(
+                                titleKey: "record.category",
+                                item: categorySelectionItem(for: selectedCategoryId)
+                            )
                         }
 
-                        Picker("record.account", selection: $selectedAccountId) {
-                            ForEach(draftStore.accounts) { account in
-                                Text(account.name).tag(account.id)
-                            }
+                        NavigationLink {
+                            TransactionVisualSelectionPage(
+                                titleKey: "record.account",
+                                items: accountSelectionItems,
+                                selectedId: $selectedAccountId
+                            )
+                        } label: {
+                            TransactionVisualSelectionRow(
+                                titleKey: "record.account",
+                                item: accountSelectionItem(for: selectedAccountId)
+                            )
                         }
                     } header: {
                         Text("record.section.bookkeeping")
@@ -409,6 +538,17 @@ private struct TransactionEditorPage: View {
             .onChange(of: draftStore.categories) { _, _ in
                 normalizeSelections()
             }
+        }
+    }
+
+    private var amountTint: Color {
+        switch transaction.kind {
+        case .expense:
+            return .red
+        case .income:
+            return .green
+        case .transfer:
+            return .primary
         }
     }
 
@@ -488,8 +628,60 @@ private struct TransactionEditorPage: View {
         }
     }
 
-    private func categoryTitle(for item: DraftCategoryHierarchyItem) -> String {
-        String(repeating: "  ", count: max(item.depth - 1, 0)) + draftStore.categoryDisplayName(for: item.category.id)
+    private var accountSelectionItems: [TransactionVisualSelectionItem] {
+        draftStore.accounts.map { account in
+            TransactionVisualSelectionItem(
+                id: account.id,
+                name: account.name,
+                iconName: account.iconName,
+                colorHex: account.colorHex,
+                subtitle: draftStore.accountBalanceSummary(for: account.id)
+            )
+        }
+    }
+
+    private func categorySelectionItems(for kind: DraftEntryKind) -> [TransactionVisualSelectionItem] {
+        draftStore.categoryHierarchyItems(for: kind).map { item in
+            let category = item.category
+
+            return TransactionVisualSelectionItem(
+                id: category.id,
+                name: category.name,
+                iconName: category.iconName,
+                colorHex: category.colorHex,
+                subtitle: draftStore.categoryTodaySummary(for: category.id),
+                depth: item.depth
+            )
+        }
+    }
+
+    private func accountSelectionItem(for id: String) -> TransactionVisualSelectionItem {
+        accountSelectionItems.first { $0.id == id } ?? Self.unselectedSelectionItem
+    }
+
+    private func categorySelectionItem(for id: String) -> TransactionVisualSelectionItem {
+        guard let category = draftStore.categories.first(where: { $0.id == id }) else {
+            return Self.unselectedSelectionItem
+        }
+
+        return TransactionVisualSelectionItem(
+            id: category.id,
+            name: draftStore.categoryDisplayName(for: category.id),
+            iconName: category.iconName,
+            colorHex: category.colorHex,
+            subtitle: draftStore.categoryTodaySummary(for: category.id)
+        )
+    }
+
+    private static var unselectedSelectionItem: TransactionVisualSelectionItem {
+        TransactionVisualSelectionItem(
+            id: "",
+            name: NSLocalizedString("record.picker.unselected", comment: ""),
+            iconName: "circle-question",
+            colorHex: "#64748B",
+            subtitle: "",
+            depth: 1
+        )
     }
 
     private func defaultAccountId(in accounts: [DraftAccount]) -> String {
@@ -524,4 +716,5 @@ private struct TransactionEditorPage: View {
 #Preview {
     TransactionsPage()
         .environmentObject(DraftBookkeepingStore())
+        .environmentObject(ProfileStore())
 }

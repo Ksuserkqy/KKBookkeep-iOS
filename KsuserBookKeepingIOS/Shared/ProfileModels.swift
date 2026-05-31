@@ -71,6 +71,30 @@ enum ProfileCurrency: String, CaseIterable, Codable, Identifiable {
             return "profile.edit.currency.jpy"
         }
     }
+
+    var code: String {
+        switch self {
+        case .cny:
+            return "CNY"
+        case .usd:
+            return "USD"
+        case .eur:
+            return "EUR"
+        case .jpy:
+            return "JPY"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .cny, .jpy:
+            return "¥"
+        case .usd:
+            return "$"
+        case .eur:
+            return "€"
+        }
+    }
 }
 
 enum ProfileTimeZone: String, CaseIterable, Codable, Identifiable {

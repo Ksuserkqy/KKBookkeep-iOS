@@ -339,6 +339,50 @@ final class DraftBookkeepingStore: ObservableObject {
         return categoryPath(for: id).map(\.name).joined(separator: " / ")
     }
 
+    func accountBalanceSummary(for id: String?) -> String {
+        guard
+            let id,
+            let account = accounts.first(where: { $0.id == id })
+        else {
+            return NSLocalizedString("draft.item.missing", comment: "")
+        }
+
+        return String(
+            format: NSLocalizedString("selection.account.balanceFormat", comment: ""),
+            DraftAmountFormatter.currencyText(from: account.balanceText)
+        )
+    }
+
+    func categoryTodaySummary(for id: String?, calendar: Calendar = .current, now: Date = Date()) -> String {
+        guard let id else {
+            return NSLocalizedString("draft.item.missing", comment: "")
+        }
+
+        let startOfDay = calendar.startOfDay(for: now)
+        guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+            return NSLocalizedString("draft.item.missing", comment: "")
+        }
+
+        let todayTransactions = transactions.filter { transaction in
+            transaction.categoryId == id &&
+            transaction.date >= startOfDay &&
+            transaction.date < endOfDay
+        }
+
+        let income = todayTransactions.reduce(Decimal(0)) { partialResult, transaction in
+            transaction.kind == .income ? partialResult + decimalValue(from: transaction.amountText) : partialResult
+        }
+        let expense = todayTransactions.reduce(Decimal(0)) { partialResult, transaction in
+            transaction.kind == .expense ? partialResult + decimalValue(from: transaction.amountText) : partialResult
+        }
+
+        return String(
+            format: NSLocalizedString("selection.category.todayFormat", comment: ""),
+            DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: income)),
+            DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: expense))
+        )
+    }
+
     func saveTransaction(_ transaction: DraftTransaction) {
         transactions.insert(transaction, at: 0)
         transactions.sort(by: Self.transactionSort)
