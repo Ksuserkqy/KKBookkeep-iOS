@@ -47,6 +47,11 @@ struct SyncSettingsPage: View {
                     }
                 }
 
+                LabeledContent("sync.setupMode") {
+                    Text(setupModeTextKey)
+                        .foregroundStyle(.secondary)
+                }
+
                 LabeledContent("sync.lastSync") {
                     Text(lastBackupText)
                         .foregroundStyle(.secondary)
@@ -159,6 +164,11 @@ struct SyncSettingsPage: View {
                     }
                 }
                 .disabled(isRunningSyncAction)
+
+                Button("sync.action.runLocalOnly") {
+                    runLocalOnly()
+                }
+                .disabled(isRunningSyncAction)
             } footer: {
                 if let messageKey = settingsMessageKey ?? profileStore.messageKey ?? draftBookkeepingStore.messageKey {
                     Text(LocalizedStringKey(messageKey))
@@ -247,6 +257,7 @@ struct SyncSettingsPage: View {
             try syncSettingsStore.save(draft)
 
             if configuration.backupEnabled {
+                syncSettingsStore.completeInitialSetup(.syncSpace)
                 let secrets = currentSyncSecrets()
                 let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
                 let ledgerDataBackedUp = await draftBookkeepingStore.backupLedgerDataNow(
@@ -261,6 +272,7 @@ struct SyncSettingsPage: View {
                     showSettingsMessage("sync.settings.savedButBackupFailed")
                 }
             } else {
+                syncSettingsStore.completeInitialSetup(.localOnly)
                 showSettingsMessage("sync.settings.saved")
             }
         } catch {
@@ -311,8 +323,53 @@ struct SyncSettingsPage: View {
                 configuration: configuration,
                 secrets: secrets
             )
+            if profileImported, metadataImported, transactionsImported {
+                do {
+                    try syncSettingsStore.save(
+                        SyncSettingsDraft(
+                            configuration: configuration,
+                            password: password,
+                            accessToken: accessToken,
+                            encryptionPassword: encryptionEnabled ? encryptionPassword : ""
+                        )
+                    )
+                } catch {
+                    showSettingsMessage("sync.settings.error.saveFailed")
+                    return
+                }
+                syncSettingsStore.completeInitialSetup(.syncSpace)
+            }
             showSettingsMessage(profileImported && metadataImported && transactionsImported ? "sync.import.completed" : "sync.import.error.failed")
         }
+    }
+
+    private func runLocalOnly() {
+        isRunningSyncAction = true
+        backupEnabled = false
+        autoImport = false
+        backupOnChange = false
+
+        var configuration = makeConfiguration()
+        configuration.backupEnabled = false
+        configuration.autoImport = false
+        configuration.backupOnChange = false
+
+        let draft = SyncSettingsDraft(
+            configuration: configuration,
+            password: password,
+            accessToken: accessToken,
+            encryptionPassword: encryptionEnabled ? encryptionPassword : ""
+        )
+
+        do {
+            try syncSettingsStore.save(draft)
+            syncSettingsStore.completeInitialSetup(.localOnly)
+            showSettingsMessage("sync.settings.localOnlySaved")
+        } catch {
+            showSettingsMessage("sync.settings.error.saveFailed")
+        }
+
+        isRunningSyncAction = false
     }
 
     private func runSyncAction(_ action: @escaping () async -> Void) async {
@@ -380,5 +437,16 @@ struct SyncSettingsPage: View {
             date: .abbreviated,
             time: .shortened
         )
+    }
+
+    private var setupModeTextKey: LocalizedStringKey {
+        switch syncSettingsStore.setupChoice {
+        case .undecided:
+            return "sync.setupMode.undecided"
+        case .syncSpace:
+            return "sync.setupMode.syncSpace"
+        case .localOnly:
+            return "sync.setupMode.localOnly"
+        }
     }
 }

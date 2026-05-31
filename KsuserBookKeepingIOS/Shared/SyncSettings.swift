@@ -63,6 +63,12 @@ enum BackupInterval: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+enum SyncSetupChoice: String {
+    case undecided
+    case syncSpace
+    case localOnly
+}
+
 struct SyncConfiguration: Codable, Equatable {
     var backupEnabled: Bool
     var provider: SyncProvider
@@ -104,17 +110,21 @@ struct SyncSecrets {
 @MainActor
 final class SyncSettingsStore: ObservableObject {
     @Published private(set) var configuration: SyncConfiguration
+    @Published private(set) var setupChoice: SyncSetupChoice
 
     private let defaults: UserDefaults
     private let credentialStore = WebDAVCredentialStore()
 
     private enum DefaultsKey {
         static let configuration = "sync.configuration"
+        static let setupChoice = "sync.setupChoice"
     }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
+        let loadedConfiguration: SyncConfiguration
+        let hasStoredConfiguration: Bool
         if
             let data = defaults.data(forKey: DefaultsKey.configuration),
             let stored = try? Self.decoder.decode(SyncConfiguration.self, from: data)
@@ -123,10 +133,29 @@ final class SyncSettingsStore: ObservableObject {
             if !normalized.provider.isAvailable {
                 normalized.provider = .webDAV
             }
-            self.configuration = normalized
+            loadedConfiguration = normalized
+            hasStoredConfiguration = true
         } else {
-            self.configuration = .defaultValue
+            loadedConfiguration = .defaultValue
+            hasStoredConfiguration = false
         }
+
+        self.configuration = loadedConfiguration
+
+        if
+            let rawSetupChoice = defaults.string(forKey: DefaultsKey.setupChoice),
+            let setupChoice = SyncSetupChoice(rawValue: rawSetupChoice)
+        {
+            self.setupChoice = setupChoice
+        } else if hasStoredConfiguration {
+            self.setupChoice = loadedConfiguration.backupEnabled ? .syncSpace : .localOnly
+        } else {
+            self.setupChoice = .undecided
+        }
+    }
+
+    var needsInitialSyncSetup: Bool {
+        setupChoice == .undecided
     }
 
     func makeDraft() -> SyncSettingsDraft {
@@ -147,6 +176,11 @@ final class SyncSettingsStore: ObservableObject {
         try credentialStore.save(draft.encryptionPassword, account: .encryptionPassword)
 
         configuration = draft.configuration
+    }
+
+    func completeInitialSetup(_ choice: SyncSetupChoice) {
+        defaults.set(choice.rawValue, forKey: DefaultsKey.setupChoice)
+        setupChoice = choice
     }
 
     func markBackupCompleted(at date: Date = Date()) throws {

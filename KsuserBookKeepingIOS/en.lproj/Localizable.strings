@@ -10,6 +10,16 @@
 "common.ok" = "OK";
 "common.save" = "Save";
 
+"initialSync.navigationTitle" = "Get Started";
+"initialSync.title" = "Choose how this device uses data";
+"initialSync.subtitle" = "Import profile, account, category, and transaction data from an existing sync space, or keep this device independent for now.";
+"initialSync.provider.footer" = "WebDAV sync space is supported first. iCloud Drive is kept for a later version.";
+"initialSync.behavior.footer" = "After import succeeds, this device can auto-import external changes and back up local changes.";
+"initialSync.actions.footer" = "Import reads remote incremental logs first and does not upload an empty ledger before import. Independent mode turns off auto-import and automatic backup.";
+"initialSync.action.import" = "Import from Sync Space";
+"initialSync.action.localOnly" = "Run This Device Independently";
+"initialSync.import.completed" = "Sync space import completed.";
+
 "quickAction.expense.title" = "Record Expense";
 "quickAction.income.title" = "Record Income";
 "quickAction.transfer.title" = "Record Transfer";
@@ -398,6 +408,10 @@
 "sync.section.encryption" = "File Encryption";
 "sync.status" = "Current Status";
 "sync.status.localOnly" = "Local ledger only";
+"sync.setupMode" = "Device Mode";
+"sync.setupMode.undecided" = "Not chosen yet";
+"sync.setupMode.syncSpace" = "Using sync space";
+"sync.setupMode.localOnly" = "Independent device";
 "sync.lastSync" = "Last Backup";
 "sync.lastSync.never" = "Never synced";
 "sync.conflictHandling" = "Conflict Handling";
@@ -430,8 +444,10 @@
 "sync.encryption.footer" = "The sync password derives the file encryption key and will later be stored in system secure storage.";
 "sync.action.testConnection" = "Test Backup Location";
 "sync.action.backupNow" = "Back Up Now";
-"sync.action.importNow" = "Import Data";
+"sync.action.importNow" = "Import from Sync Space";
+"sync.action.runLocalOnly" = "Run This Device Independently";
 "sync.settings.saved" = "Sync settings saved.";
+"sync.settings.localOnlySaved" = "This device now runs independently.";
 "sync.backup.succeeded" = "Data backup completed.";
 "sync.backup.error.failed" = "Could not back up all data. Check the WebDAV address, sync password, and credentials.";
 "sync.import.completed" = "Data import completed.";

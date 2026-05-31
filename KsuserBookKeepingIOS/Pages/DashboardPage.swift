@@ -157,7 +157,7 @@ struct DashboardPage: View {
                     systemImage: "arrow.down.circle.fill",
                     tint: .green
                 )
-
+ 
                 DashboardMetricTile(
                     titleKey: "dashboard.monthExpense",
                     value: currencyText(from: summary.expense),

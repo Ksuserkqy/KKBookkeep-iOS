@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var isBackingUpLedgerData = false
     @State private var hasPendingLedgerDataBackup = false
     @State private var ledgerDataBackupTask: Task<Void, Never>?
+    @State private var isShowingInitialSyncSetup = false
     @State private var selectedTab = AppTab.dashboard
     @State private var requestedRecordKind: DraftEntryKind?
 
@@ -88,7 +89,11 @@ struct ContentView: View {
         .task {
             quickActionRouter.configureShortcuts()
             handleQuickAction(quickActionRouter.pendingAction)
-            await importRemoteDataIfNeeded(force: true)
+            if syncSettingsStore.needsInitialSyncSetup {
+                isShowingInitialSyncSetup = true
+            } else {
+                await importRemoteDataIfNeeded(force: true)
+            }
         }
         .onChange(of: quickActionRouter.pendingAction) { _, action in
             handleQuickAction(action)
@@ -105,7 +110,11 @@ struct ContentView: View {
                 isPrivacyCovered = false
                 appLock.refreshConfiguration()
                 Task {
-                    await importRemoteDataIfNeeded()
+                    if syncSettingsStore.needsInitialSyncSetup {
+                        isShowingInitialSyncSetup = true
+                    } else {
+                        await importRemoteDataIfNeeded()
+                    }
                 }
             case .inactive:
                 isPrivacyCovered = appLock.isPasswordEnabled && !appLock.isLocked
@@ -115,6 +124,17 @@ struct ContentView: View {
             @unknown default:
                 break
             }
+        }
+        .fullScreenCover(isPresented: $isShowingInitialSyncSetup) {
+            InitialSyncSetupPage {
+                isShowingInitialSyncSetup = false
+                Task {
+                    await importRemoteDataIfNeeded(force: true)
+                }
+            }
+            .environmentObject(profileStore)
+            .environmentObject(syncSettingsStore)
+            .environmentObject(draftBookkeepingStore)
         }
     }
 
