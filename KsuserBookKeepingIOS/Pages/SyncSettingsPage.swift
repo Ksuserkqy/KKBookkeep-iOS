@@ -67,6 +67,7 @@ struct SyncSettingsPage: View {
 
             Section {
                 Toggle("sync.backupEnabled", isOn: $backupEnabled)
+                    .tint(.accentColor)
 
                 Picker("sync.provider", selection: $provider) {
                     ForEach(SyncProvider.allCases) { option in
@@ -113,7 +114,9 @@ struct SyncSettingsPage: View {
 
             Section {
                 Toggle("sync.backupOnChange", isOn: $backupOnChange)
+                    .tint(.accentColor)
                 Toggle("sync.autoImport", isOn: $autoImport)
+                    .tint(.accentColor)
 
                 Picker("sync.backupInterval", selection: $backupInterval) {
                     ForEach(BackupInterval.allCases) { option in
@@ -128,6 +131,7 @@ struct SyncSettingsPage: View {
 
             Section {
                 Toggle("sync.encryption.enabled", isOn: $encryptionEnabled)
+                    .tint(.accentColor)
 
                 SecureField("sync.encryption.password.placeholder", text: $encryptionPassword)
 

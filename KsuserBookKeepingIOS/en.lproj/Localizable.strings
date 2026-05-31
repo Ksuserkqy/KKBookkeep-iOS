@@ -10,9 +10,26 @@
 "common.ok" = "OK";
 "common.save" = "Save";
 
+"initialSync.legal.navigationTitle" = "Welcome";
+"initialSync.legal.title" = "Welcome to KKBookkeep";
+"initialSync.legal.subtitle" = "Please review and accept the following terms before continuing.";
+"initialSync.legal.terms" = "Terms of Service";
+"initialSync.legal.privacy" = "Privacy Policy";
+"initialSync.legal.footer" = "By tapping Agree and Continue, you confirm that you have read and accepted the User Agreement and Privacy Policy.";
+"initialSync.legal.accept" = "Agree and Continue";
 "initialSync.navigationTitle" = "Get Started";
 "initialSync.title" = "Choose how this device uses data";
 "initialSync.subtitle" = "Import profile, account, category, and transaction data from an existing sync space, or keep this device independent for now.";
+"initialSync.choice.section" = "Do You Need Sync?";
+"initialSync.choice.iCloud.title" = "Sync from iCloud";
+"initialSync.choice.iCloud.subtitle" = "Temporarily unavailable. Coming in a later version.";
+"initialSync.choice.webDAV.title" = "Sync from WebDAV";
+"initialSync.choice.webDAV.subtitle" = "Connect your WebDAV space and import existing data.";
+"initialSync.choice.localOnly.title" = "Do Not Sync";
+"initialSync.choice.localOnly.subtitle" = "Keep the ledger on this device for now. You can enable sync later from Me.";
+"initialSync.choice.unavailable" = "Unavailable";
+"initialSync.choice.footer" = "Choose a sync method before configuring its server. Do Not Sync turns off auto-import and automatic backup.";
+"initialSync.webDAV.navigationTitle" = "WebDAV Setup";
 "initialSync.provider.footer" = "WebDAV sync space is supported first. iCloud Drive is kept for a later version.";
 "initialSync.behavior.footer" = "After import succeeds, this device can auto-import external changes and back up local changes.";
 "initialSync.actions.footer" = "Import reads remote incremental logs first and does not upload an empty ledger before import. Independent mode turns off auto-import and automatic backup.";

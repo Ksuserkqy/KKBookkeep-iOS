@@ -111,6 +111,7 @@ struct SyncSecrets {
 final class SyncSettingsStore: ObservableObject {
     @Published private(set) var configuration: SyncConfiguration
     @Published private(set) var setupChoice: SyncSetupChoice
+    @Published private(set) var hasAcceptedLegalTerms: Bool
 
     private let defaults: UserDefaults
     private let credentialStore = WebDAVCredentialStore()
@@ -118,6 +119,7 @@ final class SyncSettingsStore: ObservableObject {
     private enum DefaultsKey {
         static let configuration = "sync.configuration"
         static let setupChoice = "sync.setupChoice"
+        static let hasAcceptedLegalTerms = "onboarding.hasAcceptedLegalTerms"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -141,6 +143,7 @@ final class SyncSettingsStore: ObservableObject {
         }
 
         self.configuration = loadedConfiguration
+        self.hasAcceptedLegalTerms = defaults.bool(forKey: DefaultsKey.hasAcceptedLegalTerms)
 
         if
             let rawSetupChoice = defaults.string(forKey: DefaultsKey.setupChoice),
@@ -155,7 +158,7 @@ final class SyncSettingsStore: ObservableObject {
     }
 
     var needsInitialSyncSetup: Bool {
-        setupChoice == .undecided
+        !hasAcceptedLegalTerms || setupChoice == .undecided
     }
 
     func makeDraft() -> SyncSettingsDraft {
@@ -181,6 +184,11 @@ final class SyncSettingsStore: ObservableObject {
     func completeInitialSetup(_ choice: SyncSetupChoice) {
         defaults.set(choice.rawValue, forKey: DefaultsKey.setupChoice)
         setupChoice = choice
+    }
+
+    func acceptLegalTerms() {
+        defaults.set(true, forKey: DefaultsKey.hasAcceptedLegalTerms)
+        hasAcceptedLegalTerms = true
     }
 
     func markBackupCompleted(at date: Date = Date()) throws {

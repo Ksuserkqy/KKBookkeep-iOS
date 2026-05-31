@@ -10,9 +10,26 @@
 "common.ok" = "确定";
 "common.save" = "保存";
 
+"initialSync.legal.navigationTitle" = "欢迎使用";
+"initialSync.legal.title" = "欢迎使用羊羊记账";
+"initialSync.legal.subtitle" = "继续前请阅读并同意以下条款。";
+"initialSync.legal.terms" = "服务条款";
+"initialSync.legal.privacy" = "隐私政策";
+"initialSync.legal.footer" = "点击同意并继续，即表示你已阅读并同意《用户协议》和《隐私政策》。";
+"initialSync.legal.accept" = "同意并继续";
 "initialSync.navigationTitle" = "开始使用";
 "initialSync.title" = "选择本设备的数据方式";
 "initialSync.subtitle" = "可以从已有同步空间导入个人信息、账户、分类和流水，也可以让这台设备先独立运行。";
+"initialSync.choice.section" = "是否需要同步";
+"initialSync.choice.iCloud.title" = "从 iCloud 同步";
+"initialSync.choice.iCloud.subtitle" = "暂不可用，后续版本开放。";
+"initialSync.choice.webDAV.title" = "从 WebDAV 同步";
+"initialSync.choice.webDAV.subtitle" = "连接你自己的 WebDAV 空间并导入已有数据。";
+"initialSync.choice.localOnly.title" = "不进行同步";
+"initialSync.choice.localOnly.subtitle" = "先只在本设备保存账本，之后可在“我的”里开启同步。";
+"initialSync.choice.unavailable" = "暂不可用";
+"initialSync.choice.footer" = "选择同步方式后再配置对应服务器；不进行同步会关闭自动导入和自动备份。";
+"initialSync.webDAV.navigationTitle" = "WebDAV 配置";
 "initialSync.provider.footer" = "当前先支持 WebDAV 同步空间；iCloud 云盘入口保留给后续版本。";
 "initialSync.behavior.footer" = "导入成功后，后续可自动导入外部增量，并在本机有修改时自动备份。";
 "initialSync.actions.footer" = "从同步空间导入会先读取远端增量日志，不会把空账本先覆盖到远端；独立运行会关闭本机自动导入和自动备份。";

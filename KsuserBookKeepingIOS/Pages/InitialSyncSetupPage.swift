@@ -7,6 +7,8 @@ struct InitialSyncSetupPage: View {
 
     let onComplete: () -> Void
 
+    @State private var currentStep = InitialSetupStep.legal
+    @State private var didLoadExistingDraft = false
     @State private var provider = SyncProvider.webDAV
     @State private var webDAVAuthentication = WebDAVAuthentication.password
     @State private var serverURL = ""
@@ -22,131 +24,41 @@ struct InitialSyncSetupPage: View {
     @State private var messageKey: String?
     @State private var isShowingMessage = false
 
+    private let userAgreementURL = URL(string: "https://www.ksuser.cn/agreement/user.html")!
+    private let privacyPolicyURL = URL(string: "https://www.ksuser.cn/agreement/privacy.html")!
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("initialSync.title", systemImage: "arrow.triangle.2.circlepath.circle.fill")
-                            .font(.headline)
-
-                        Text("initialSync.subtitle")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 6)
-                }
-
-                if let messageKey {
-                    Section {
-                        Label {
-                            Text(LocalizedStringKey(messageKey))
-                        } icon: {
-                            Image(systemName: isErrorMessage(messageKey) ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                        }
-                        .foregroundStyle(isErrorMessage(messageKey) ? .red : .green)
-                    }
-                }
-
-                Section {
-                    Picker("sync.provider", selection: $provider) {
-                        ForEach(SyncProvider.allCases) { option in
-                            Text(option.titleKey).tag(option)
-                                .disabled(!option.isAvailable)
-                        }
-                    }
-                } header: {
-                    Text("sync.section.provider")
-                } footer: {
-                    if provider == .iCloudDrive {
-                        Text("sync.provider.iCloudDrive.unavailable")
-                    } else {
-                        Text("initialSync.provider.footer")
-                    }
-                }
-
-                if provider == .webDAV {
-                    Section {
-                        TextField("sync.webDAV.server.placeholder", text: $serverURL)
-                            .keyboardType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-
-                        Picker("sync.webDAV.authentication", selection: $webDAVAuthentication) {
-                            ForEach(WebDAVAuthentication.allCases) { option in
-                                Text(option.titleKey).tag(option)
-                            }
-                        }
-
-                        if webDAVAuthentication == .password {
-                            TextField("sync.webDAV.username.placeholder", text: $username)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-
-                            SecureField("sync.webDAV.password.placeholder", text: $password)
-                        } else {
-                            SecureField("sync.webDAV.token.placeholder", text: $accessToken)
-                        }
-                    } header: {
-                        Text("sync.section.webDAV")
-                    } footer: {
-                        Text("sync.webDAV.footer")
-                    }
-                }
-
-                Section {
-                    Toggle("sync.autoImport", isOn: $autoImport)
-                    Toggle("sync.backupOnChange", isOn: $backupOnChange)
-                } header: {
-                    Text("sync.section.behavior")
-                } footer: {
-                    Text("initialSync.behavior.footer")
-                }
-
-                Section {
-                    Toggle("sync.encryption.enabled", isOn: $encryptionEnabled)
-
-                    SecureField("sync.encryption.password.placeholder", text: $encryptionPassword)
-
-                    SecureField("sync.encryption.confirm.placeholder", text: $encryptionPasswordConfirmation)
-                } header: {
-                    Text("sync.section.encryption")
-                } footer: {
-                    Text("sync.encryption.footer")
-                }
-
-                Section {
-                    Button {
-                        Task {
-                            await importFromSyncSpace()
-                        }
-                    } label: {
-                        syncActionLabel(
-                            titleKey: "initialSync.action.import",
-                            systemImage: "square.and.arrow.down"
-                        )
-                    }
-                    .disabled(isWorking)
-
-                    Button {
-                        runLocalOnly()
-                    } label: {
-                        syncActionLabel(
-                            titleKey: "initialSync.action.localOnly",
-                            systemImage: "iphone"
-                        )
-                    }
-                    .disabled(isWorking)
-                } footer: {
-                    Text("initialSync.actions.footer")
+            Group {
+                switch currentStep {
+                case .legal:
+                    legalConsentView
+                case .syncChoice:
+                    syncChoiceView
+                case .webDAVConfiguration:
+                    webDAVConfigurationView
                 }
             }
-            .navigationTitle(Text("initialSync.navigationTitle"))
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(Text(currentStep.navigationTitleKey))
+            .navigationBarTitleDisplayMode(currentStep.titleDisplayMode)
+            .tint(.accentColor)
+            .toolbar {
+                if currentStep == .webDAVConfiguration {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("common.back") {
+                            currentStep = .syncChoice
+                        }
+                        .disabled(isWorking)
+                    }
+                }
+            }
         }
         .interactiveDismissDisabled()
         .task {
+            guard !didLoadExistingDraft else { return }
+            didLoadExistingDraft = true
             loadExistingDraft()
+            currentStep = syncSettingsStore.hasAcceptedLegalTerms ? .syncChoice : .legal
         }
         .alert(Text("sync.settings.message.title"), isPresented: $isShowingMessage) {
             Button("common.ok", role: .cancel) {}
@@ -157,7 +69,252 @@ struct InitialSyncSetupPage: View {
         }
     }
 
-    private func syncActionLabel(titleKey: String, systemImage: String) -> some View {
+    private var legalConsentView: some View {
+        Form {
+            Section {
+                VStack(alignment: .center, spacing: 16) {
+                    AppIconView(cornerRadius: 18)
+                        .frame(width: 76, height: 76)
+
+                    VStack(spacing: 8) {
+                        Text("initialSync.legal.title")
+                            .font(.title3.weight(.semibold))
+                            .multilineTextAlignment(.center)
+
+                        Text("initialSync.legal.subtitle")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+            }
+
+            Section {
+                Link(destination: userAgreementURL) {
+                    Label("initialSync.legal.terms", systemImage: "doc.plaintext")
+                }
+
+                Link(destination: privacyPolicyURL) {
+                    Label("initialSync.legal.privacy", systemImage: "lock.shield")
+                }
+            } footer: {
+                Text("initialSync.legal.footer")
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 0) {
+                Button {
+                    acceptLegalTerms()
+                } label: {
+                    Text("initialSync.legal.accept")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .tint(.accentColor)
+                .disabled(isWorking)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+            .background(.bar)
+        }
+    }
+
+    private var syncChoiceView: some View {
+        Form {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("initialSync.title", systemImage: "arrow.triangle.2.circlepath.circle.fill")
+                        .font(.headline)
+
+                    Text("initialSync.subtitle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+            }
+
+            messageSection
+
+            Section {
+                syncChoiceButton(
+                    titleKey: "initialSync.choice.iCloud.title",
+                    subtitleKey: "initialSync.choice.iCloud.subtitle",
+                    systemImage: "icloud.fill",
+                    isAvailable: false
+                ) {}
+
+                syncChoiceButton(
+                    titleKey: "initialSync.choice.webDAV.title",
+                    subtitleKey: "initialSync.choice.webDAV.subtitle",
+                    systemImage: "server.rack"
+                ) {
+                    provider = .webDAV
+                    currentStep = .webDAVConfiguration
+                }
+
+                syncChoiceButton(
+                    titleKey: "initialSync.choice.localOnly.title",
+                    subtitleKey: "initialSync.choice.localOnly.subtitle",
+                    systemImage: "iphone"
+                ) {
+                    runLocalOnly()
+                }
+            } header: {
+                Text("initialSync.choice.section")
+            } footer: {
+                Text("initialSync.choice.footer")
+            }
+        }
+    }
+
+    private var webDAVConfigurationView: some View {
+        Form {
+            messageSection
+
+            Section {
+                TextField("sync.webDAV.server.placeholder", text: $serverURL)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+
+                Picker("sync.webDAV.authentication", selection: $webDAVAuthentication) {
+                    ForEach(WebDAVAuthentication.allCases) { option in
+                        Text(option.titleKey).tag(option)
+                    }
+                }
+
+                if webDAVAuthentication == .password {
+                    TextField("sync.webDAV.username.placeholder", text: $username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+
+                    SecureField("sync.webDAV.password.placeholder", text: $password)
+                } else {
+                    SecureField("sync.webDAV.token.placeholder", text: $accessToken)
+                }
+            } header: {
+                Text("sync.section.webDAV")
+            } footer: {
+                Text("sync.webDAV.footer")
+            }
+
+            Section {
+                Toggle("sync.autoImport", isOn: $autoImport)
+                    .tint(.accentColor)
+                Toggle("sync.backupOnChange", isOn: $backupOnChange)
+                    .tint(.accentColor)
+            } header: {
+                Text("sync.section.behavior")
+            } footer: {
+                Text("initialSync.behavior.footer")
+            }
+
+            Section {
+                Toggle("sync.encryption.enabled", isOn: $encryptionEnabled)
+                    .tint(.accentColor)
+
+                SecureField("sync.encryption.password.placeholder", text: $encryptionPassword)
+
+                SecureField("sync.encryption.confirm.placeholder", text: $encryptionPasswordConfirmation)
+            } header: {
+                Text("sync.section.encryption")
+            } footer: {
+                Text("sync.encryption.footer")
+            }
+
+            Section {
+                Button {
+                    Task {
+                        await importFromSyncSpace()
+                    }
+                } label: {
+                    setupActionLabel(
+                        titleKey: "initialSync.action.import",
+                        systemImage: "square.and.arrow.down"
+                    )
+                }
+                .disabled(isWorking)
+            } footer: {
+                Text("initialSync.actions.footer")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var messageSection: some View {
+        if let messageKey {
+            Section {
+                Label {
+                    Text(LocalizedStringKey(messageKey))
+                } icon: {
+                    Image(systemName: isErrorMessage(messageKey) ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                }
+                .foregroundStyle(isErrorMessage(messageKey) ? .red : .green)
+            }
+        }
+    }
+
+    private func syncChoiceButton(
+        titleKey: String,
+        subtitleKey: String,
+        systemImage: String,
+        isAvailable: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            action()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.title3)
+                    .foregroundStyle(isAvailable ? Color.accentColor : Color.secondary)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(LocalizedStringKey(titleKey))
+                            .font(.body)
+                            .foregroundStyle(.primary)
+
+                        if !isAvailable {
+                            Text("initialSync.choice.unavailable")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(LocalizedStringKey(subtitleKey))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+
+                Spacer(minLength: 8)
+
+                if isAvailable {
+                    if isWorking {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .opacity(isAvailable ? 1 : 0.55)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isAvailable || isWorking)
+    }
+
+    private func setupActionLabel(titleKey: String, systemImage: String) -> some View {
         HStack {
             Label {
                 Text(LocalizedStringKey(titleKey))
@@ -168,6 +325,16 @@ struct InitialSyncSetupPage: View {
             if isWorking {
                 ProgressView()
             }
+        }
+    }
+
+    private func acceptLegalTerms() {
+        syncSettingsStore.acceptLegalTerms()
+
+        if syncSettingsStore.setupChoice == .undecided {
+            currentStep = .syncChoice
+        } else {
+            onComplete()
         }
     }
 
@@ -311,5 +478,31 @@ struct InitialSyncSetupPage: View {
 
     private func isErrorMessage(_ key: String) -> Bool {
         key.contains(".error.")
+    }
+}
+
+private enum InitialSetupStep {
+    case legal
+    case syncChoice
+    case webDAVConfiguration
+
+    var navigationTitleKey: LocalizedStringKey {
+        switch self {
+        case .legal:
+            return "initialSync.legal.navigationTitle"
+        case .syncChoice:
+            return "initialSync.navigationTitle"
+        case .webDAVConfiguration:
+            return "initialSync.webDAV.navigationTitle"
+        }
+    }
+
+    var titleDisplayMode: NavigationBarItem.TitleDisplayMode {
+        switch self {
+        case .legal:
+            return .large
+        case .syncChoice, .webDAVConfiguration:
+            return .inline
+        }
     }
 }
