@@ -136,6 +136,13 @@
 "transactions.draft.toAccount" = "转入账户";
 "transactions.draft.note" = "备注";
 "transactions.footer.localOnly" = "当前流水仅保存在本机，WebDAV 同步后续统一接入。";
+"transactions.edit.title" = "编辑流水";
+"transactions.edit.kind" = "类型";
+"transactions.delete.title" = "删除流水";
+"transactions.delete.message" = "删除后会同步回滚这笔流水对账户余额的影响。";
+"transactions.delete.confirm" = "删除流水";
+"transactions.message.updated" = "流水已更新。";
+"transactions.message.deleted" = "流水已删除。";
 "draft.item.missing" = "未选择";
 
 "management.action.rename" = "重命名";

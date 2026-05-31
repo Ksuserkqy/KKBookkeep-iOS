@@ -350,6 +350,37 @@ final class DraftBookkeepingStore: ObservableObject {
         messageKey = "record.transaction.saved"
     }
 
+    @discardableResult
+    func updateTransaction(_ transaction: DraftTransaction) -> Bool {
+        guard let index = transactions.firstIndex(where: { $0.id == transaction.id }) else { return false }
+
+        let originalTransaction = transactions[index]
+        applyTransactionToAccountBalances(originalTransaction, multiplier: -1)
+        transactions[index] = transaction
+        transactions.sort(by: Self.transactionSort)
+        lastDraft = transactions.first
+        applyTransactionToAccountBalances(transaction)
+        persistAccounts()
+        persistTransactions()
+        persistLastDraft()
+        messageKey = "transactions.message.updated"
+        return true
+    }
+
+    @discardableResult
+    func deleteTransaction(id: String) -> Bool {
+        guard let index = transactions.firstIndex(where: { $0.id == id }) else { return false }
+
+        let transaction = transactions.remove(at: index)
+        applyTransactionToAccountBalances(transaction, multiplier: -1)
+        lastDraft = transactions.first
+        persistAccounts()
+        persistTransactions()
+        persistLastDraft()
+        messageKey = "transactions.message.deleted"
+        return true
+    }
+
     func backupMetadataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
         guard configuration.backupEnabled else {
             messageKey = "bookkeeping.metadata.sync.error.backupDisabled"
@@ -906,20 +937,20 @@ final class DraftBookkeepingStore: ObservableObject {
         Self.save(lastDraft, forKey: DefaultsKey.lastDraft, to: defaults)
     }
 
-    private func applyTransactionToAccountBalances(_ transaction: DraftTransaction) {
+    private func applyTransactionToAccountBalances(_ transaction: DraftTransaction, multiplier: Decimal = 1) {
         switch transaction.kind {
         case .expense:
             guard let accountId = transaction.accountId else { return }
-            adjustAccountBalance(id: accountId, by: -decimalValue(from: transaction.amountText))
+            adjustAccountBalance(id: accountId, by: -decimalValue(from: transaction.amountText) * multiplier)
         case .income:
             guard let accountId = transaction.accountId else { return }
-            adjustAccountBalance(id: accountId, by: decimalValue(from: transaction.amountText))
+            adjustAccountBalance(id: accountId, by: decimalValue(from: transaction.amountText) * multiplier)
         case .transfer:
             if let fromAccountId = transaction.fromAccountId {
-                adjustAccountBalance(id: fromAccountId, by: -decimalValue(from: transaction.amountText))
+                adjustAccountBalance(id: fromAccountId, by: -decimalValue(from: transaction.amountText) * multiplier)
             }
             if let toAccountId = transaction.toAccountId {
-                adjustAccountBalance(id: toAccountId, by: decimalValue(from: transaction.transferInAmountText ?? transaction.amountText))
+                adjustAccountBalance(id: toAccountId, by: decimalValue(from: transaction.transferInAmountText ?? transaction.amountText) * multiplier)
             }
         }
     }

@@ -136,6 +136,13 @@
 "transactions.draft.toAccount" = "To Account";
 "transactions.draft.note" = "Note";
 "transactions.footer.localOnly" = "Transactions are currently stored on this device only. WebDAV sync will be connected later.";
+"transactions.edit.title" = "Edit Transaction";
+"transactions.edit.kind" = "Type";
+"transactions.delete.title" = "Delete Transaction";
+"transactions.delete.message" = "Deleting this transaction will also roll back its effect on account balances.";
+"transactions.delete.confirm" = "Delete Transaction";
+"transactions.message.updated" = "Transaction updated.";
+"transactions.message.deleted" = "Transaction deleted.";
 "draft.item.missing" = "Not selected";
 
 "management.action.rename" = "Rename";
