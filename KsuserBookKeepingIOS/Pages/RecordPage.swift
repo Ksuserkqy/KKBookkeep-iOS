@@ -18,6 +18,7 @@ struct RecordPage: View {
     @State private var note = ""
     @State private var location: DraftLocation?
     @State private var isLocating = false
+    @State private var locationCaptureToken = 0
     @State private var locationMessageKey: String?
     @State private var errorKey: String?
 
@@ -431,26 +432,48 @@ struct RecordPage: View {
         )
 
         draftStore.saveTransaction(transaction)
-        errorKey = nil
+        resetFormForNextTransaction()
+        draftStore.clearMessage()
         selectedTab = .transactions
+    }
+
+    private func resetFormForNextTransaction() {
+        selectedKind = .expense
+        amountText = ""
+        transferInAmountText = ""
+        date = Date()
+        note = ""
+        location = nil
+        isLocating = false
+        locationCaptureToken += 1
+        locationMessageKey = nil
+        errorKey = nil
+        normalizeSelections()
     }
 
     private func captureLocation() {
         guard !isLocating else { return }
 
+        locationCaptureToken += 1
+        let currentLocationCaptureToken = locationCaptureToken
         isLocating = true
         locationMessageKey = "record.location.locating"
 
         Task {
             do {
-                location = try await locationProvider.captureLocation()
+                let capturedLocation = try await locationProvider.captureLocation()
+                guard locationCaptureToken == currentLocationCaptureToken else { return }
+                location = capturedLocation
                 locationMessageKey = nil
             } catch CurrentLocationProvider.ProviderError.denied {
+                guard locationCaptureToken == currentLocationCaptureToken else { return }
                 locationMessageKey = "record.location.error.denied"
             } catch {
+                guard locationCaptureToken == currentLocationCaptureToken else { return }
                 locationMessageKey = "record.location.error.unavailable"
             }
 
+            guard locationCaptureToken == currentLocationCaptureToken else { return }
             isLocating = false
         }
     }
