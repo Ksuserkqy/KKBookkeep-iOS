@@ -6,6 +6,7 @@
 
 "common.back" = "Back";
 "common.cancel" = "Cancel";
+"common.done" = "Done";
 "common.ok" = "OK";
 "common.save" = "Save";
 
@@ -147,6 +148,14 @@
 "transactions.location.mapPicker.title" = "Choose Map";
 "transactions.location.mapPicker.appleMaps" = "Apple Maps";
 "transactions.location.mapPicker.amap" = "Amap";
+"transactions.date.month" = "Choose Month";
+"transactions.date.previousMonth" = "Previous Month";
+"transactions.date.nextMonth" = "Next Month";
+"transactions.filter.allAccounts" = "All Accounts";
+"transactions.filter.allCategories" = "All Categories";
+"transactions.filter.reset" = "Clear Filters";
+"transactions.empty.month" = "No transactions in this month.";
+"transactions.empty.filtered" = "No transactions match these filters.";
 "selection.category.todayFormat" = "Today income %@ · expense %@";
 "selection.account.balanceFormat" = "Balance %@";
 "draft.item.missing" = "Not selected";

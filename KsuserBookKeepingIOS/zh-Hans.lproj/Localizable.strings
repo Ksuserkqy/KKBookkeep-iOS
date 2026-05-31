@@ -6,6 +6,7 @@
 
 "common.back" = "返回";
 "common.cancel" = "取消";
+"common.done" = "完成";
 "common.ok" = "确定";
 "common.save" = "保存";
 
@@ -147,6 +148,14 @@
 "transactions.location.mapPicker.title" = "选择地图";
 "transactions.location.mapPicker.appleMaps" = "Apple 地图";
 "transactions.location.mapPicker.amap" = "高德地图";
+"transactions.date.month" = "选择月份";
+"transactions.date.previousMonth" = "上个月";
+"transactions.date.nextMonth" = "下个月";
+"transactions.filter.allAccounts" = "全部账户";
+"transactions.filter.allCategories" = "全部分类";
+"transactions.filter.reset" = "清除筛选";
+"transactions.empty.month" = "这个月份还没有流水。";
+"transactions.empty.filtered" = "没有符合筛选条件的流水。";
 "selection.category.todayFormat" = "今日收入 %@ · 支出 %@";
 "selection.account.balanceFormat" = "余额 %@";
 "draft.item.missing" = "未选择";

@@ -7,6 +7,45 @@ struct TransactionsPage: View {
     @EnvironmentObject private var profileStore: ProfileStore
     @State private var editingTransaction: DraftTransaction?
     @State private var deletingTransaction: DraftTransaction?
+    @State private var selectedMonth = Date()
+    @State private var selectedAccountId: String?
+    @State private var selectedCategoryId: String?
+    @State private var hasInitializedMonth = false
+
+    private var filteredTransactions: [DraftTransaction] {
+        draftStore.transactions.filter { transaction in
+            guard Calendar.current.isDate(transaction.date, equalTo: selectedMonth, toGranularity: .month) else {
+                return false
+            }
+
+            if let selectedAccountId, !matchesAccount(transaction, accountId: selectedAccountId) {
+                return false
+            }
+
+            if let selectedCategoryId, transaction.categoryId != selectedCategoryId {
+                return false
+            }
+
+            return true
+        }
+    }
+
+    private var groupedTransactions: [TransactionDayGroup] {
+        let calendar = Calendar.current
+        let groups = Dictionary(grouping: filteredTransactions) { transaction in
+            calendar.startOfDay(for: transaction.date)
+        }
+
+        return groups
+            .map { date, transactions in
+                TransactionDayGroup(date: date, transactions: sortedTransactions(transactions))
+            }
+            .sorted { $0.date > $1.date }
+    }
+
+    private var hasActiveFilters: Bool {
+        selectedAccountId != nil || selectedCategoryId != nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -28,37 +67,77 @@ struct TransactionsPage: View {
                     }
                 } else {
                     Section {
-                        ForEach(draftStore.transactions) { transaction in
-                            TransactionSummaryCard(
-                                transaction: transaction,
-                                localizedTitle: localizedTitle(for: transaction.kind),
-                                accountItem: accountItem(for: transaction),
-                                categoryItem: categoryItem(for: transaction),
-                                dateText: Self.dateFormatter.string(from: transaction.date),
-                                onEdit: {
-                                    editingTransaction = transaction
-                                }
-                            )
-                            .padding(.vertical, 6)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    deletingTransaction = transaction
-                                } label: {
-                                    Label("management.action.delete", systemImage: "trash")
-                                }
-                            }
-                            .contextMenu {
-                                Button {
-                                    editingTransaction = transaction
-                                } label: {
-                                    Label("management.action.edit", systemImage: "pencil")
-                                }
+                        TransactionMonthHeader(
+                            selectedMonth: $selectedMonth,
+                            onPreviousMonth: { shiftMonth(by: -1) },
+                            onNextMonth: { shiftMonth(by: 1) }
+                        )
 
-                                Button(role: .destructive) {
-                                    deletingTransaction = transaction
-                                } label: {
-                                    Label("management.action.delete", systemImage: "trash")
+                        TransactionFilterBar(
+                            selectedAccountId: $selectedAccountId,
+                            selectedCategoryId: $selectedCategoryId,
+                            accounts: draftStore.accounts,
+                            categories: draftStore.categories,
+                            hasActiveFilters: hasActiveFilters,
+                            resetFilters: resetFilters
+                        )
+                    }
+                    .listRowSeparator(.hidden)
+
+                    Section {
+                        if groupedTransactions.isEmpty {
+                            TransactionEmptyFilteredView(hasActiveFilters: hasActiveFilters)
+                                .padding(.vertical, 28)
+                                .frame(maxWidth: .infinity)
+                                .listRowSeparator(.hidden)
+                        } else {
+                            ForEach(groupedTransactions) { group in
+                                VStack(spacing: 0) {
+                                    TransactionDayHeader(
+                                        date: group.date
+                                    )
+                                    .padding(.bottom, 8)
+
+                                    ForEach(group.transactions) { transaction in
+                                        TransactionSummaryCard(
+                                            transaction: transaction,
+                                            accountItem: accountItem(for: transaction),
+                                            categoryItem: categoryItem(for: transaction),
+                                            timeText: Self.timeFormatter.string(from: transaction.date),
+                                            onEdit: {
+                                                editingTransaction = transaction
+                                            }
+                                        )
+                                        .padding(.vertical, 10)
+                                        .overlay(alignment: .bottom) {
+                                            if transaction.id != group.transactions.last?.id {
+                                                Divider()
+                                                    .padding(.leading, 58)
+                                            }
+                                        }
+                                        .swipeActions(edge: .trailing) {
+                                            Button(role: .destructive) {
+                                                deletingTransaction = transaction
+                                            } label: {
+                                                Label("management.action.delete", systemImage: "trash")
+                                            }
+                                        }
+                                        .contextMenu {
+                                            Button {
+                                                editingTransaction = transaction
+                                            } label: {
+                                                Label("management.action.edit", systemImage: "pencil")
+                                            }
+
+                                            Button(role: .destructive) {
+                                                deletingTransaction = transaction
+                                            } label: {
+                                                Label("management.action.delete", systemImage: "trash")
+                                            }
+                                        }
+                                    }
                                 }
+                                .padding(.vertical, 6)
                             }
                         }
                     } footer: {
@@ -66,7 +145,14 @@ struct TransactionsPage: View {
                     }
                 }
             }
+            .listStyle(.insetGrouped)
             .navigationTitle(Text("tab.transactions"))
+            .onAppear {
+                initializeSelectedMonthIfNeeded()
+            }
+            .onChange(of: draftStore.transactions) { _, _ in
+                initializeSelectedMonthIfNeeded()
+            }
             .sheet(item: $editingTransaction) { transaction in
                 TransactionEditorPage(transaction: transaction)
                     .environmentObject(draftStore)
@@ -100,8 +186,39 @@ struct TransactionsPage: View {
         }
     }
 
-    private func localizedTitle(for kind: DraftEntryKind) -> String {
-        NSLocalizedString(kind.localizationKey, comment: "")
+    private func initializeSelectedMonthIfNeeded() {
+        guard !hasInitializedMonth else { return }
+        if let latestTransaction = draftStore.transactions.first {
+            selectedMonth = latestTransaction.date
+        }
+        hasInitializedMonth = true
+    }
+
+    private func shiftMonth(by value: Int) {
+        selectedMonth = Calendar.current.date(byAdding: .month, value: value, to: selectedMonth) ?? selectedMonth
+    }
+
+    private func resetFilters() {
+        selectedAccountId = nil
+        selectedCategoryId = nil
+    }
+
+    private func matchesAccount(_ transaction: DraftTransaction, accountId: String) -> Bool {
+        switch transaction.kind {
+        case .expense, .income:
+            return transaction.accountId == accountId
+        case .transfer:
+            return transaction.fromAccountId == accountId || transaction.toAccountId == accountId
+        }
+    }
+
+    private func sortedTransactions(_ transactions: [DraftTransaction]) -> [DraftTransaction] {
+        transactions.sorted { lhs, rhs in
+            if lhs.date == rhs.date {
+                return lhs.createdAt > rhs.createdAt
+            }
+            return lhs.date > rhs.date
+        }
     }
 
     private func accountItem(for id: String?) -> DraftVisualSummaryItem {
@@ -179,20 +296,266 @@ struct TransactionsPage: View {
         }
     }
 
-    private static let dateFormatter: DateFormatter = {
+    private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateStyle = .medium
+        formatter.dateStyle = .none
         formatter.timeStyle = .short
         return formatter
     }()
 }
 
+private struct TransactionDayGroup: Identifiable {
+    let date: Date
+    let transactions: [DraftTransaction]
+
+    var id: Date { date }
+}
+
+private struct TransactionMonthHeader: View {
+    @Binding var selectedMonth: Date
+    let onPreviousMonth: () -> Void
+    let onNextMonth: () -> Void
+    @State private var isDatePickerPresented = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: onPreviousMonth) {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(Text("transactions.date.previousMonth"))
+
+            Button {
+                isDatePickerPresented = true
+            } label: {
+                Text(Self.monthFormatter.string(from: selectedMonth))
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                    .padding(.horizontal, 12)
+                    .background(Capsule().fill(Color.secondary.opacity(0.12)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Text("transactions.date.month"))
+
+            Button(action: onNextMonth) {
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 36, height: 36)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel(Text("transactions.date.nextMonth"))
+        }
+        .padding(.vertical, 4)
+        .sheet(isPresented: $isDatePickerPresented) {
+            NavigationStack {
+                DatePicker(
+                    "transactions.date.month",
+                    selection: $selectedMonth,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+                .navigationTitle(Text("transactions.date.month"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("common.done") {
+                            isDatePickerPresented = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
+    private static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMM", options: 0, locale: .current)
+        return formatter
+    }()
+}
+
+private struct TransactionFilterBar: View {
+    @Binding var selectedAccountId: String?
+    @Binding var selectedCategoryId: String?
+    let accounts: [DraftAccount]
+    let categories: [DraftCategory]
+    let hasActiveFilters: Bool
+    let resetFilters: () -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Menu {
+                    Button("transactions.filter.allAccounts") {
+                        selectedAccountId = nil
+                    }
+
+                    ForEach(accounts) { account in
+                        Button(archivedAwareName(account.name, isArchived: account.isArchived)) {
+                            selectedAccountId = account.id
+                        }
+                    }
+                } label: {
+                    TransactionFilterPill(
+                        title: accountTitle,
+                        systemImage: "creditcard",
+                        isActive: selectedAccountId != nil
+                    )
+                }
+
+                Menu {
+                    Button("transactions.filter.allCategories") {
+                        selectedCategoryId = nil
+                    }
+
+                    ForEach(categories) { category in
+                        Button(archivedAwareName(category.name, isArchived: category.isArchived)) {
+                            selectedCategoryId = category.id
+                        }
+                    }
+                } label: {
+                    TransactionFilterPill(
+                        title: categoryTitle,
+                        systemImage: "tag",
+                        isActive: selectedCategoryId != nil
+                    )
+                }
+
+                if hasActiveFilters {
+                    Button(action: resetFilters) {
+                        TransactionFilterPill(
+                            title: NSLocalizedString("transactions.filter.reset", comment: ""),
+                            systemImage: "xmark.circle",
+                            isActive: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    private var accountTitle: String {
+        guard
+            let selectedAccountId,
+            let account = accounts.first(where: { $0.id == selectedAccountId })
+        else {
+            return NSLocalizedString("transactions.filter.allAccounts", comment: "")
+        }
+
+        return archivedAwareName(account.name, isArchived: account.isArchived)
+    }
+
+    private var categoryTitle: String {
+        guard
+            let selectedCategoryId,
+            let category = categories.first(where: { $0.id == selectedCategoryId })
+        else {
+            return NSLocalizedString("transactions.filter.allCategories", comment: "")
+        }
+
+        return archivedAwareName(category.name, isArchived: category.isArchived)
+    }
+
+    private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
+        guard isArchived else { return name }
+        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+    }
+}
+
+private struct TransactionFilterPill: View {
+    let title: String
+    let systemImage: String
+    let isActive: Bool
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
+            .foregroundStyle(isActive ? Color.accentColor : .primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(isActive ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.12))
+            )
+    }
+}
+
+private struct TransactionDayHeader: View {
+    let date: Date
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.dayFormatter.string(from: date))
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.primary)
+
+                Text(Self.weekdayFormatter.string(from: date))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 44, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.fullDateFormatter.string(from: date))
+                    .font(.subheadline.weight(.semibold))
+            }
+
+            Spacer()
+        }
+    }
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d"
+        return formatter
+    }()
+
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter
+    }()
+
+    private static let fullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMd", options: 0, locale: .current)
+        return formatter
+    }()
+}
+
+private struct TransactionEmptyFilteredView: View {
+    let hasActiveFilters: Bool
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle" : "calendar")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.tint)
+
+            Text(LocalizedStringKey(hasActiveFilters ? "transactions.empty.filtered" : "transactions.empty.month"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+}
+
 private struct TransactionSummaryCard: View {
     let transaction: DraftTransaction
-    let localizedTitle: String
     let accountItem: DraftVisualSummaryItem
     let categoryItem: DraftVisualSummaryItem
-    let dateText: String
+    let timeText: String
     let onEdit: () -> Void
 
     private var amountText: String {
@@ -218,62 +581,58 @@ private struct TransactionSummaryCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        Button(action: onEdit) {
             HStack(alignment: .center, spacing: 12) {
-                DraftVisualBadge(iconName: categoryItem.iconName, colorHex: categoryItem.colorHex, size: 34)
+                DraftVisualBadge(iconName: categoryItem.iconName, colorHex: categoryItem.colorHex, size: 38)
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(categoryItem.name)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    Text(localizedTitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if !transaction.note.isEmpty {
+                        Text(transaction.note)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    HStack(spacing: 5) {
+                        Text(timeText)
+
+                        Text("·")
+
+                        Text(accountItem.name)
+
+                        if let location = transaction.location {
+                            Text("·")
+                            Image(systemName: "location.fill")
+                                .accessibilityLabel(Text(location.displayName))
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
                 }
 
                 Spacer(minLength: 12)
 
-                Text(amountText)
-                    .font(.headline)
-                    .foregroundStyle(amountColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                HStack(spacing: 8) {
+                    Text(amountText)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(amountColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
             }
             .contentShape(Rectangle())
-            .onTapGesture(perform: onEdit)
-
-            HStack(spacing: 8) {
-                DraftVisualBadge(iconName: accountItem.iconName, colorHex: accountItem.colorHex, size: 22)
-
-                Text(accountItem.name)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                Text(dateText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onEdit)
-
-            if let location = transaction.location {
-                TransactionLocationButton(location: location, font: .caption)
-            }
-
-            if !transaction.note.isEmpty {
-                Text(transaction.note)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: onEdit)
-            }
         }
+        .buttonStyle(.plain)
     }
 }
 
