@@ -207,12 +207,17 @@ final class DraftBookkeepingStore: ObservableObject {
     @Published private(set) var lastDraft: DraftTransaction?
     @Published private(set) var messageKey: String?
     @Published private(set) var localMetadataChangeToken = 0
+    @Published private(set) var localTransactionsChangeToken = 0
 
     private let defaults: UserDefaults
     private let syncService: BookkeepingMetadataSyncService
+    private let transactionsSyncService: BookkeepingTransactionsSyncService
     private var metadataRevision: Int
     private var metadataUpdatedAt: Date
     private var metadataUpdatedByDeviceId: String
+    private var transactionsRevision: Int
+    private var transactionsUpdatedAt: Date
+    private var transactionsUpdatedByDeviceId: String
 
     private enum DefaultsKey {
         static let accounts = "draftBookkeeping.accounts"
@@ -222,16 +227,25 @@ final class DraftBookkeepingStore: ObservableObject {
         static let metadataRevision = "draftBookkeeping.metadata.revision"
         static let metadataUpdatedAt = "draftBookkeeping.metadata.updatedAt"
         static let metadataUpdatedByDeviceId = "draftBookkeeping.metadata.updatedByDeviceId"
+        static let transactionsRevision = "draftBookkeeping.transactions.revision"
+        static let transactionsUpdatedAt = "draftBookkeeping.transactions.updatedAt"
+        static let transactionsUpdatedByDeviceId = "draftBookkeeping.transactions.updatedByDeviceId"
     }
 
     private static let maxCategoryDepth = 3
 
-    init(defaults: UserDefaults = .standard, syncService: BookkeepingMetadataSyncService = BookkeepingMetadataSyncService()) {
+    init(
+        defaults: UserDefaults = .standard,
+        syncService: BookkeepingMetadataSyncService = BookkeepingMetadataSyncService(),
+        transactionsSyncService: BookkeepingTransactionsSyncService = BookkeepingTransactionsSyncService()
+    ) {
         self.defaults = defaults
         self.syncService = syncService
+        self.transactionsSyncService = transactionsSyncService
         let hasStoredAccounts = defaults.data(forKey: DefaultsKey.accounts) != nil
         let hasStoredCategories = defaults.data(forKey: DefaultsKey.categories) != nil
         let hasStoredMetadata = defaults.object(forKey: DefaultsKey.metadataRevision) != nil
+        let hasStoredTransactionsMetadata = defaults.object(forKey: DefaultsKey.transactionsRevision) != nil
         self.accounts = Self.load([DraftAccount].self, forKey: DefaultsKey.accounts, from: defaults) ?? Self.defaultAccounts
         self.categories = Self.load([DraftCategory].self, forKey: DefaultsKey.categories, from: defaults) ?? Self.defaultCategories
         let storedTransactions = Self.load([DraftTransaction].self, forKey: DefaultsKey.transactions, from: defaults) ?? []
@@ -257,6 +271,19 @@ final class DraftBookkeepingStore: ObservableObject {
             self.metadataUpdatedAt = Date(timeIntervalSince1970: 0)
             self.metadataUpdatedByDeviceId = DeviceIdentity.currentDeviceId
         }
+        if hasStoredTransactionsMetadata {
+            self.transactionsRevision = defaults.integer(forKey: DefaultsKey.transactionsRevision)
+            self.transactionsUpdatedAt = defaults.object(forKey: DefaultsKey.transactionsUpdatedAt) as? Date ?? Date(timeIntervalSince1970: 0)
+            self.transactionsUpdatedByDeviceId = defaults.string(forKey: DefaultsKey.transactionsUpdatedByDeviceId) ?? DeviceIdentity.currentDeviceId
+        } else if !initializedTransactions.isEmpty {
+            self.transactionsRevision = 1
+            self.transactionsUpdatedAt = Date()
+            self.transactionsUpdatedByDeviceId = DeviceIdentity.currentDeviceId
+        } else {
+            self.transactionsRevision = 0
+            self.transactionsUpdatedAt = Date(timeIntervalSince1970: 0)
+            self.transactionsUpdatedByDeviceId = DeviceIdentity.currentDeviceId
+        }
 
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
@@ -266,6 +293,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistCategories()
         persistTransactions()
         persistMetadata()
+        persistTransactionsMetadata()
     }
 
     func clearMessage() {
@@ -408,6 +436,8 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactions()
         persistLastDraft()
+        markMetadataChanged()
+        markTransactionsChanged()
         messageKey = "record.transaction.saved"
     }
 
@@ -425,6 +455,8 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactions()
         persistLastDraft()
+        markMetadataChanged()
+        markTransactionsChanged()
         messageKey = "transactions.message.updated"
         return true
     }
@@ -439,8 +471,35 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactions()
         persistLastDraft()
+        markMetadataChanged()
+        markTransactionsChanged()
         messageKey = "transactions.message.deleted"
         return true
+    }
+
+    func backupLedgerDataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.ledger.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            try await syncService.backup(
+                document: makeMetadataDocument(),
+                configuration: configuration,
+                secrets: secrets
+            )
+            try await transactionsSyncService.backup(
+                document: makeTransactionsDocument(),
+                configuration: configuration,
+                secrets: secrets
+            )
+            messageKey = "bookkeeping.ledger.sync.backupSucceeded"
+            return true
+        } catch {
+            messageKey = "bookkeeping.ledger.sync.error.backupFailed"
+            return false
+        }
     }
 
     func backupMetadataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
@@ -481,6 +540,64 @@ final class DraftBookkeepingStore: ObservableObject {
         } catch {
             messageKey = "bookkeeping.metadata.sync.error.importFailed"
             return false
+        }
+    }
+
+    func backupTransactionsNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.transactions.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            try await transactionsSyncService.backup(
+                document: makeTransactionsDocument(),
+                configuration: configuration,
+                secrets: secrets
+            )
+            messageKey = "bookkeeping.transactions.sync.backupSucceeded"
+            return true
+        } catch {
+            messageKey = "bookkeeping.transactions.sync.error.backupFailed"
+            return false
+        }
+    }
+
+    func importTransactionsNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.transactions.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            guard let remoteDocument = try await transactionsSyncService.importDocument(configuration: configuration, secrets: secrets) else {
+                messageKey = "bookkeeping.transactions.sync.importNoRemoteTransactions"
+                return true
+            }
+
+            applyRemoteTransactions(remoteDocument)
+            messageKey = "bookkeeping.transactions.sync.importSucceeded"
+            return true
+        } catch {
+            messageKey = "bookkeeping.transactions.sync.error.importFailed"
+            return false
+        }
+    }
+
+    func importIfRemoteTransactionsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
+        guard configuration.backupEnabled else { return }
+
+        do {
+            guard let remoteDocument = try await transactionsSyncService.importDocument(configuration: configuration, secrets: secrets) else {
+                return
+            }
+
+            guard remoteDocument.isNewer(than: makeTransactionsDocument()) else { return }
+
+            applyRemoteTransactions(remoteDocument)
+            messageKey = "bookkeeping.transactions.sync.importSucceeded"
+        } catch {
+            return
         }
     }
 
@@ -741,6 +858,15 @@ final class DraftBookkeepingStore: ObservableObject {
         )
     }
 
+    private func makeTransactionsDocument() -> BookkeepingTransactionsSyncDocument {
+        BookkeepingTransactionsSyncDocument(
+            revision: transactionsRevision,
+            updatedAt: transactionsUpdatedAt,
+            updatedByDeviceId: transactionsUpdatedByDeviceId,
+            transactions: transactions
+        )
+    }
+
     private func applyRemoteMetadata(_ document: BookkeepingMetadataSyncDocument) {
         accounts = document.accounts.isEmpty ? Self.defaultAccounts : document.accounts
         categories = document.categories.isEmpty ? Self.defaultCategories : document.categories
@@ -759,6 +885,19 @@ final class DraftBookkeepingStore: ObservableObject {
         persistMetadata()
     }
 
+    private func applyRemoteTransactions(_ document: BookkeepingTransactionsSyncDocument) {
+        transactions = document.transactions.sorted(by: Self.transactionSort)
+        lastDraft = transactions.first
+        transactionsRevision = document.revision
+        transactionsUpdatedAt = document.updatedAt
+        transactionsUpdatedByDeviceId = document.updatedByDeviceId
+
+        normalizeTransactionsAfterMetadataChange()
+        persistTransactions()
+        persistLastDraft()
+        persistTransactionsMetadata()
+    }
+
     private func markMetadataChanged(at date: Date = Date()) {
         metadataRevision += 1
         metadataUpdatedAt = date
@@ -767,10 +906,24 @@ final class DraftBookkeepingStore: ObservableObject {
         localMetadataChangeToken += 1
     }
 
+    private func markTransactionsChanged(at date: Date = Date()) {
+        transactionsRevision += 1
+        transactionsUpdatedAt = date
+        transactionsUpdatedByDeviceId = DeviceIdentity.currentDeviceId
+        persistTransactionsMetadata()
+        localTransactionsChangeToken += 1
+    }
+
     private func persistMetadata() {
         defaults.set(metadataRevision, forKey: DefaultsKey.metadataRevision)
         defaults.set(metadataUpdatedAt, forKey: DefaultsKey.metadataUpdatedAt)
         defaults.set(metadataUpdatedByDeviceId, forKey: DefaultsKey.metadataUpdatedByDeviceId)
+    }
+
+    private func persistTransactionsMetadata() {
+        defaults.set(transactionsRevision, forKey: DefaultsKey.transactionsRevision)
+        defaults.set(transactionsUpdatedAt, forKey: DefaultsKey.transactionsUpdatedAt)
+        defaults.set(transactionsUpdatedByDeviceId, forKey: DefaultsKey.transactionsUpdatedByDeviceId)
     }
 
     private func normalizeTransactionsAfterMetadataChange() {

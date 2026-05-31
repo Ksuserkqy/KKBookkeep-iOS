@@ -130,9 +130,9 @@
 "record.action.saveDraft" = "保存草稿";
 "record.action.saveTransaction" = "保存流水";
 "record.footer.draftOnly" = "当前只生成本机草稿，尚未正式写入账本。";
-"record.footer.localOnly" = "流水会保存到本机账本，暂不进行 WebDAV 同步。";
+"record.footer.localOnly" = "流水会保存到本机账本，并可通过 WebDAV 文件同步备份。";
 "record.draft.saved" = "草稿已保存，尚未正式入账。";
-"record.transaction.saved" = "流水已保存到本机。";
+"record.transaction.saved" = "流水已保存。";
 "record.error.invalidAmount" = "请输入大于 0 的金额。";
 "record.error.invalidTransferInAmount" = "请输入大于 0 的转入金额。";
 "record.error.categoryRequired" = "请选择分类。";
@@ -154,7 +154,7 @@
 "transactions.draft.fromAccount" = "转出账户";
 "transactions.draft.toAccount" = "转入账户";
 "transactions.draft.note" = "备注";
-"transactions.footer.localOnly" = "当前流水仅保存在本机，WebDAV 同步后续统一接入。";
+"transactions.footer.localOnly" = "流水保存在本机，可通过 WebDAV 文件同步备份和导入。";
 "transactions.edit.title" = "编辑流水";
 "transactions.edit.kind" = "类型";
 "transactions.delete.title" = "删除流水";
@@ -421,7 +421,7 @@
 "sync.backupInterval.oneMinute" = "1 分钟";
 "sync.backupInterval.fiveMinutes" = "5 分钟";
 "sync.backupInterval.tenMinutes" = "10 分钟";
-"sync.behavior.footer" = "有修改时会尽快备份；后台定期检查受系统调度影响。手动导入会在远端文件存在时覆盖本机个人信息、账户和分类。";
+"sync.behavior.footer" = "有修改时会尽快备份；后台定期检查受系统调度影响。手动导入会在远端文件存在时覆盖本机个人信息、账户、分类和流水。";
 "sync.encryption.enabled" = "加密备份文件";
 "sync.encryption.password.placeholder" = "同步密码";
 "sync.encryption.confirm.placeholder" = "确认同步密码";
@@ -450,6 +450,17 @@
 "bookkeeping.metadata.sync.error.backupDisabled" = "请先启用文件备份，再同步账户和分类。";
 "bookkeeping.metadata.sync.error.backupFailed" = "账户和分类备份失败，请检查 WebDAV 地址、同步密码和凭据。";
 "bookkeeping.metadata.sync.error.importFailed" = "账户和分类导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+
+"bookkeeping.transactions.sync.backupSucceeded" = "流水备份完成。";
+"bookkeeping.transactions.sync.importSucceeded" = "流水已导入。";
+"bookkeeping.transactions.sync.importNoRemoteTransactions" = "没有找到远端流水文件。";
+"bookkeeping.transactions.sync.error.backupDisabled" = "请先启用文件备份，再同步流水。";
+"bookkeeping.transactions.sync.error.backupFailed" = "流水备份失败，请检查 WebDAV 地址、同步密码和凭据。";
+"bookkeeping.transactions.sync.error.importFailed" = "流水导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+
+"bookkeeping.ledger.sync.backupSucceeded" = "账本数据备份完成。";
+"bookkeeping.ledger.sync.error.backupDisabled" = "请先启用文件备份，再同步账本数据。";
+"bookkeeping.ledger.sync.error.backupFailed" = "账本数据备份失败，请检查 WebDAV 地址、同步密码和凭据。";
 
 "settings.title" = "应用设置";
 "settings.language" = "语言";

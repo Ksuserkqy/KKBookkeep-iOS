@@ -249,12 +249,12 @@ struct SyncSettingsPage: View {
             if configuration.backupEnabled {
                 let secrets = currentSyncSecrets()
                 let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
-                let metadataBackedUp = await draftBookkeepingStore.backupMetadataNow(
+                let ledgerDataBackedUp = await draftBookkeepingStore.backupLedgerDataNow(
                     configuration: configuration,
                     secrets: secrets
                 )
 
-                if profileBackedUp, metadataBackedUp {
+                if profileBackedUp, ledgerDataBackedUp {
                     try? syncSettingsStore.markBackupCompleted()
                     showSettingsMessage("sync.settings.savedAndBackedUp")
                 } else {
@@ -284,12 +284,12 @@ struct SyncSettingsPage: View {
             let configuration = savedOrCurrentConfiguration()
             let secrets = currentSyncSecrets()
             let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
-            let metadataBackedUp = await draftBookkeepingStore.backupMetadataNow(
+            let ledgerDataBackedUp = await draftBookkeepingStore.backupLedgerDataNow(
                 configuration: configuration,
                 secrets: secrets
             )
 
-            if profileBackedUp, metadataBackedUp {
+            if profileBackedUp, ledgerDataBackedUp {
                 try? syncSettingsStore.markBackupCompleted()
                 showSettingsMessage("sync.backup.succeeded")
             } else {
@@ -307,7 +307,11 @@ struct SyncSettingsPage: View {
                 configuration: configuration,
                 secrets: secrets
             )
-            showSettingsMessage(profileImported && metadataImported ? "sync.import.completed" : "sync.import.error.failed")
+            let transactionsImported = await draftBookkeepingStore.importTransactionsNow(
+                configuration: configuration,
+                secrets: secrets
+            )
+            showSettingsMessage(profileImported && metadataImported && transactionsImported ? "sync.import.completed" : "sync.import.error.failed")
         }
     }
 

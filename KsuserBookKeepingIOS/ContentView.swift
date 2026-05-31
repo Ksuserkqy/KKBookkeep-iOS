@@ -20,9 +20,9 @@ struct ContentView: View {
     @State private var isPrivacyCovered = false
     @State private var isImportingRemoteData = false
     @State private var lastRemoteDataImportAt: Date?
-    @State private var isBackingUpMetadata = false
-    @State private var hasPendingMetadataBackup = false
-    @State private var metadataBackupTask: Task<Void, Never>?
+    @State private var isBackingUpLedgerData = false
+    @State private var hasPendingLedgerDataBackup = false
+    @State private var ledgerDataBackupTask: Task<Void, Never>?
     @State private var selectedTab = AppTab.dashboard
     @State private var requestedRecordKind: DraftEntryKind?
 
@@ -94,7 +94,10 @@ struct ContentView: View {
             handleQuickAction(action)
         }
         .onReceive(draftBookkeepingStore.$localMetadataChangeToken.dropFirst()) { _ in
-            scheduleMetadataBackup()
+            scheduleLedgerDataBackup()
+        }
+        .onReceive(draftBookkeepingStore.$localTransactionsChangeToken.dropFirst()) { _ in
+            scheduleLedgerDataBackup()
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
@@ -138,6 +141,10 @@ struct ContentView: View {
             configuration: configuration,
             secrets: secrets
         )
+        await draftBookkeepingStore.importIfRemoteTransactionsAreNewer(
+            configuration: configuration,
+            secrets: secrets
+        )
         lastRemoteDataImportAt = Date()
         isImportingRemoteData = false
     }
@@ -150,43 +157,43 @@ struct ContentView: View {
         quickActionRouter.clearPendingAction()
     }
 
-    private func scheduleMetadataBackup() {
+    private func scheduleLedgerDataBackup() {
         let configuration = syncSettingsStore.configuration
         guard configuration.backupEnabled, configuration.backupOnChange else { return }
 
-        guard !isBackingUpMetadata else {
-            hasPendingMetadataBackup = true
+        guard !isBackingUpLedgerData else {
+            hasPendingLedgerDataBackup = true
             return
         }
 
-        metadataBackupTask?.cancel()
-        metadataBackupTask = Task {
+        ledgerDataBackupTask?.cancel()
+        ledgerDataBackupTask = Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
-            await backupMetadataIfNeeded(configuration: configuration)
+            await backupLedgerDataIfNeeded(configuration: configuration)
         }
     }
 
-    private func backupMetadataIfNeeded(configuration: SyncConfiguration) async {
-        guard !isBackingUpMetadata else {
-            hasPendingMetadataBackup = true
+    private func backupLedgerDataIfNeeded(configuration: SyncConfiguration) async {
+        guard !isBackingUpLedgerData else {
+            hasPendingLedgerDataBackup = true
             return
         }
         guard configuration == syncSettingsStore.configuration else { return }
 
-        isBackingUpMetadata = true
-        let didBackup = await draftBookkeepingStore.backupMetadataNow(
+        isBackingUpLedgerData = true
+        let didBackup = await draftBookkeepingStore.backupLedgerDataNow(
             configuration: configuration,
             secrets: syncSettingsStore.secrets(for: configuration)
         )
         if didBackup {
             try? syncSettingsStore.markBackupCompleted()
         }
-        isBackingUpMetadata = false
+        isBackingUpLedgerData = false
 
-        if hasPendingMetadataBackup {
-            hasPendingMetadataBackup = false
-            scheduleMetadataBackup()
+        if hasPendingLedgerDataBackup {
+            hasPendingLedgerDataBackup = false
+            scheduleLedgerDataBackup()
         }
     }
 }
