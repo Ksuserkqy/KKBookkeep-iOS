@@ -1,3 +1,4 @@
+import MapKit
 import SwiftUI
 
 struct TransactionsPage: View {
@@ -27,19 +28,17 @@ struct TransactionsPage: View {
                 } else {
                     Section {
                         ForEach(draftStore.transactions) { transaction in
-                            Button {
-                                editingTransaction = transaction
-                            } label: {
-                                TransactionSummaryCard(
-                                    transaction: transaction,
-                                    localizedTitle: localizedTitle(for: transaction.kind),
-                                    accountItem: accountItem(for: transaction),
-                                    categoryItem: categoryItem(for: transaction),
-                                    dateText: Self.dateFormatter.string(from: transaction.date)
-                                )
-                                .padding(.vertical, 6)
-                            }
-                            .buttonStyle(.plain)
+                            TransactionSummaryCard(
+                                transaction: transaction,
+                                localizedTitle: localizedTitle(for: transaction.kind),
+                                accountItem: accountItem(for: transaction),
+                                categoryItem: categoryItem(for: transaction),
+                                dateText: Self.dateFormatter.string(from: transaction.date),
+                                onEdit: {
+                                    editingTransaction = transaction
+                                }
+                            )
+                            .padding(.vertical, 6)
                             .swipeActions(edge: .trailing) {
                                 Button(role: .destructive) {
                                     deletingTransaction = transaction
@@ -193,6 +192,7 @@ private struct TransactionSummaryCard: View {
     let accountItem: DraftVisualSummaryItem
     let categoryItem: DraftVisualSummaryItem
     let dateText: String
+    let onEdit: () -> Void
 
     private var amountText: String {
         switch transaction.kind {
@@ -239,6 +239,8 @@ private struct TransactionSummaryCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onEdit)
 
             HStack(spacing: 8) {
                 DraftVisualBadge(iconName: accountItem.iconName, colorHex: accountItem.colorHex, size: 22)
@@ -254,12 +256,11 @@ private struct TransactionSummaryCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onEdit)
 
             if let location = transaction.location {
-                Label(location.displayName, systemImage: "location.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                TransactionLocationButton(location: location, font: .caption)
             }
 
             if !transaction.note.isEmpty {
@@ -267,8 +268,55 @@ private struct TransactionSummaryCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onEdit)
             }
         }
+    }
+}
+
+private struct TransactionLocationButton: View {
+    let location: DraftLocation
+    var font: Font = .body
+
+    var body: some View {
+        Button {
+            location.openInMaps()
+        } label: {
+            Label(location.displayName, systemImage: "location.fill")
+                .lineLimit(1)
+                .font(font)
+                .foregroundStyle(.tint)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            Text(
+                String(
+                    format: NSLocalizedString("transactions.location.openInMaps.accessibility", comment: ""),
+                    location.displayName
+                )
+            )
+        )
+    }
+}
+
+private extension DraftLocation {
+    func openInMaps() {
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+
+        let placemark = MKPlacemark(coordinate: coordinate)
+        let mapItem = MKMapItem(placemark: placemark)
+        mapItem.name = displayName.isEmpty ? address : displayName
+        mapItem.openInMaps(
+            launchOptions: [
+                MKLaunchOptionsMapCenterKey: NSValue(mkCoordinate: coordinate),
+                MKLaunchOptionsMapSpanKey: NSValue(
+                    mkCoordinateSpan: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                )
+            ]
+        )
     }
 }
 
@@ -497,8 +545,7 @@ private struct TransactionEditorPage: View {
                     DatePicker("record.dateTime", selection: $date, displayedComponents: [.date, .hourAndMinute])
 
                     if let location = transaction.location {
-                        Label(location.displayName, systemImage: "location.fill")
-                            .foregroundStyle(.secondary)
+                        TransactionLocationButton(location: location)
                     }
 
                     TextField("record.note.placeholder", text: $note, axis: .vertical)
