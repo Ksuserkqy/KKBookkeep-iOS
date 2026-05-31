@@ -2,6 +2,7 @@ import Foundation
 
 protocol SyncStorage {
     func listFiles(at path: String) async throws -> [String]
+    func listDirectories(at path: String) async throws -> [String]
     func readFile(at path: String) async throws -> Data
     func writeFileAtomic(_ data: Data, to path: String) async throws
     func moveFile(from sourcePath: String, to destinationPath: String) async throws
@@ -43,6 +44,21 @@ struct WebDAVSyncStorage: SyncStorage {
     let secret: String
 
     func listFiles(at path: String) async throws -> [String] {
+        try await listEntries(at: path)
+            .filter { !$0.isDirectory }
+            .map(\.name)
+            .sorted()
+    }
+
+    func listDirectories(at path: String) async throws -> [String] {
+        try await listEntries(at: path)
+            .filter { $0.isDirectory }
+            .map(\.name)
+            .filter { !$0.isEmpty }
+            .sorted()
+    }
+
+    private func listEntries(at path: String) async throws -> [WebDAVEntry] {
         var request = try makeRequest(method: "PROPFIND", path: path)
         request.setValue("1", forHTTPHeaderField: "Depth")
         request.httpBody = Data("""
@@ -55,9 +71,12 @@ struct WebDAVSyncStorage: SyncStorage {
 
         return WebDAVHrefParser.parse(data: data)
             .compactMap { href in
-                href.hasSuffix("/") ? nil : URL(string: href)?.lastPathComponent
+                let trimmedHref = href.trimmingCharacters(in: .whitespacesAndNewlines)
+                let isDirectory = trimmedHref.hasSuffix("/")
+                guard let name = WebDAVEntry.name(from: trimmedHref) else { return nil }
+                guard name != WebDAVEntry.name(from: try? url(for: path).absoluteString) else { return nil }
+                return WebDAVEntry(name: name, isDirectory: isDirectory)
             }
-            .sorted()
     }
 
     func readFile(at path: String) async throws -> Data {
@@ -237,5 +256,27 @@ private final class WebDAVHrefParser: NSObject, XMLParserDelegate {
 
     private func isHrefElement(_ elementName: String) -> Bool {
         elementName == "href" || elementName.hasSuffix(":href")
+    }
+}
+
+private struct WebDAVEntry {
+    var name: String
+    var isDirectory: Bool
+
+    static func name(from href: String?) -> String? {
+        guard var href, !href.isEmpty else { return nil }
+        while href.hasSuffix("/") {
+            href.removeLast()
+        }
+
+        guard !href.isEmpty else { return nil }
+
+        if let url = URL(string: href) {
+            let name = url.lastPathComponent
+            return name.isEmpty ? nil : name
+        }
+
+        let name = href.split(separator: "/").last.map(String.init) ?? ""
+        return name.isEmpty ? nil : name
     }
 }

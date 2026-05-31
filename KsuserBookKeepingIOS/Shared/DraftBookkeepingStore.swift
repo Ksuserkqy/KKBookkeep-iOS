@@ -215,9 +215,26 @@ final class DraftBookkeepingStore: ObservableObject {
     private var metadataRevision: Int
     private var metadataUpdatedAt: Date
     private var metadataUpdatedByDeviceId: String
+    private var nextMetadataOpSeq: Int
+    private var localMetadataOps: [BookkeepingMetadataOp]
+    private var uploadedMetadataOpIds: Set<String>
+    private var processedMetadataOpIds: Set<String>
+    private var importedMetadataSeqByDeviceId: [String: Int]
+    private var metadataOpSortKeysById: [String: MetadataOpSortKey]
+    private var deletedMetadataOpSortKeysById: [String: MetadataOpSortKey]
+    private var didImportLegacyMetadataSeed: Bool
     private var transactionsRevision: Int
     private var transactionsUpdatedAt: Date
     private var transactionsUpdatedByDeviceId: String
+    private var nextTransactionOpSeq: Int
+    private var localTransactionOps: [BookkeepingTransactionOp]
+    private var uploadedTransactionOpIds: Set<String>
+    private var processedTransactionOpIds: Set<String>
+    private var importedTransactionSeqByDeviceId: [String: Int]
+    private var transactionOpSortKeysById: [String: TransactionOpSortKey]
+    private var deletedTransactionOpSortKeysById: [String: TransactionOpSortKey]
+    private var accountBaseBalanceTextById: [String: String]
+    private var didImportLegacyTransactionsSeed: Bool
 
     private enum DefaultsKey {
         static let accounts = "draftBookkeeping.accounts"
@@ -227,9 +244,26 @@ final class DraftBookkeepingStore: ObservableObject {
         static let metadataRevision = "draftBookkeeping.metadata.revision"
         static let metadataUpdatedAt = "draftBookkeeping.metadata.updatedAt"
         static let metadataUpdatedByDeviceId = "draftBookkeeping.metadata.updatedByDeviceId"
+        static let metadataNextSeq = "draftBookkeeping.metadata.nextSeq"
+        static let metadataLocalOps = "draftBookkeeping.metadata.localOps"
+        static let metadataUploadedOpIds = "draftBookkeeping.metadata.uploadedOpIds"
+        static let metadataProcessedOpIds = "draftBookkeeping.metadata.processedOpIds"
+        static let metadataImportedSeqByDeviceId = "draftBookkeeping.metadata.importedSeqByDeviceId"
+        static let metadataOpSortKeysById = "draftBookkeeping.metadata.opSortKeysById"
+        static let deletedMetadataOpSortKeysById = "draftBookkeeping.metadata.deletedOpSortKeysById"
+        static let didImportLegacyMetadataSeed = "draftBookkeeping.metadata.didImportLegacySeed"
         static let transactionsRevision = "draftBookkeeping.transactions.revision"
         static let transactionsUpdatedAt = "draftBookkeeping.transactions.updatedAt"
         static let transactionsUpdatedByDeviceId = "draftBookkeeping.transactions.updatedByDeviceId"
+        static let transactionNextSeq = "draftBookkeeping.transactions.nextSeq"
+        static let transactionLocalOps = "draftBookkeeping.transactions.localOps"
+        static let transactionUploadedOpIds = "draftBookkeeping.transactions.uploadedOpIds"
+        static let transactionProcessedOpIds = "draftBookkeeping.transactions.processedOpIds"
+        static let transactionImportedSeqByDeviceId = "draftBookkeeping.transactions.importedSeqByDeviceId"
+        static let transactionOpSortKeysById = "draftBookkeeping.transactions.opSortKeysById"
+        static let deletedTransactionOpSortKeysById = "draftBookkeeping.transactions.deletedOpSortKeysById"
+        static let accountBaseBalanceTextById = "draftBookkeeping.accounts.baseBalanceTextById"
+        static let didImportLegacyTransactionsSeed = "draftBookkeeping.transactions.didImportLegacySeed"
     }
 
     private static let maxCategoryDepth = 3
@@ -271,6 +305,15 @@ final class DraftBookkeepingStore: ObservableObject {
             self.metadataUpdatedAt = Date(timeIntervalSince1970: 0)
             self.metadataUpdatedByDeviceId = DeviceIdentity.currentDeviceId
         }
+        let storedMetadataNextSeq = defaults.integer(forKey: DefaultsKey.metadataNextSeq)
+        self.nextMetadataOpSeq = storedMetadataNextSeq > 0 ? storedMetadataNextSeq : 1
+        self.localMetadataOps = Self.load([BookkeepingMetadataOp].self, forKey: DefaultsKey.metadataLocalOps, from: defaults) ?? []
+        self.uploadedMetadataOpIds = Set(Self.load([String].self, forKey: DefaultsKey.metadataUploadedOpIds, from: defaults) ?? [])
+        self.processedMetadataOpIds = Set(Self.load([String].self, forKey: DefaultsKey.metadataProcessedOpIds, from: defaults) ?? [])
+        self.importedMetadataSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.metadataImportedSeqByDeviceId, from: defaults) ?? [:]
+        self.metadataOpSortKeysById = Self.load([String: MetadataOpSortKey].self, forKey: DefaultsKey.metadataOpSortKeysById, from: defaults) ?? [:]
+        self.deletedMetadataOpSortKeysById = Self.load([String: MetadataOpSortKey].self, forKey: DefaultsKey.deletedMetadataOpSortKeysById, from: defaults) ?? [:]
+        self.didImportLegacyMetadataSeed = defaults.bool(forKey: DefaultsKey.didImportLegacyMetadataSeed)
         if hasStoredTransactionsMetadata {
             self.transactionsRevision = defaults.integer(forKey: DefaultsKey.transactionsRevision)
             self.transactionsUpdatedAt = defaults.object(forKey: DefaultsKey.transactionsUpdatedAt) as? Date ?? Date(timeIntervalSince1970: 0)
@@ -284,16 +327,30 @@ final class DraftBookkeepingStore: ObservableObject {
             self.transactionsUpdatedAt = Date(timeIntervalSince1970: 0)
             self.transactionsUpdatedByDeviceId = DeviceIdentity.currentDeviceId
         }
+        let storedNextSeq = defaults.integer(forKey: DefaultsKey.transactionNextSeq)
+        self.nextTransactionOpSeq = storedNextSeq > 0 ? storedNextSeq : 1
+        self.localTransactionOps = Self.load([BookkeepingTransactionOp].self, forKey: DefaultsKey.transactionLocalOps, from: defaults) ?? []
+        self.uploadedTransactionOpIds = Set(Self.load([String].self, forKey: DefaultsKey.transactionUploadedOpIds, from: defaults) ?? [])
+        self.processedTransactionOpIds = Set(Self.load([String].self, forKey: DefaultsKey.transactionProcessedOpIds, from: defaults) ?? [])
+        self.importedTransactionSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.transactionImportedSeqByDeviceId, from: defaults) ?? [:]
+        self.transactionOpSortKeysById = Self.load([String: TransactionOpSortKey].self, forKey: DefaultsKey.transactionOpSortKeysById, from: defaults) ?? [:]
+        self.deletedTransactionOpSortKeysById = Self.load([String: TransactionOpSortKey].self, forKey: DefaultsKey.deletedTransactionOpSortKeysById, from: defaults) ?? [:]
+        self.accountBaseBalanceTextById = Self.load([String: String].self, forKey: DefaultsKey.accountBaseBalanceTextById, from: defaults) ?? [:]
+        self.didImportLegacyTransactionsSeed = defaults.bool(forKey: DefaultsKey.didImportLegacyTransactionsSeed)
 
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
         normalizeTransactionsAfterMetadataChange()
+        initializeTransactionSyncStateIfNeeded()
+        recomputeAccountBalancesFromBase()
         persistAccounts()
         persistCategories()
         persistTransactions()
         persistMetadata()
+        persistMetadataSyncState()
         persistTransactionsMetadata()
+        persistTransactionSyncState()
     }
 
     func clearMessage() {
@@ -436,8 +493,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactions()
         persistLastDraft()
-        markMetadataChanged()
-        markTransactionsChanged()
+        appendLocalTransactionOp(action: .create, transaction: normalizedTransaction, occurredAt: normalizedTransaction.createdAt)
         messageKey = "record.transaction.saved"
     }
 
@@ -455,8 +511,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactions()
         persistLastDraft()
-        markMetadataChanged()
-        markTransactionsChanged()
+        appendLocalTransactionOp(action: .update, transaction: normalizedTransaction)
         messageKey = "transactions.message.updated"
         return true
     }
@@ -471,8 +526,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactions()
         persistLastDraft()
-        markMetadataChanged()
-        markTransactionsChanged()
+        appendLocalTransactionOp(action: .delete, transaction: transaction)
         messageKey = "transactions.message.deleted"
         return true
     }
@@ -484,16 +538,8 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         do {
-            try await syncService.backup(
-                document: makeMetadataDocument(),
-                configuration: configuration,
-                secrets: secrets
-            )
-            try await transactionsSyncService.backup(
-                document: makeTransactionsDocument(),
-                configuration: configuration,
-                secrets: secrets
-            )
+            try await backupPendingMetadataOps(configuration: configuration, secrets: secrets)
+            try await backupPendingTransactionOps(configuration: configuration, secrets: secrets)
             messageKey = "bookkeeping.ledger.sync.backupSucceeded"
             return true
         } catch {
@@ -509,11 +555,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         do {
-            try await syncService.backup(
-                document: makeMetadataDocument(),
-                configuration: configuration,
-                secrets: secrets
-            )
+            try await backupPendingMetadataOps(configuration: configuration, secrets: secrets)
             messageKey = "bookkeeping.metadata.sync.backupSucceeded"
             return true
         } catch {
@@ -529,13 +571,8 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         do {
-            guard let remoteDocument = try await syncService.importDocument(configuration: configuration, secrets: secrets) else {
-                messageKey = "bookkeeping.metadata.sync.importNoRemoteMetadata"
-                return true
-            }
-
-            applyRemoteMetadata(remoteDocument)
-            messageKey = "bookkeeping.metadata.sync.importSucceeded"
+            let didImport = try await importMetadataOps(configuration: configuration, secrets: secrets, includeLegacySeed: true)
+            messageKey = didImport ? "bookkeeping.metadata.sync.importSucceeded" : "bookkeeping.metadata.sync.importNoRemoteMetadata"
             return true
         } catch {
             messageKey = "bookkeeping.metadata.sync.error.importFailed"
@@ -550,11 +587,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         do {
-            try await transactionsSyncService.backup(
-                document: makeTransactionsDocument(),
-                configuration: configuration,
-                secrets: secrets
-            )
+            try await backupPendingTransactionOps(configuration: configuration, secrets: secrets)
             messageKey = "bookkeeping.transactions.sync.backupSucceeded"
             return true
         } catch {
@@ -570,13 +603,8 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         do {
-            guard let remoteDocument = try await transactionsSyncService.importDocument(configuration: configuration, secrets: secrets) else {
-                messageKey = "bookkeeping.transactions.sync.importNoRemoteTransactions"
-                return true
-            }
-
-            applyRemoteTransactions(remoteDocument)
-            messageKey = "bookkeeping.transactions.sync.importSucceeded"
+            let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets, includeLegacySeed: true)
+            messageKey = didImport ? "bookkeeping.transactions.sync.importSucceeded" : "bookkeeping.transactions.sync.importNoRemoteTransactions"
             return true
         } catch {
             messageKey = "bookkeeping.transactions.sync.error.importFailed"
@@ -588,14 +616,10 @@ final class DraftBookkeepingStore: ObservableObject {
         guard configuration.backupEnabled else { return }
 
         do {
-            guard let remoteDocument = try await transactionsSyncService.importDocument(configuration: configuration, secrets: secrets) else {
-                return
+            let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets, includeLegacySeed: false)
+            if didImport {
+                messageKey = "bookkeeping.transactions.sync.importSucceeded"
             }
-
-            guard remoteDocument.isNewer(than: makeTransactionsDocument()) else { return }
-
-            applyRemoteTransactions(remoteDocument)
-            messageKey = "bookkeeping.transactions.sync.importSucceeded"
         } catch {
             return
         }
@@ -605,14 +629,10 @@ final class DraftBookkeepingStore: ObservableObject {
         guard configuration.backupEnabled else { return }
 
         do {
-            guard let remoteDocument = try await syncService.importDocument(configuration: configuration, secrets: secrets) else {
-                return
+            let didImport = try await importMetadataOps(configuration: configuration, secrets: secrets, includeLegacySeed: false)
+            if didImport {
+                messageKey = "bookkeeping.metadata.sync.importSucceeded"
             }
-
-            guard remoteDocument.isNewer(than: makeMetadataDocument()) else { return }
-
-            applyRemoteMetadata(remoteDocument)
-            messageKey = "bookkeeping.metadata.sync.importSucceeded"
         } catch {
             return
         }
@@ -626,7 +646,8 @@ final class DraftBookkeepingStore: ObservableObject {
             return false
         }
 
-        accounts.append(DraftAccount(
+        initializeMetadataSyncStateIfNeeded()
+        let account = DraftAccount(
             id: UUID().uuidString,
             name: trimmedName,
             isDefault: false,
@@ -635,9 +656,12 @@ final class DraftBookkeepingStore: ObservableObject {
             colorHex: colorHex,
             balanceText: normalizedBalanceText,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines)
-        ))
+        )
+        accounts.append(account)
+        accountBaseBalanceTextById[account.id] = normalizedBalanceText
         persistAccounts()
-        markMetadataChanged()
+        persistTransactionSyncState()
+        appendLocalMetadataOp(entity: .account, action: .create, account: account, category: nil)
         messageKey = "management.account.saved"
         return true
     }
@@ -651,34 +675,40 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         guard let index = accounts.firstIndex(where: { $0.id == id }) else { return false }
+        initializeMetadataSyncStateIfNeeded()
+        accountBaseBalanceTextById[id] = Self.plainAmountText(from: decimalValue(from: normalizedBalanceText) - transactionBalanceDelta(forAccountId: id))
         accounts[index].name = trimmedName
         accounts[index].type = type
         accounts[index].iconName = iconName
         accounts[index].colorHex = colorHex
         accounts[index].balanceText = normalizedBalanceText
         accounts[index].note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        recomputeAccountBalancesFromBase()
         persistAccounts()
-        markMetadataChanged()
+        persistTransactionSyncState()
+        appendLocalMetadataOp(entity: .account, action: .update, account: accounts[index], category: nil)
         messageKey = "management.account.saved"
         return true
     }
 
     func moveAccounts(from source: IndexSet, to destination: Int) {
+        initializeMetadataSyncStateIfNeeded()
         accounts.move(fromOffsets: source, toOffset: destination)
         persistAccounts()
-        markMetadataChanged()
+        appendLocalMetadataSnapshotOps(for: .account)
     }
 
     func setDefaultAccount(id: String) {
         guard accounts.contains(where: { $0.id == id && !$0.isArchived }) else { return }
 
+        initializeMetadataSyncStateIfNeeded()
         accounts = accounts.map { account in
             var updated = account
             updated.isDefault = !account.isArchived && account.id == id
             return updated
         }
         persistAccounts()
-        markMetadataChanged()
+        appendLocalMetadataSnapshotOps(for: .account)
         messageKey = "management.account.defaultSet"
     }
 
@@ -689,17 +719,30 @@ final class DraftBookkeepingStore: ObservableObject {
             return false
         }
 
+        initializeMetadataSyncStateIfNeeded()
+        let opAccount: DraftAccount?
+        let opAction: BookkeepingMetadataOpAction
         if isAccountReferenced(id: id), let index = accounts.firstIndex(where: { $0.id == id }) {
             accounts[index].archivedAt = Date()
             accounts[index].isDefault = false
             messageKey = "management.account.archived"
+            opAccount = accounts[index]
+            opAction = .archive
         } else {
+            opAccount = accounts.first(where: { $0.id == id })
             accounts.removeAll { $0.id == id }
+            accountBaseBalanceTextById.removeValue(forKey: id)
             messageKey = "management.account.deleted"
+            opAction = .delete
         }
         normalizeDefaultAccounts()
         persistAccounts()
-        markMetadataChanged()
+        persistTransactionSyncState()
+        if opAction == .delete {
+            appendLocalMetadataOp(entity: .account, entityId: id, action: .delete, account: nil, category: nil)
+        } else if let opAccount {
+            appendLocalMetadataOp(entity: .account, action: .archive, account: opAccount, category: nil)
+        }
         return true
     }
 
@@ -712,16 +755,18 @@ final class DraftBookkeepingStore: ObservableObject {
             return false
         }
 
-        categories.append(DraftCategory(
+        initializeMetadataSyncStateIfNeeded()
+        let category = DraftCategory(
             id: UUID().uuidString,
             name: trimmedName,
             kind: kind,
             parentId: parentId,
             iconName: iconName,
             colorHex: colorHex
-        ))
+        )
+        categories.append(category)
         persistCategories()
-        markMetadataChanged()
+        appendLocalMetadataOp(entity: .category, action: .create, account: nil, category: category)
         messageKey = "management.category.saved"
         return true
     }
@@ -737,6 +782,7 @@ final class DraftBookkeepingStore: ObservableObject {
             messageKey = "management.category.error.invalidParent"
             return false
         }
+        initializeMetadataSyncStateIfNeeded()
         categories[index].name = trimmedName
         categories[index].parentId = parentId
         if parentId != nil {
@@ -746,12 +792,13 @@ final class DraftBookkeepingStore: ObservableObject {
         categories[index].colorHex = colorHex
         normalizeDefaultCategories(kind: kind)
         persistCategories()
-        markMetadataChanged()
+        appendLocalMetadataOp(entity: .category, action: .update, account: nil, category: categories[index])
         messageKey = "management.category.saved"
         return true
     }
 
     func moveCategories(kind: DraftEntryKind, from source: IndexSet, to destination: Int) {
+        initializeMetadataSyncStateIfNeeded()
         let visibleCategories = categoryHierarchyItems(for: kind).map(\.category)
         let movedCategories = source.compactMap { index in
             visibleCategories.indices.contains(index) ? visibleCategories[index] : nil
@@ -782,13 +829,14 @@ final class DraftBookkeepingStore: ObservableObject {
             return categoriesById[reorderedId] ?? category
         }
         persistCategories()
-        markMetadataChanged()
+        appendLocalMetadataSnapshotOps(for: .category)
     }
 
     func setDefaultCategory(id: String) {
         guard let selectedCategory = categories.first(where: { $0.id == id }) else { return }
         guard selectedCategory.parentId == nil else { return }
 
+        initializeMetadataSyncStateIfNeeded()
         categories = categories.map { category in
             var updated = category
             if category.kind == selectedCategory.kind {
@@ -797,7 +845,7 @@ final class DraftBookkeepingStore: ObservableObject {
             return updated
         }
         persistCategories()
-        markMetadataChanged()
+        appendLocalMetadataSnapshotOps(for: .category)
         messageKey = "management.category.defaultSet"
     }
 
@@ -813,6 +861,9 @@ final class DraftBookkeepingStore: ObservableObject {
             return false
         }
 
+        initializeMetadataSyncStateIfNeeded()
+        let opCategories: [DraftCategory]
+        let opAction: BookkeepingMetadataOpAction
         if isAnyCategoryReferenced(ids: deletedIds) {
             categories = categories.map { item in
                 var updated = item
@@ -823,13 +874,25 @@ final class DraftBookkeepingStore: ObservableObject {
                 return updated
             }
             messageKey = "management.category.archived"
+            opCategories = categories.filter { deletedIds.contains($0.id) }
+            opAction = .archive
         } else {
+            opCategories = categories.filter { deletedIds.contains($0.id) }
             categories.removeAll { deletedIds.contains($0.id) }
             messageKey = "management.category.deleted"
+            opAction = .delete
         }
         normalizeDefaultCategories(kind: category.kind)
         persistCategories()
-        markMetadataChanged()
+        if opAction == .delete {
+            for categoryId in deletedIds {
+                appendLocalMetadataOp(entity: .category, entityId: categoryId, action: .delete, account: nil, category: nil)
+            }
+        } else {
+            for opCategory in opCategories {
+                appendLocalMetadataOp(entity: .category, action: .archive, account: nil, category: opCategory)
+            }
+        }
         return true
     }
 
@@ -848,28 +911,14 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
-    private func makeMetadataDocument() -> BookkeepingMetadataSyncDocument {
-        BookkeepingMetadataSyncDocument(
-            revision: metadataRevision,
-            updatedAt: metadataUpdatedAt,
-            updatedByDeviceId: metadataUpdatedByDeviceId,
-            accounts: accounts,
-            categories: categories
-        )
-    }
-
-    private func makeTransactionsDocument() -> BookkeepingTransactionsSyncDocument {
-        BookkeepingTransactionsSyncDocument(
-            revision: transactionsRevision,
-            updatedAt: transactionsUpdatedAt,
-            updatedByDeviceId: transactionsUpdatedByDeviceId,
-            transactions: transactions
-        )
-    }
-
-    private func applyRemoteMetadata(_ document: BookkeepingMetadataSyncDocument) {
+    private func applyLegacyMetadata(_ document: BookkeepingMetadataSyncDocument) {
         accounts = document.accounts.isEmpty ? Self.defaultAccounts : document.accounts
         categories = document.categories.isEmpty ? Self.defaultCategories : document.categories
+        accountBaseBalanceTextById = Dictionary(
+            uniqueKeysWithValues: accounts.map { account in
+                (account.id, Self.normalizedBalanceText(account.balanceText))
+            }
+        )
         metadataRevision = document.revision
         metadataUpdatedAt = document.updatedAt
         metadataUpdatedByDeviceId = document.updatedByDeviceId
@@ -878,6 +927,8 @@ final class DraftBookkeepingStore: ObservableObject {
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
         normalizeTransactionsAfterMetadataChange()
+        initializeMissingBaseBalances()
+        recomputeAccountBalancesFromBase()
         persistAccounts()
         persistCategories()
         persistTransactions()
@@ -885,17 +936,477 @@ final class DraftBookkeepingStore: ObservableObject {
         persistMetadata()
     }
 
-    private func applyRemoteTransactions(_ document: BookkeepingTransactionsSyncDocument) {
-        transactions = document.transactions.sorted(by: Self.transactionSort)
-        lastDraft = transactions.first
-        transactionsRevision = document.revision
-        transactionsUpdatedAt = document.updatedAt
-        transactionsUpdatedByDeviceId = document.updatedByDeviceId
+    private func backupPendingMetadataOps(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
+        initializeMetadataSyncStateIfNeeded()
+        let pendingOps = localMetadataOps.filter { !uploadedMetadataOpIds.contains($0.opId) }
+        guard !pendingOps.isEmpty else { return }
 
-        normalizeTransactionsAfterMetadataChange()
+        let pendingFileIndexes = Set(pendingOps.map(\.fileIndex))
+        let opsToWrite = localMetadataOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        try await syncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        uploadedMetadataOpIds.formUnion(pendingOps.map(\.opId))
+        persistMetadataSyncState()
+    }
+
+    @discardableResult
+    private func importMetadataOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        includeLegacySeed: Bool
+    ) async throws -> Bool {
+        var didImport = false
+
+        if
+            includeLegacySeed,
+            !didImportLegacyMetadataSeed,
+            localMetadataOps.isEmpty,
+            let legacyDocument = try await syncService.importLegacyDocument(configuration: configuration, secrets: secrets)
+        {
+            applyLegacyMetadata(legacyDocument)
+            initializeMetadataSyncStateIfNeeded()
+            didImportLegacyMetadataSeed = true
+            persistAccounts()
+            persistCategories()
+            persistMetadata()
+            persistMetadataSyncState()
+            didImport = true
+        }
+
+        let remoteOps = try await syncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let unappliedOps = remoteOps
+            .filter { !processedMetadataOpIds.contains($0.opId) }
+            .sorted(by: Self.metadataOpReplaySort)
+
+        guard !unappliedOps.isEmpty else {
+            return didImport
+        }
+
+        for op in unappliedOps {
+            applyRemoteMetadataOp(op)
+        }
+
+        normalizeDefaultNames()
+        normalizeCategoryHierarchy()
+        normalizeDefaultSelections()
+        initializeMissingBaseBalances()
+        recomputeAccountBalancesFromBase()
+        persistAccounts()
+        persistCategories()
+        persistMetadata()
+        persistMetadataSyncState()
+        persistTransactionSyncState()
+        return true
+    }
+
+    private func appendLocalMetadataSnapshotOps(for entity: BookkeepingMetadataEntity) {
+        switch entity {
+        case .account:
+            for account in accounts {
+                appendLocalMetadataOp(entity: .account, action: .update, account: account, category: nil)
+            }
+        case .category:
+            for category in categories {
+                appendLocalMetadataOp(entity: .category, action: .update, account: nil, category: category)
+            }
+        }
+    }
+
+    private func metadataAccountPayload(_ account: DraftAccount) -> DraftAccount {
+        var payload = account
+        payload.balanceText = accountBaseBalanceTextById[account.id] ?? account.balanceText
+        return payload
+    }
+
+    private func appendLocalMetadataOp(
+        entity: BookkeepingMetadataEntity,
+        entityId: String? = nil,
+        action: BookkeepingMetadataOpAction,
+        account: DraftAccount?,
+        category: DraftCategory?
+    ) {
+        let resolvedEntityId: String
+        switch entity {
+        case .account:
+            resolvedEntityId = entityId ?? account?.id ?? ""
+        case .category:
+            resolvedEntityId = entityId ?? category?.id ?? ""
+        }
+        guard !resolvedEntityId.isEmpty else { return }
+
+        let payload: BookkeepingMetadataOpPayload?
+        if action == .delete {
+            payload = nil
+        } else {
+            payload = BookkeepingMetadataOpPayload(account: account.map(metadataAccountPayload), category: category)
+        }
+        let op = BookkeepingMetadataOp(
+            deviceId: DeviceIdentity.currentDeviceId,
+            seq: nextMetadataOpSeq,
+            entity: entity,
+            entityId: resolvedEntityId,
+            action: action,
+            payload: payload
+        )
+        nextMetadataOpSeq += 1
+        localMetadataOps.append(op)
+        processedMetadataOpIds.insert(op.opId)
+        importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyMetadataOpState(op)
+        markMetadataChanged(at: op.occurredAt)
+        persistMetadataSyncState()
+    }
+
+    private func applyRemoteMetadataOp(_ op: BookkeepingMetadataOp) {
+        guard op.schemaVersion == 1 else { return }
+        guard !processedMetadataOpIds.contains(op.opId) else { return }
+        guard shouldApplyMetadataOp(op) else {
+            processedMetadataOpIds.insert(op.opId)
+            importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            return
+        }
+
+        switch op.entity {
+        case .account:
+            applyRemoteAccountOp(op)
+        case .category:
+            applyRemoteCategoryOp(op)
+        }
+
+        processedMetadataOpIds.insert(op.opId)
+        importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyMetadataOpState(op)
+        updateMetadataSyncMetadata(at: op.occurredAt, deviceId: op.deviceId)
+    }
+
+    private func applyRemoteAccountOp(_ op: BookkeepingMetadataOp) {
+        switch op.action {
+        case .create, .update, .archive, .upsert:
+            guard var account = op.payload?.account else { return }
+            let baseBalanceText = Self.normalizedBalanceText(account.balanceText)
+            accountBaseBalanceTextById[account.id] = baseBalanceText
+            account.balanceText = baseBalanceText
+            if let index = accounts.firstIndex(where: { $0.id == op.entityId }) {
+                accounts[index] = account
+            } else {
+                accounts.append(account)
+            }
+        case .delete:
+            if isAccountReferenced(id: op.entityId), let index = accounts.firstIndex(where: { $0.id == op.entityId }) {
+                accounts[index].archivedAt = accounts[index].archivedAt ?? op.occurredAt
+                accounts[index].isDefault = false
+            } else {
+                accounts.removeAll { $0.id == op.entityId }
+                accountBaseBalanceTextById.removeValue(forKey: op.entityId)
+            }
+        }
+    }
+
+    private func applyRemoteCategoryOp(_ op: BookkeepingMetadataOp) {
+        switch op.action {
+        case .create, .update, .archive, .upsert:
+            guard let category = op.payload?.category else { return }
+            if let index = categories.firstIndex(where: { $0.id == op.entityId }) {
+                categories[index] = category
+            } else {
+                categories.append(category)
+            }
+        case .delete:
+            if isAnyCategoryReferenced(ids: [op.entityId]), let index = categories.firstIndex(where: { $0.id == op.entityId }) {
+                categories[index].archivedAt = categories[index].archivedAt ?? op.occurredAt
+                categories[index].isDefault = false
+            } else {
+                categories.removeAll { $0.id == op.entityId }
+            }
+        }
+    }
+
+    private func shouldApplyMetadataOp(_ op: BookkeepingMetadataOp) -> Bool {
+        let key = metadataStateKey(entity: op.entity, id: op.entityId)
+        let incomingKey = op.sortKey
+        let currentKey = metadataOpSortKeysById[key] ?? .zero
+        let deletedKey = deletedMetadataOpSortKeysById[key] ?? .zero
+
+        switch op.action {
+        case .create, .update, .archive, .upsert:
+            guard incomingKey >= currentKey else { return false }
+            guard incomingKey > deletedKey else { return false }
+            return true
+        case .delete:
+            return incomingKey >= currentKey && incomingKey >= deletedKey
+        }
+    }
+
+    private func applyMetadataOpState(_ op: BookkeepingMetadataOp) {
+        let key = metadataStateKey(entity: op.entity, id: op.entityId)
+        switch op.action {
+        case .create, .update, .archive, .upsert:
+            metadataOpSortKeysById[key] = op.sortKey
+            deletedMetadataOpSortKeysById.removeValue(forKey: key)
+        case .delete:
+            deletedMetadataOpSortKeysById[key] = op.sortKey
+        }
+    }
+
+    private func metadataStateKey(entity: BookkeepingMetadataEntity, id: String) -> String {
+        "\(entity.rawValue):\(id)"
+    }
+
+    private func initializeMetadataSyncStateIfNeeded() {
+        guard localMetadataOps.isEmpty, processedMetadataOpIds.isEmpty else { return }
+
+        for account in accounts {
+            let syncAccount = metadataAccountPayload(account)
+            let op = BookkeepingMetadataOp(
+                deviceId: DeviceIdentity.currentDeviceId,
+                seq: nextMetadataOpSeq,
+                entity: .account,
+                entityId: account.id,
+                action: .create,
+                occurredAt: metadataUpdatedAt,
+                createdAt: metadataUpdatedAt,
+                payload: BookkeepingMetadataOpPayload(account: syncAccount, category: nil)
+            )
+            nextMetadataOpSeq += 1
+            localMetadataOps.append(op)
+            processedMetadataOpIds.insert(op.opId)
+            importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            metadataOpSortKeysById[metadataStateKey(entity: .account, id: account.id)] = op.sortKey
+        }
+
+        for category in categories {
+            let op = BookkeepingMetadataOp(
+                deviceId: DeviceIdentity.currentDeviceId,
+                seq: nextMetadataOpSeq,
+                entity: .category,
+                entityId: category.id,
+                action: .create,
+                occurredAt: metadataUpdatedAt,
+                createdAt: metadataUpdatedAt,
+                payload: BookkeepingMetadataOpPayload(account: nil, category: category)
+            )
+            nextMetadataOpSeq += 1
+            localMetadataOps.append(op)
+            processedMetadataOpIds.insert(op.opId)
+            importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            metadataOpSortKeysById[metadataStateKey(entity: .category, id: category.id)] = op.sortKey
+        }
+
+        persistMetadataSyncState()
+    }
+
+    private func backupPendingTransactionOps(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
+        let pendingOps = localTransactionOps.filter { !uploadedTransactionOpIds.contains($0.opId) }
+        guard !pendingOps.isEmpty else { return }
+
+        let pendingFileIndexes = Set(pendingOps.map(\.fileIndex))
+        let opsToWrite = localTransactionOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        try await transactionsSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        uploadedTransactionOpIds.formUnion(pendingOps.map(\.opId))
+        persistTransactionSyncState()
+    }
+
+    @discardableResult
+    private func importTransactionOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        includeLegacySeed: Bool
+    ) async throws -> Bool {
+        var didImport = false
+
+        if
+            includeLegacySeed,
+            !didImportLegacyTransactionsSeed,
+            localTransactionOps.isEmpty,
+            let legacyTransactions = try await transactionsSyncService.importLegacyTransactions(configuration: configuration, secrets: secrets),
+            !legacyTransactions.isEmpty
+        {
+            transactions = legacyTransactions.sorted(by: Self.transactionSort)
+            lastDraft = transactions.first
+            for transaction in transactions {
+                let key = TransactionOpSortKey(
+                    occurredAt: transaction.createdAt,
+                    deviceId: transactionsUpdatedByDeviceId,
+                    seq: transactionOpSortKeysById.count + 1
+                )
+                transactionOpSortKeysById[transaction.id] = key
+            }
+            didImportLegacyTransactionsSeed = true
+            initializeMissingBaseBalances()
+            recomputeAccountBalancesFromBase()
+            persistAccounts()
+            persistTransactions()
+            persistLastDraft()
+            persistTransactionSyncState()
+            didImport = true
+        }
+
+        let remoteOps = try await transactionsSyncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let unappliedOps = remoteOps
+            .filter { !processedTransactionOpIds.contains($0.opId) }
+            .sorted(by: Self.transactionOpReplaySort)
+
+        guard !unappliedOps.isEmpty else {
+            return didImport
+        }
+
+        for op in unappliedOps {
+            applyRemoteTransactionOp(op)
+        }
+
+        transactions.sort(by: Self.transactionSort)
+        lastDraft = transactions.first
+        recomputeAccountBalancesFromBase()
+        persistAccounts()
         persistTransactions()
         persistLastDraft()
         persistTransactionsMetadata()
+        persistTransactionSyncState()
+        return true
+    }
+
+    private func appendLocalTransactionOp(action: BookkeepingTransactionOpAction, transaction: DraftTransaction, occurredAt: Date = Date()) {
+        let op = BookkeepingTransactionOp(
+            deviceId: DeviceIdentity.currentDeviceId,
+            seq: nextTransactionOpSeq,
+            entityId: transaction.id,
+            action: action,
+            occurredAt: occurredAt,
+            payload: action == .delete ? nil : transaction
+        )
+        nextTransactionOpSeq += 1
+        localTransactionOps.append(op)
+        processedTransactionOpIds.insert(op.opId)
+        importedTransactionSeqByDeviceId[op.deviceId] = max(importedTransactionSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyTransactionOpState(op)
+        markTransactionsChanged(at: occurredAt)
+        persistTransactionSyncState()
+    }
+
+    private func applyRemoteTransactionOp(_ op: BookkeepingTransactionOp) {
+        guard op.schemaVersion == 1, op.entity == "transaction" else { return }
+        guard !processedTransactionOpIds.contains(op.opId) else { return }
+        guard shouldApplyTransactionOp(op) else {
+            processedTransactionOpIds.insert(op.opId)
+            importedTransactionSeqByDeviceId[op.deviceId] = max(importedTransactionSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            return
+        }
+
+        switch op.action {
+        case .create, .update:
+            guard let payload = op.payload else { break }
+            let normalized = normalizedTransactionAmounts(payload)
+            if let index = transactions.firstIndex(where: { $0.id == op.entityId }) {
+                transactions[index] = normalized
+            } else {
+                transactions.append(normalized)
+            }
+        case .delete:
+            transactions.removeAll { $0.id == op.entityId }
+            deletedTransactionOpSortKeysById[op.entityId] = op.sortKey
+        }
+
+        processedTransactionOpIds.insert(op.opId)
+        importedTransactionSeqByDeviceId[op.deviceId] = max(importedTransactionSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyTransactionOpState(op)
+        updateTransactionsSyncMetadata(at: op.occurredAt, deviceId: op.deviceId)
+    }
+
+    private func shouldApplyTransactionOp(_ op: BookkeepingTransactionOp) -> Bool {
+        let incomingKey = op.sortKey
+        let currentKey = transactionOpSortKeysById[op.entityId] ?? .zero
+        let deletedKey = deletedTransactionOpSortKeysById[op.entityId] ?? .zero
+
+        switch op.action {
+        case .create, .update:
+            guard incomingKey >= currentKey else { return false }
+            guard incomingKey > deletedKey else { return false }
+            return true
+        case .delete:
+            return incomingKey >= currentKey && incomingKey >= deletedKey
+        }
+    }
+
+    private func applyTransactionOpState(_ op: BookkeepingTransactionOp) {
+        switch op.action {
+        case .create, .update:
+            transactionOpSortKeysById[op.entityId] = op.sortKey
+            deletedTransactionOpSortKeysById.removeValue(forKey: op.entityId)
+        case .delete:
+            deletedTransactionOpSortKeysById[op.entityId] = op.sortKey
+        }
+    }
+
+    private func initializeTransactionSyncStateIfNeeded() {
+        if !accountBaseBalanceTextById.isEmpty {
+            initializeMissingBaseBalances()
+        } else {
+            accountBaseBalanceTextById = Dictionary(
+                uniqueKeysWithValues: accounts.map { account in
+                    (account.id, Self.plainAmountText(from: decimalValue(from: account.balanceText) - transactionBalanceDelta(forAccountId: account.id)))
+                }
+            )
+        }
+
+        guard localTransactionOps.isEmpty, processedTransactionOpIds.isEmpty, !transactions.isEmpty else {
+            return
+        }
+
+        for transaction in transactions.sorted(by: { $0.createdAt < $1.createdAt }) {
+            let op = BookkeepingTransactionOp(
+                deviceId: DeviceIdentity.currentDeviceId,
+                seq: nextTransactionOpSeq,
+                entityId: transaction.id,
+                action: .create,
+                occurredAt: transaction.createdAt,
+                createdAt: transaction.createdAt,
+                payload: transaction
+            )
+            nextTransactionOpSeq += 1
+            localTransactionOps.append(op)
+            processedTransactionOpIds.insert(op.opId)
+            importedTransactionSeqByDeviceId[op.deviceId] = max(importedTransactionSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            transactionOpSortKeysById[transaction.id] = op.sortKey
+        }
+    }
+
+    private func initializeMissingBaseBalances() {
+        for account in accounts where accountBaseBalanceTextById[account.id] == nil {
+            accountBaseBalanceTextById[account.id] = Self.plainAmountText(from: decimalValue(from: account.balanceText) - transactionBalanceDelta(forAccountId: account.id))
+        }
+    }
+
+    private func recomputeAccountBalancesFromBase() {
+        initializeMissingBaseBalances()
+        accounts = accounts.map { account in
+            var updated = account
+            let baseBalance = decimalValue(from: accountBaseBalanceTextById[account.id] ?? account.balanceText)
+            updated.balanceText = Self.plainAmountText(from: baseBalance + transactionBalanceDelta(forAccountId: account.id))
+            return updated
+        }
+    }
+
+    private func transactionBalanceDelta(forAccountId accountId: String) -> Decimal {
+        transactions.reduce(Decimal(0)) { partialResult, transaction in
+            partialResult + transactionBalanceDelta(transaction, forAccountId: accountId)
+        }
+    }
+
+    private func transactionBalanceDelta(_ transaction: DraftTransaction, forAccountId accountId: String) -> Decimal {
+        switch transaction.kind {
+        case .expense:
+            return transaction.accountId == accountId ? -decimalValue(from: transaction.amountText) : 0
+        case .income:
+            return transaction.accountId == accountId ? decimalValue(from: transaction.amountText) : 0
+        case .transfer:
+            var delta = Decimal(0)
+            if transaction.fromAccountId == accountId {
+                delta -= decimalValue(from: transaction.amountText)
+            }
+            if transaction.toAccountId == accountId {
+                delta += decimalValue(from: transaction.transferInAmountText ?? transaction.amountText)
+            }
+            return delta
+        }
     }
 
     private func markMetadataChanged(at date: Date = Date()) {
@@ -906,12 +1417,23 @@ final class DraftBookkeepingStore: ObservableObject {
         localMetadataChangeToken += 1
     }
 
+    private func updateMetadataSyncMetadata(at date: Date, deviceId: String) {
+        metadataRevision += 1
+        metadataUpdatedAt = date
+        metadataUpdatedByDeviceId = deviceId
+        persistMetadata()
+    }
+
     private func markTransactionsChanged(at date: Date = Date()) {
+        updateTransactionsSyncMetadata(at: date, deviceId: DeviceIdentity.currentDeviceId)
+        localTransactionsChangeToken += 1
+    }
+
+    private func updateTransactionsSyncMetadata(at date: Date, deviceId: String) {
         transactionsRevision += 1
         transactionsUpdatedAt = date
-        transactionsUpdatedByDeviceId = DeviceIdentity.currentDeviceId
+        transactionsUpdatedByDeviceId = deviceId
         persistTransactionsMetadata()
-        localTransactionsChangeToken += 1
     }
 
     private func persistMetadata() {
@@ -924,6 +1446,29 @@ final class DraftBookkeepingStore: ObservableObject {
         defaults.set(transactionsRevision, forKey: DefaultsKey.transactionsRevision)
         defaults.set(transactionsUpdatedAt, forKey: DefaultsKey.transactionsUpdatedAt)
         defaults.set(transactionsUpdatedByDeviceId, forKey: DefaultsKey.transactionsUpdatedByDeviceId)
+    }
+
+    private func persistMetadataSyncState() {
+        defaults.set(nextMetadataOpSeq, forKey: DefaultsKey.metadataNextSeq)
+        Self.save(localMetadataOps, forKey: DefaultsKey.metadataLocalOps, to: defaults)
+        Self.save(Array(uploadedMetadataOpIds), forKey: DefaultsKey.metadataUploadedOpIds, to: defaults)
+        Self.save(Array(processedMetadataOpIds), forKey: DefaultsKey.metadataProcessedOpIds, to: defaults)
+        Self.save(importedMetadataSeqByDeviceId, forKey: DefaultsKey.metadataImportedSeqByDeviceId, to: defaults)
+        Self.save(metadataOpSortKeysById, forKey: DefaultsKey.metadataOpSortKeysById, to: defaults)
+        Self.save(deletedMetadataOpSortKeysById, forKey: DefaultsKey.deletedMetadataOpSortKeysById, to: defaults)
+        defaults.set(didImportLegacyMetadataSeed, forKey: DefaultsKey.didImportLegacyMetadataSeed)
+    }
+
+    private func persistTransactionSyncState() {
+        defaults.set(nextTransactionOpSeq, forKey: DefaultsKey.transactionNextSeq)
+        Self.save(localTransactionOps, forKey: DefaultsKey.transactionLocalOps, to: defaults)
+        Self.save(Array(uploadedTransactionOpIds), forKey: DefaultsKey.transactionUploadedOpIds, to: defaults)
+        Self.save(Array(processedTransactionOpIds), forKey: DefaultsKey.transactionProcessedOpIds, to: defaults)
+        Self.save(importedTransactionSeqByDeviceId, forKey: DefaultsKey.transactionImportedSeqByDeviceId, to: defaults)
+        Self.save(transactionOpSortKeysById, forKey: DefaultsKey.transactionOpSortKeysById, to: defaults)
+        Self.save(deletedTransactionOpSortKeysById, forKey: DefaultsKey.deletedTransactionOpSortKeysById, to: defaults)
+        Self.save(accountBaseBalanceTextById, forKey: DefaultsKey.accountBaseBalanceTextById, to: defaults)
+        defaults.set(didImportLegacyTransactionsSeed, forKey: DefaultsKey.didImportLegacyTransactionsSeed)
     }
 
     private func normalizeTransactionsAfterMetadataChange() {
@@ -1189,6 +1734,30 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         return lhs.date > rhs.date
+    }
+
+    private static func metadataOpReplaySort(_ lhs: BookkeepingMetadataOp, _ rhs: BookkeepingMetadataOp) -> Bool {
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        if lhs.deviceId != rhs.deviceId {
+            return lhs.deviceId < rhs.deviceId
+        }
+
+        return lhs.seq < rhs.seq
+    }
+
+    private static func transactionOpReplaySort(_ lhs: BookkeepingTransactionOp, _ rhs: BookkeepingTransactionOp) -> Bool {
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        if lhs.deviceId != rhs.deviceId {
+            return lhs.deviceId < rhs.deviceId
+        }
+
+        return lhs.seq < rhs.seq
     }
 
     private static func plainAmountText(from decimal: Decimal) -> String {
