@@ -39,6 +39,12 @@ struct AccountManagementPage: View {
                                         .font(.caption2.weight(.semibold))
                                         .foregroundStyle(.secondary)
                                 }
+
+                                if account.isArchived {
+                                    Text("management.archivedBadge")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
 
                             Text(account.type.titleKey)
@@ -77,7 +83,7 @@ struct AccountManagementPage: View {
                         }
                         .tint(.red)
 
-                        if !account.isDefault {
+                        if !account.isDefault && !account.isArchived {
                             Button {
                                 draftStore.setDefaultAccount(id: account.id)
                             } label: {

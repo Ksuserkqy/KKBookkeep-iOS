@@ -279,7 +279,7 @@ struct RecordPage: View {
     }
 
     private func normalizeSelections() {
-        let accounts = draftStore.accounts
+        let accounts = draftStore.accounts.filter { !$0.isArchived }
         if !accounts.contains(where: { $0.id == selectedAccountId }) {
             selectedAccountId = defaultAccountId(in: accounts)
         }
@@ -317,7 +317,7 @@ struct RecordPage: View {
     }
 
     private var accountSelectionItems: [RecordVisualSelectionItem] {
-        draftStore.accounts.map { account in
+        draftStore.accounts.filter { !$0.isArchived }.map { account in
             RecordVisualSelectionItem(
                 id: account.id,
                 name: account.name,

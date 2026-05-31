@@ -146,11 +146,13 @@
 "selection.category.todayFormat" = "今日收入 %@ · 支出 %@";
 "selection.account.balanceFormat" = "余额 %@";
 "draft.item.missing" = "未选择";
+"draft.item.archivedFormat" = "%@（已归档）";
 
 "management.action.rename" = "重命名";
 "management.action.edit" = "编辑";
 "management.action.delete" = "删除";
 "management.action.setDefault" = "设为默认";
+"management.archivedBadge" = "已归档";
 "management.icon" = "图标";
 "management.icon.more" = "更多图标";
 "management.icon.more.short" = "更多";
@@ -258,6 +260,7 @@
 "management.account.type.other" = "其他账户";
 "management.account.saved" = "账户已保存。";
 "management.account.deleted" = "账户已删除。";
+"management.account.archived" = "账户已归档，历史流水仍会保留引用。";
 "management.account.defaultSet" = "默认账户已更新。";
 "management.account.delete.confirm.title" = "删除账户？";
 "management.account.delete.confirm.message" = "该账户将从本机账户数据中移除。";
@@ -284,6 +287,7 @@
 "management.category.level.third" = "三级分类";
 "management.category.saved" = "分类已保存。";
 "management.category.deleted" = "分类已删除。";
+"management.category.archived" = "分类已归档，历史流水仍会保留引用。";
 "management.category.defaultSet" = "默认分类已更新。";
 "management.category.delete.confirm.title" = "删除分类？";
 "management.category.delete.confirm.message" = "该分类将从本机分类数据中移除。";

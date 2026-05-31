@@ -6,7 +6,7 @@ struct DashboardPage: View {
     @Binding var requestedRecordKind: DraftEntryKind?
 
     private var totalBalanceText: String {
-        let total = draftStore.accounts.reduce(Decimal(0)) { partialResult, account in
+        let total = draftStore.accounts.filter { !$0.isArchived }.reduce(Decimal(0)) { partialResult, account in
             partialResult + decimalValue(from: account.balanceText)
         }
 
@@ -14,7 +14,7 @@ struct DashboardPage: View {
     }
 
     private var displayedAccounts: [DraftAccount] {
-        Array(draftStore.accounts.prefix(3))
+        Array(draftStore.accounts.filter { !$0.isArchived }.prefix(3))
     }
 
     var body: some View {

@@ -41,6 +41,11 @@ struct DraftAccount: Codable, Identifiable, Equatable {
     var colorHex: String
     var balanceText: String
     var note: String
+    var archivedAt: Date?
+
+    var isArchived: Bool {
+        archivedAt != nil
+    }
 
     init(
         id: String,
@@ -50,7 +55,8 @@ struct DraftAccount: Codable, Identifiable, Equatable {
         iconName: String = "wallet",
         colorHex: String = "#F6C343",
         balanceText: String = "0",
-        note: String = ""
+        note: String = "",
+        archivedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -60,6 +66,7 @@ struct DraftAccount: Codable, Identifiable, Equatable {
         self.colorHex = colorHex
         self.balanceText = balanceText
         self.note = note
+        self.archivedAt = archivedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -72,6 +79,7 @@ struct DraftAccount: Codable, Identifiable, Equatable {
         self.colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? ""
         self.balanceText = try container.decodeIfPresent(String.self, forKey: .balanceText) ?? "0"
         self.note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
+        self.archivedAt = try container.decodeIfPresent(Date.self, forKey: .archivedAt)
     }
 }
 
@@ -83,6 +91,11 @@ struct DraftCategory: Codable, Identifiable, Equatable {
     var parentId: String?
     var iconName: String
     var colorHex: String
+    var archivedAt: Date?
+
+    var isArchived: Bool {
+        archivedAt != nil
+    }
 
     init(
         id: String,
@@ -91,7 +104,8 @@ struct DraftCategory: Codable, Identifiable, Equatable {
         kind: DraftEntryKind,
         parentId: String? = nil,
         iconName: String = "tag",
-        colorHex: String = "#F6C343"
+        colorHex: String = "#F6C343",
+        archivedAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -100,6 +114,7 @@ struct DraftCategory: Codable, Identifiable, Equatable {
         self.parentId = parentId
         self.iconName = iconName
         self.colorHex = colorHex
+        self.archivedAt = archivedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -111,6 +126,7 @@ struct DraftCategory: Codable, Identifiable, Equatable {
         self.parentId = try container.decodeIfPresent(String.self, forKey: .parentId)
         self.iconName = try container.decodeIfPresent(String.self, forKey: .iconName) ?? ""
         self.colorHex = try container.decodeIfPresent(String.self, forKey: .colorHex) ?? ""
+        self.archivedAt = try container.decodeIfPresent(Date.self, forKey: .archivedAt)
     }
 }
 
@@ -257,17 +273,17 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     func categories(for kind: DraftEntryKind) -> [DraftCategory] {
-        categories.filter { $0.kind == kind }
+        categories.filter { $0.kind == kind && !$0.isArchived }
     }
 
     func categoryHierarchyItems(for kind: DraftEntryKind) -> [DraftCategoryHierarchyItem] {
         categories
-            .filter { $0.kind == kind && $0.parentId == nil }
+            .filter { $0.kind == kind && $0.parentId == nil && !$0.isArchived }
             .flatMap { hierarchyItems(from: $0, depth: 1, visitedIds: []) }
     }
 
     func childCategories(of id: String) -> [DraftCategory] {
-        categories.filter { $0.parentId == id }
+        categories.filter { $0.parentId == id && !$0.isArchived }
     }
 
     func hasChildCategories(id: String) -> Bool {
@@ -537,11 +553,11 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     func setDefaultAccount(id: String) {
-        guard accounts.contains(where: { $0.id == id }) else { return }
+        guard accounts.contains(where: { $0.id == id && !$0.isArchived }) else { return }
 
         accounts = accounts.map { account in
             var updated = account
-            updated.isDefault = account.id == id
+            updated.isDefault = !account.isArchived && account.id == id
             return updated
         }
         persistAccounts()
@@ -550,17 +566,23 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     func deleteAccount(id: String) -> Bool {
-        guard accounts.count > 1 else {
+        let activeAccounts = accounts.filter { !$0.isArchived }
+        guard activeAccounts.count > 1 else {
             messageKey = "management.account.error.lastItem"
             return false
         }
 
-        accounts.removeAll { $0.id == id }
+        if isAccountReferenced(id: id), let index = accounts.firstIndex(where: { $0.id == id }) {
+            accounts[index].archivedAt = Date()
+            accounts[index].isDefault = false
+            messageKey = "management.account.archived"
+        } else {
+            accounts.removeAll { $0.id == id }
+            messageKey = "management.account.deleted"
+        }
         normalizeDefaultAccounts()
         persistAccounts()
-        normalizeTransactionsAfterAccountDeletion(id: id)
         markMetadataChanged()
-        messageKey = "management.account.deleted"
         return true
     }
 
@@ -666,7 +688,7 @@ final class DraftBookkeepingStore: ObservableObject {
         guard let category = categories.first(where: { $0.id == id }) else { return false }
         let deletedIds = categoryDescendantIds(for: id).union([id])
         let remainingRootCount = categories.filter { item in
-            item.kind == category.kind && item.parentId == nil && !deletedIds.contains(item.id)
+            item.kind == category.kind && item.parentId == nil && !item.isArchived && !deletedIds.contains(item.id)
         }.count
 
         guard remainingRootCount > 0 else {
@@ -674,45 +696,39 @@ final class DraftBookkeepingStore: ObservableObject {
             return false
         }
 
-        categories.removeAll { deletedIds.contains($0.id) }
+        if isAnyCategoryReferenced(ids: deletedIds) {
+            categories = categories.map { item in
+                var updated = item
+                if deletedIds.contains(item.id) {
+                    updated.archivedAt = Date()
+                    updated.isDefault = false
+                }
+                return updated
+            }
+            messageKey = "management.category.archived"
+        } else {
+            categories.removeAll { deletedIds.contains($0.id) }
+            messageKey = "management.category.deleted"
+        }
         normalizeDefaultCategories(kind: category.kind)
         persistCategories()
-        normalizeTransactionsAfterCategoryDeletion(ids: deletedIds)
         markMetadataChanged()
-        messageKey = "management.category.deleted"
         return true
     }
 
-    private func normalizeTransactionsAfterAccountDeletion(id: String) {
-        transactions = transactions.map { transaction in
-            var normalized = transaction
-            if normalized.accountId == id {
-                normalized.accountId = nil
-            }
-            if normalized.fromAccountId == id {
-                normalized.fromAccountId = nil
-            }
-            if normalized.toAccountId == id {
-                normalized.toAccountId = nil
-            }
-            return normalized
+    private func isAccountReferenced(id: String) -> Bool {
+        transactions.contains { transaction in
+            transaction.accountId == id ||
+            transaction.fromAccountId == id ||
+            transaction.toAccountId == id
         }
-        lastDraft = transactions.first
-        persistTransactions()
-        persistLastDraft()
     }
 
-    private func normalizeTransactionsAfterCategoryDeletion(ids: Set<String>) {
-        transactions = transactions.map { transaction in
-            var normalized = transaction
-            if let categoryId = normalized.categoryId, ids.contains(categoryId) {
-                normalized.categoryId = nil
-            }
-            return normalized
+    private func isAnyCategoryReferenced(ids: Set<String>) -> Bool {
+        transactions.contains { transaction in
+            guard let categoryId = transaction.categoryId else { return false }
+            return ids.contains(categoryId)
         }
-        lastDraft = transactions.first
-        persistTransactions()
-        persistLastDraft()
     }
 
     private func makeMetadataDocument() -> BookkeepingMetadataSyncDocument {
@@ -758,26 +774,6 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func normalizeTransactionsAfterMetadataChange() {
-        let accountIds = Set(accounts.map(\.id))
-        let categoryIds = Set(categories.map(\.id))
-
-        transactions = transactions.map { transaction in
-            var normalized = transaction
-            if let accountId = normalized.accountId, !accountIds.contains(accountId) {
-                normalized.accountId = nil
-            }
-            if let fromAccountId = normalized.fromAccountId, !accountIds.contains(fromAccountId) {
-                normalized.fromAccountId = nil
-            }
-            if let toAccountId = normalized.toAccountId, !accountIds.contains(toAccountId) {
-                normalized.toAccountId = nil
-            }
-            if let categoryId = normalized.categoryId, !categoryIds.contains(categoryId) {
-                normalized.categoryId = nil
-            }
-            return normalized
-        }
-
         lastDraft = transactions.first
     }
 
@@ -788,7 +784,7 @@ final class DraftBookkeepingStore: ObservableObject {
 
         let nextVisitedIds = visitedIds.union([category.id])
         let children = categories.filter { child in
-            child.kind == category.kind && child.parentId == category.id
+            child.kind == category.kind && child.parentId == category.id && !child.isArchived
         }
 
         return [DraftCategoryHierarchyItem(category: category, depth: depth)] + children.flatMap { child in
@@ -889,27 +885,28 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func normalizeDefaultAccounts() {
-        let selectedDefaultId = accounts.first { $0.isDefault }?.id ?? accounts.first?.id
+        let activeAccounts = accounts.filter { !$0.isArchived }
+        let selectedDefaultId = activeAccounts.first { $0.isDefault }?.id ?? activeAccounts.first?.id
 
         accounts = accounts.map { account in
             var normalized = account
-            normalized.isDefault = account.id == selectedDefaultId
+            normalized.isDefault = !account.isArchived && account.id == selectedDefaultId
             return normalized
         }
     }
 
     private func normalizeDefaultCategories(kind: DraftEntryKind) {
-        let categoryIds = categories.filter { $0.kind == kind && $0.parentId == nil }.map(\.id)
+        let categoryIds = categories.filter { $0.kind == kind && $0.parentId == nil && !$0.isArchived }.map(\.id)
         guard let fallbackId = categoryIds.first else { return }
 
         let selectedDefaultId = categories.first { category in
-            category.kind == kind && category.parentId == nil && category.isDefault
+            category.kind == kind && category.parentId == nil && !category.isArchived && category.isDefault
         }?.id ?? fallbackId
 
         categories = categories.map { category in
             var normalized = category
             if category.kind == kind {
-                normalized.isDefault = category.parentId == nil && category.id == selectedDefaultId
+                normalized.isDefault = !category.isArchived && category.parentId == nil && category.id == selectedDefaultId
             }
             return normalized
         }
@@ -921,7 +918,7 @@ final class DraftBookkeepingStore: ObservableObject {
                 continue
             }
 
-            if !canUseParent(parentId, for: categories[index].id, kind: categories[index].kind) {
+            if categories[index].isArchived || !canUseParent(parentId, for: categories[index].id, kind: categories[index].kind) {
                 categories[index].parentId = nil
             }
 

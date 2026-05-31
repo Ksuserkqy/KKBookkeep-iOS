@@ -146,11 +146,13 @@
 "selection.category.todayFormat" = "Today income %@ · expense %@";
 "selection.account.balanceFormat" = "Balance %@";
 "draft.item.missing" = "Not selected";
+"draft.item.archivedFormat" = "%@ (Archived)";
 
 "management.action.rename" = "Rename";
 "management.action.edit" = "Edit";
 "management.action.delete" = "Delete";
 "management.action.setDefault" = "Set Default";
+"management.archivedBadge" = "Archived";
 "management.icon" = "Icon";
 "management.icon.more" = "More Icons";
 "management.icon.more.short" = "More";
@@ -258,6 +260,7 @@
 "management.account.type.other" = "Other Account";
 "management.account.saved" = "Account saved.";
 "management.account.deleted" = "Account deleted.";
+"management.account.archived" = "Account archived. Existing transactions will keep their reference.";
 "management.account.defaultSet" = "Default account updated.";
 "management.account.delete.confirm.title" = "Delete Account?";
 "management.account.delete.confirm.message" = "This account will be removed from local account data.";
@@ -284,6 +287,7 @@
 "management.category.level.third" = "Third-level Category";
 "management.category.saved" = "Category saved.";
 "management.category.deleted" = "Category deleted.";
+"management.category.archived" = "Category archived. Existing transactions will keep their reference.";
 "management.category.defaultSet" = "Default category updated.";
 "management.category.delete.confirm.title" = "Delete Category?";
 "management.category.delete.confirm.message" = "This category will be removed from local category data.";

@@ -57,6 +57,12 @@ struct CategoryManagementPage: View {
                                         .font(.caption2.weight(.semibold))
                                         .foregroundStyle(.secondary)
                                 }
+
+                                if category.isArchived {
+                                    Text("management.archivedBadge")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
 
                             if item.depth > 1 {
@@ -85,7 +91,7 @@ struct CategoryManagementPage: View {
                         }
                         .tint(.red)
 
-                        if !category.isDefault, category.parentId == nil {
+                        if !category.isDefault, !category.isArchived, category.parentId == nil {
                             Button {
                                 draftStore.setDefaultCategory(id: category.id)
                             } label: {

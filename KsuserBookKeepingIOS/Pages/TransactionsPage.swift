@@ -116,7 +116,11 @@ struct TransactionsPage: View {
             )
         }
 
-        return DraftVisualSummaryItem(name: account.name, iconName: account.iconName, colorHex: account.colorHex)
+        return DraftVisualSummaryItem(
+            name: archivedAwareName(account.name, isArchived: account.isArchived),
+            iconName: account.iconName,
+            colorHex: account.colorHex
+        )
     }
 
     private func categoryItem(for id: String?) -> DraftVisualSummaryItem {
@@ -132,10 +136,15 @@ struct TransactionsPage: View {
         }
 
         return DraftVisualSummaryItem(
-            name: draftStore.categoryDisplayName(for: category.id),
+            name: archivedAwareName(draftStore.categoryDisplayName(for: category.id), isArchived: category.isArchived),
             iconName: category.iconName,
             colorHex: category.colorHex
         )
+    }
+
+    private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
+        guard isArchived else { return name }
+        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
     }
 
     private func accountItem(for transaction: DraftTransaction) -> DraftVisualSummaryItem {
@@ -615,25 +624,28 @@ private struct TransactionEditorPage: View {
     }
 
     private func normalizeSelections() {
-        let accounts = draftStore.accounts
-        if !accounts.contains(where: { $0.id == selectedAccountId }) {
+        let accounts = draftStore.accounts.filter { !$0.isArchived }
+        if !draftStore.accounts.contains(where: { $0.id == selectedAccountId }) {
             selectedAccountId = defaultAccountId(in: accounts)
         }
-        if !accounts.contains(where: { $0.id == selectedFromAccountId }) {
+        if !draftStore.accounts.contains(where: { $0.id == selectedFromAccountId }) {
             selectedFromAccountId = defaultAccountId(in: accounts)
         }
-        if !accounts.contains(where: { $0.id == selectedToAccountId }) {
+        if !draftStore.accounts.contains(where: { $0.id == selectedToAccountId }) {
             selectedToAccountId = defaultTransferDestinationAccountId(in: accounts)
         }
 
         let categories = draftStore.categories(for: transaction.kind)
-        if transaction.kind != .transfer, !categories.contains(where: { $0.id == selectedCategoryId }) {
+        let selectedCategoryExists = draftStore.categories.contains { category in
+            category.id == selectedCategoryId && category.kind == transaction.kind
+        }
+        if transaction.kind != .transfer, !selectedCategoryExists, !categories.contains(where: { $0.id == selectedCategoryId }) {
             selectedCategoryId = defaultCategoryId(in: categories)
         }
     }
 
     private var accountSelectionItems: [TransactionVisualSelectionItem] {
-        draftStore.accounts.map { account in
+        draftStore.accounts.filter { !$0.isArchived }.map { account in
             TransactionVisualSelectionItem(
                 id: account.id,
                 name: account.name,
@@ -660,7 +672,19 @@ private struct TransactionEditorPage: View {
     }
 
     private func accountSelectionItem(for id: String) -> TransactionVisualSelectionItem {
-        accountSelectionItems.first { $0.id == id } ?? Self.unselectedSelectionItem
+        if let item = accountSelectionItems.first(where: { $0.id == id }) {
+            return item
+        }
+        guard let account = draftStore.accounts.first(where: { $0.id == id }) else {
+            return Self.unselectedSelectionItem
+        }
+        return TransactionVisualSelectionItem(
+            id: account.id,
+            name: archivedAwareName(account.name, isArchived: account.isArchived),
+            iconName: account.iconName,
+            colorHex: account.colorHex,
+            subtitle: draftStore.accountBalanceSummary(for: account.id)
+        )
     }
 
     private func categorySelectionItem(for id: String) -> TransactionVisualSelectionItem {
@@ -670,7 +694,7 @@ private struct TransactionEditorPage: View {
 
         return TransactionVisualSelectionItem(
             id: category.id,
-            name: draftStore.categoryDisplayName(for: category.id),
+            name: archivedAwareName(draftStore.categoryDisplayName(for: category.id), isArchived: category.isArchived),
             iconName: category.iconName,
             colorHex: category.colorHex,
             subtitle: draftStore.categoryTodaySummary(for: category.id)
@@ -686,6 +710,11 @@ private struct TransactionEditorPage: View {
             subtitle: "",
             depth: 1
         )
+    }
+
+    private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
+        guard isArchived else { return name }
+        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
     }
 
     private func defaultAccountId(in accounts: [DraftAccount]) -> String {
