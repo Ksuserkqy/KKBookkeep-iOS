@@ -84,64 +84,58 @@ struct TransactionsPage: View {
                     }
                     .listRowSeparator(.hidden)
 
-                    Section {
-                        if groupedTransactions.isEmpty {
+                    if groupedTransactions.isEmpty {
+                        Section {
                             TransactionEmptyFilteredView(hasActiveFilters: hasActiveFilters)
                                 .padding(.vertical, 28)
                                 .frame(maxWidth: .infinity)
                                 .listRowSeparator(.hidden)
-                        } else {
-                            ForEach(groupedTransactions) { group in
-                                VStack(spacing: 0) {
-                                    TransactionDayHeader(
-                                        date: group.date
+                        } footer: {
+                            Text("transactions.footer.localOnly")
+                        }
+                    } else {
+                        ForEach(groupedTransactions) { group in
+                            Section {
+                                ForEach(group.transactions) { transaction in
+                                    TransactionSummaryCard(
+                                        transaction: transaction,
+                                        accountItem: accountItem(for: transaction),
+                                        categoryItem: categoryItem(for: transaction),
+                                        timeText: Self.timeFormatter.string(from: transaction.date),
+                                        onEdit: {
+                                            editingTransaction = transaction
+                                        }
                                     )
-                                    .padding(.bottom, 8)
-
-                                    ForEach(group.transactions) { transaction in
-                                        TransactionSummaryCard(
-                                            transaction: transaction,
-                                            accountItem: accountItem(for: transaction),
-                                            categoryItem: categoryItem(for: transaction),
-                                            timeText: Self.timeFormatter.string(from: transaction.date),
-                                            onEdit: {
-                                                editingTransaction = transaction
-                                            }
-                                        )
-                                        .padding(.vertical, 10)
-                                        .overlay(alignment: .bottom) {
-                                            if transaction.id != group.transactions.last?.id {
-                                                Divider()
-                                                    .padding(.leading, 58)
-                                            }
+                                    .padding(.vertical, 6)
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            deletingTransaction = transaction
+                                        } label: {
+                                            Label("management.action.delete", systemImage: "trash")
                                         }
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) {
-                                                deletingTransaction = transaction
-                                            } label: {
-                                                Label("management.action.delete", systemImage: "trash")
-                                            }
+                                    }
+                                    .contextMenu {
+                                        Button {
+                                            editingTransaction = transaction
+                                        } label: {
+                                            Label("management.action.edit", systemImage: "pencil")
                                         }
-                                        .contextMenu {
-                                            Button {
-                                                editingTransaction = transaction
-                                            } label: {
-                                                Label("management.action.edit", systemImage: "pencil")
-                                            }
 
-                                            Button(role: .destructive) {
-                                                deletingTransaction = transaction
-                                            } label: {
-                                                Label("management.action.delete", systemImage: "trash")
-                                            }
+                                        Button(role: .destructive) {
+                                            deletingTransaction = transaction
+                                        } label: {
+                                            Label("management.action.delete", systemImage: "trash")
                                         }
                                     }
                                 }
-                                .padding(.vertical, 6)
+                            } header: {
+                                TransactionDayHeader(date: group.date)
+                            } footer: {
+                                if group.id == groupedTransactions.last?.id {
+                                    Text("transactions.footer.localOnly")
+                                }
                             }
                         }
-                    } footer: {
-                        Text("transactions.footer.localOnly")
                     }
                 }
             }
