@@ -73,8 +73,10 @@
 
 "reports.period.title" = "报表周期";
 "reports.period.month" = "本月";
-"reports.period.quarter" = "近 3 月";
+"reports.period.quarter" = "本季";
 "reports.period.year" = "今年";
+"reports.period.summary.empty" = "当前周期还没有流水，先记一笔就能开始分析。";
+"reports.period.summary.format" = "%d 笔收支 · %d 笔转账 · %d/%d 天有支出";
 "reports.summary.expense.month" = "本月支出";
 "reports.summary.expense.quarter" = "本季支出";
 "reports.summary.expense.year" = "今年支出";
@@ -105,9 +107,22 @@
 "reports.chart.axis.expense" = "支出";
 "reports.chart.axis.income" = "收入";
 "reports.chart.axis.amount" = "金额";
+"reports.pace.title" = "支出节奏";
+"reports.pace.subtitle" = "把日均、活跃天数和峰值支出放在一起看。";
+"reports.pace.averageDaily" = "日均支出";
+"reports.pace.averageDaily.captionFormat" = "%@ 按已过日期摊平";
+"reports.pace.activeDays" = "支出天数";
+"reports.pace.activeDays.valueFormat" = "%d 天";
+"reports.pace.activeDays.captionFormat" = "当前周期已统计 %d 天";
+"reports.pace.averageActiveDay" = "有支出日均";
+"reports.pace.averageActiveDay.caption" = "只统计发生支出的日期";
+"reports.pace.peakDay" = "最高单日支出";
+"reports.empty.pace.title" = "暂无支出节奏";
+"reports.empty.pace.subtitle" = "保存支出流水后，这里会显示日均和峰值支出。";
 "reports.category.title" = "支出分类";
 "reports.category.subtitle" = "查看主要支出流向和分类占比。";
 "reports.category.totalExpense" = "总支出";
+"reports.category.other" = "其他";
 "reports.category.topNoteFormat" = "%@ 占 %@，适合优先关注。";
 "reports.category.noTopNote" = "当前周期暂无支出分类数据。";
 "reports.empty.trend.title" = "暂无趋势数据";
@@ -122,6 +137,10 @@
 "reports.insight.cashFlow.positive.subtitleFormat" = "当前周期结余 %@，收入覆盖了支出。";
 "reports.insight.cashFlow.negative.title" = "现金流为负";
 "reports.insight.cashFlow.negative.subtitleFormat" = "当前周期超支 %@，可以优先查看高支出分类。";
+"reports.insight.pace.title" = "支出节奏";
+"reports.insight.pace.subtitleFormat" = "%@ 日均支出 %@，适合和预算节奏一起看。";
+"reports.insight.peakDay.title" = "最高单日支出";
+"reports.insight.peakDay.subtitleFormat" = "%@ 支出 %@，可能是本周期的消费高峰。";
 "reports.insight.activity.title" = "记账活跃度";
 "reports.insight.activity.subtitleFormat" = "%@ 共记录 %d 笔收支，收入 %@，支出 %@。";
 "reports.insight.empty.title" = "暂无可分析数据";

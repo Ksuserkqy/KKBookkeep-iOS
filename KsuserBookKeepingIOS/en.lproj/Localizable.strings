@@ -73,8 +73,10 @@
 
 "reports.period.title" = "Report Period";
 "reports.period.month" = "Month";
-"reports.period.quarter" = "3 Months";
+"reports.period.quarter" = "Quarter";
 "reports.period.year" = "Year";
+"reports.period.summary.empty" = "No entries in this period yet. Save one entry to start the analysis.";
+"reports.period.summary.format" = "%d income/expense entries · %d transfers · spending on %d/%d days";
 "reports.summary.expense.month" = "Monthly Expense";
 "reports.summary.expense.quarter" = "Quarterly Expense";
 "reports.summary.expense.year" = "Yearly Expense";
@@ -105,9 +107,22 @@
 "reports.chart.axis.expense" = "Expense";
 "reports.chart.axis.income" = "Income";
 "reports.chart.axis.amount" = "Amount";
+"reports.pace.title" = "Spending Pace";
+"reports.pace.subtitle" = "See daily average, active days, and the peak spending day together.";
+"reports.pace.averageDaily" = "Daily Average";
+"reports.pace.averageDaily.captionFormat" = "%@ spread across elapsed days";
+"reports.pace.activeDays" = "Spending Days";
+"reports.pace.activeDays.valueFormat" = "%d days";
+"reports.pace.activeDays.captionFormat" = "%d days counted in this period";
+"reports.pace.averageActiveDay" = "Active-Day Average";
+"reports.pace.averageActiveDay.caption" = "Only days with expenses are counted";
+"reports.pace.peakDay" = "Peak Spending Day";
+"reports.empty.pace.title" = "No spending pace yet";
+"reports.empty.pace.subtitle" = "Save expense entries to show daily averages and peak spending.";
 "reports.category.title" = "Expense Categories";
 "reports.category.subtitle" = "See where spending goes by category.";
 "reports.category.totalExpense" = "Total Expense";
+"reports.category.other" = "Other";
 "reports.category.topNoteFormat" = "%@ is %@ of spending and worth checking first.";
 "reports.category.noTopNote" = "No expense category data in this period.";
 "reports.empty.trend.title" = "No trend data";
@@ -122,6 +137,10 @@
 "reports.insight.cashFlow.positive.subtitleFormat" = "This period has %@ left after expenses.";
 "reports.insight.cashFlow.negative.title" = "Cash flow is negative";
 "reports.insight.cashFlow.negative.subtitleFormat" = "This period is over by %@. Start with the largest categories.";
+"reports.insight.pace.title" = "Spending pace";
+"reports.insight.pace.subtitleFormat" = "%@ averages %@ per day. Compare it with your budget pace.";
+"reports.insight.peakDay.title" = "Peak spending day";
+"reports.insight.peakDay.subtitleFormat" = "%@ had %@ in expenses, likely this period's spending peak.";
 "reports.insight.activity.title" = "Recording activity";
 "reports.insight.activity.subtitleFormat" = "%@ has %d income/expense entries, with %@ income and %@ expense.";
 "reports.insight.empty.title" = "No insights yet";
