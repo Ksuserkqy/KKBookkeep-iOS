@@ -144,6 +144,9 @@
 "transactions.message.updated" = "Transaction updated.";
 "transactions.message.deleted" = "Transaction deleted.";
 "transactions.location.openInMaps.accessibility" = "Open %@ in Maps";
+"transactions.location.mapPicker.title" = "Choose Map";
+"transactions.location.mapPicker.appleMaps" = "Apple Maps";
+"transactions.location.mapPicker.amap" = "Amap";
 "selection.category.todayFormat" = "Today income %@ · expense %@";
 "selection.account.balanceFormat" = "Balance %@";
 "draft.item.missing" = "Not selected";

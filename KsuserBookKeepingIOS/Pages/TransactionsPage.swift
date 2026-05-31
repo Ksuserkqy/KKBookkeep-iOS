@@ -1,5 +1,6 @@
 import MapKit
 import SwiftUI
+import UIKit
 
 struct TransactionsPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
@@ -279,10 +280,11 @@ private struct TransactionSummaryCard: View {
 private struct TransactionLocationButton: View {
     let location: DraftLocation
     var font: Font = .body
+    @State private var isMapPickerPresented = false
 
     var body: some View {
         Button {
-            location.openInMaps()
+            isMapPickerPresented = true
         } label: {
             Label(location.displayName, systemImage: "location.fill")
                 .lineLimit(1)
@@ -298,11 +300,28 @@ private struct TransactionLocationButton: View {
                 )
             )
         )
+        .confirmationDialog(
+            Text("transactions.location.mapPicker.title"),
+            isPresented: $isMapPickerPresented,
+            titleVisibility: .visible
+        ) {
+            Button("transactions.location.mapPicker.appleMaps") {
+                location.openInAppleMaps()
+            }
+
+            Button("transactions.location.mapPicker.amap") {
+                location.openInAmap()
+            }
+
+            Button("common.cancel", role: .cancel) {}
+        } message: {
+            Text(location.displayName)
+        }
     }
 }
 
 private extension DraftLocation {
-    func openInMaps() {
+    func openInAppleMaps() {
         let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         guard CLLocationCoordinate2DIsValid(coordinate) else { return }
 
@@ -317,6 +336,66 @@ private extension DraftLocation {
                 )
             ]
         )
+    }
+
+    func openInAmap() {
+        let coordinate = gcj02Coordinate
+        let sourceApplication = "KKBookkeep".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "KKBookkeep"
+        let pointName = mapPointName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let urlString = "iosamap://viewMap?sourceApplication=\(sourceApplication)&poiname=\(pointName)&lat=\(coordinate.latitude)&lon=\(coordinate.longitude)&dev=0"
+
+        guard let url = URL(string: urlString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    var mapPointName: String {
+        if !displayName.isEmpty {
+            return displayName
+        }
+        if !address.isEmpty {
+            return address
+        }
+        return coordinateText
+    }
+
+    var gcj02Coordinate: CLLocationCoordinate2D {
+        let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        guard !Self.isOutsideChina(latitude: latitude, longitude: longitude) else {
+            return coordinate
+        }
+
+        var dLat = Self.transformLatitude(longitude - 105.0, latitude - 35.0)
+        var dLon = Self.transformLongitude(longitude - 105.0, latitude - 35.0)
+        let radLat = latitude / 180.0 * .pi
+        var magic = sin(radLat)
+        magic = 1 - Self.ee * magic * magic
+        let sqrtMagic = sqrt(magic)
+        dLat = (dLat * 180.0) / ((Self.a * (1 - Self.ee)) / (magic * sqrtMagic) * .pi)
+        dLon = (dLon * 180.0) / (Self.a / sqrtMagic * cos(radLat) * .pi)
+        return CLLocationCoordinate2D(latitude: latitude + dLat, longitude: longitude + dLon)
+    }
+
+    static var a: Double { 6378245.0 }
+    static var ee: Double { 0.00669342162296594323 }
+
+    static func isOutsideChina(latitude: Double, longitude: Double) -> Bool {
+        longitude < 72.004 || longitude > 137.8347 || latitude < 0.8293 || latitude > 55.8271
+    }
+
+    static func transformLatitude(_ x: Double, _ y: Double) -> Double {
+        var result = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * sqrt(abs(x))
+        result += (20.0 * sin(6.0 * x * .pi) + 20.0 * sin(2.0 * x * .pi)) * 2.0 / 3.0
+        result += (20.0 * sin(y * .pi) + 40.0 * sin(y / 3.0 * .pi)) * 2.0 / 3.0
+        result += (160.0 * sin(y / 12.0 * .pi) + 320.0 * sin(y * .pi / 30.0)) * 2.0 / 3.0
+        return result
+    }
+
+    static func transformLongitude(_ x: Double, _ y: Double) -> Double {
+        var result = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * sqrt(abs(x))
+        result += (20.0 * sin(6.0 * x * .pi) + 20.0 * sin(2.0 * x * .pi)) * 2.0 / 3.0
+        result += (20.0 * sin(x * .pi) + 40.0 * sin(x / 3.0 * .pi)) * 2.0 / 3.0
+        result += (150.0 * sin(x / 12.0 * .pi) + 300.0 * sin(x / 30.0 * .pi)) * 2.0 / 3.0
+        return result
     }
 }
 

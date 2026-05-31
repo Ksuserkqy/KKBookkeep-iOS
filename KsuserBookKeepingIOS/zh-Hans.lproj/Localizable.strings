@@ -144,6 +144,9 @@
 "transactions.message.updated" = "流水已更新。";
 "transactions.message.deleted" = "流水已删除。";
 "transactions.location.openInMaps.accessibility" = "在地图中打开%@";
+"transactions.location.mapPicker.title" = "选择地图";
+"transactions.location.mapPicker.appleMaps" = "Apple 地图";
+"transactions.location.mapPicker.amap" = "高德地图";
 "selection.category.todayFormat" = "今日收入 %@ · 支出 %@";
 "selection.account.balanceFormat" = "余额 %@";
 "draft.item.missing" = "未选择";

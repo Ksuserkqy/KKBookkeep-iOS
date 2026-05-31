@@ -259,6 +259,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "羊羊记账";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "用于解锁羊羊记账。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于在用户主动记账时录入当前位置。";
 				INFOPLIST_KEY_UIAppFonts = "FontAwesome7Free-Solid-900.otf FontAwesome7Brands-Regular-400.otf";
@@ -297,6 +298,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "羊羊记账";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "用于解锁羊羊记账。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于在用户主动记账时录入当前位置。";
 				INFOPLIST_KEY_UIAppFonts = "FontAwesome7Free-Solid-900.otf FontAwesome7Brands-Regular-400.otf";
