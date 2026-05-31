@@ -62,19 +62,18 @@ struct RecordPage: View {
                     }
                 }
 
-                Section {
-                    Button {
-                        saveDraft()
-                    } label: {
-                        Label("record.action.saveDraft", systemImage: "checkmark.circle.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                } footer: {
-                    Text("record.footer.draftOnly")
-                }
             }
             .navigationTitle(Text("tab.record"))
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        saveTransaction()
+                    } label: {
+                        Text("record.action.saveTransaction")
+                            .font(.headline)
+                    }
+                }
+            }
             .onAppear {
                 applyRequestedKindIfNeeded()
                 normalizeSelections()
@@ -345,7 +344,7 @@ struct RecordPage: View {
         )
     }
 
-    private func saveDraft() {
+    private func saveTransaction() {
         draftStore.clearMessage()
 
         guard isPositiveAmount(amountText) else {
@@ -386,7 +385,7 @@ struct RecordPage: View {
         let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedTransferInAmount = transferInAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let draft = DraftTransaction(
+        let transaction = DraftTransaction(
             id: UUID().uuidString,
             kind: selectedKind,
             amountText: trimmedAmount,
@@ -401,7 +400,7 @@ struct RecordPage: View {
             createdAt: Date()
         )
 
-        draftStore.saveDraft(draft)
+        draftStore.saveTransaction(transaction)
         errorKey = nil
         selectedTab = .transactions
     }

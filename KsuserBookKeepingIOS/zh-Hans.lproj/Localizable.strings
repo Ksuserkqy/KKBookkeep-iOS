@@ -22,7 +22,7 @@
 "dashboard.monthIncome" = "收入";
 "dashboard.monthExpense" = "支出";
 "dashboard.monthBalance" = "结余";
-"dashboard.monthOverview.empty" = "正式流水接入前，本月收支先保持为空态。";
+"dashboard.monthOverview.empty" = "本月概览后续会接入本机流水统计。";
 "dashboard.quickActions" = "快捷记账";
 "dashboard.quickExpense" = "支出";
 "dashboard.quickIncome" = "收入";
@@ -31,9 +31,9 @@
 "dashboard.budget.emptyTitle" = "本月预算尚未设置";
 "dashboard.budget.emptySubtitle" = "后续接入预算模块后，这里会显示预算使用进度。";
 "dashboard.accounts" = "账户概览";
-"dashboard.recentDraft" = "最近草稿";
-"dashboard.recentDraft.emptyTitle" = "暂无草稿";
-"dashboard.recentDraft.emptySubtitle" = "保存一笔记账草稿后，会在这里快速回看。";
+"dashboard.recentDraft" = "最近流水";
+"dashboard.recentDraft.emptyTitle" = "暂无流水";
+"dashboard.recentDraft.emptySubtitle" = "保存一笔记账后，会在这里快速回看。";
 "dashboard.transferAccountFormat" = "%@ 转入 %@";
 "transactions.placeholder" = "浏览、筛选和管理每一笔流水。";
 "record.placeholder" = "新增支出、收入或转账记录。";
@@ -109,8 +109,11 @@
 "record.note.placeholder" = "备注";
 "record.picker.unselected" = "未选择";
 "record.action.saveDraft" = "保存草稿";
+"record.action.saveTransaction" = "保存流水";
 "record.footer.draftOnly" = "当前只生成本机草稿，尚未正式写入账本。";
+"record.footer.localOnly" = "流水会保存到本机账本，暂不进行 WebDAV 同步。";
 "record.draft.saved" = "草稿已保存，尚未正式入账。";
+"record.transaction.saved" = "流水已保存到本机。";
 "record.error.invalidAmount" = "请输入大于 0 的金额。";
 "record.error.invalidTransferInAmount" = "请输入大于 0 的转入金额。";
 "record.error.categoryRequired" = "请选择分类。";
@@ -132,6 +135,7 @@
 "transactions.draft.fromAccount" = "转出账户";
 "transactions.draft.toAccount" = "转入账户";
 "transactions.draft.note" = "备注";
+"transactions.footer.localOnly" = "当前流水仅保存在本机，WebDAV 同步后续统一接入。";
 "draft.item.missing" = "未选择";
 
 "management.action.rename" = "重命名";

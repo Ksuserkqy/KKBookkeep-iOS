@@ -6,61 +6,7 @@ struct TransactionsPage: View {
     var body: some View {
         NavigationStack {
             List {
-                if let draft = draftStore.lastDraft {
-                    Section {
-                        VStack(alignment: .leading, spacing: 14) {
-                            Label("transactions.draft.title", systemImage: "doc.badge.clock")
-                                .font(.headline)
-
-                            Text("transactions.draft.subtitle")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-
-                            VStack(alignment: .leading, spacing: 10) {
-                                DraftSummaryRow(titleKey: "transactions.draft.kind", value: localizedTitle(for: draft.kind))
-                                if draft.kind == .transfer {
-                                    DraftSummaryRow(titleKey: "transactions.draft.transferOutAmount", value: draft.amountText)
-                                    DraftSummaryRow(titleKey: "transactions.draft.transferInAmount", value: draft.transferInAmountText ?? draft.amountText)
-                                } else {
-                                    DraftSummaryRow(titleKey: "transactions.draft.amount", value: draft.amountText)
-                                }
-                                DraftSummaryRow(titleKey: "transactions.draft.dateTime", value: Self.dateFormatter.string(from: draft.date))
-
-                                if let location = draft.location {
-                                    DraftSummaryRow(titleKey: "transactions.draft.location", value: location.displayName)
-                                }
-
-                                if draft.kind == .transfer {
-                                    DraftVisualSummaryRow(
-                                        titleKey: "transactions.draft.fromAccount",
-                                        item: accountItem(for: draft.fromAccountId)
-                                    )
-                                    DraftVisualSummaryRow(
-                                        titleKey: "transactions.draft.toAccount",
-                                        item: accountItem(for: draft.toAccountId)
-                                    )
-                                } else {
-                                    DraftVisualSummaryRow(
-                                        titleKey: "transactions.draft.category",
-                                        item: categoryItem(for: draft.categoryId)
-                                    )
-                                    DraftVisualSummaryRow(
-                                        titleKey: "transactions.draft.account",
-                                        item: accountItem(for: draft.accountId)
-                                    )
-                                }
-
-                                if !draft.note.isEmpty {
-                                    DraftSummaryRow(titleKey: "transactions.draft.note", value: draft.note)
-                                }
-                            }
-                            .font(.subheadline)
-                        }
-                        .padding(.vertical, 8)
-                    } footer: {
-                        Text("transactions.draft.footer")
-                    }
-                } else {
+                if draftStore.transactions.isEmpty {
                     Section {
                         VStack(spacing: 16) {
                             Image(systemName: "list.bullet.rectangle")
@@ -74,6 +20,21 @@ struct TransactionsPage: View {
                         }
                         .padding(.vertical, 36)
                         .frame(maxWidth: .infinity)
+                    }
+                } else {
+                    Section {
+                        ForEach(draftStore.transactions) { transaction in
+                            TransactionSummaryCard(
+                                transaction: transaction,
+                                localizedTitle: localizedTitle(for: transaction.kind),
+                                accountItem: accountItem(for: transaction),
+                                categoryItem: categoryItem(for: transaction),
+                                dateText: Self.dateFormatter.string(from: transaction.date)
+                            )
+                            .padding(.vertical, 6)
+                        }
+                    } footer: {
+                        Text("transactions.footer.localOnly")
                     }
                 }
             }
@@ -119,6 +80,38 @@ struct TransactionsPage: View {
         )
     }
 
+    private func accountItem(for transaction: DraftTransaction) -> DraftVisualSummaryItem {
+        switch transaction.kind {
+        case .expense, .income:
+            return accountItem(for: transaction.accountId)
+        case .transfer:
+            let fromAccount = accountItem(for: transaction.fromAccountId)
+            let toAccount = accountItem(for: transaction.toAccountId)
+            return DraftVisualSummaryItem(
+                name: String(
+                    format: NSLocalizedString("dashboard.transferAccountFormat", comment: ""),
+                    fromAccount.name,
+                    toAccount.name
+                ),
+                iconName: "right-left",
+                colorHex: "#3B82F6"
+            )
+        }
+    }
+
+    private func categoryItem(for transaction: DraftTransaction) -> DraftVisualSummaryItem {
+        switch transaction.kind {
+        case .expense, .income:
+            return categoryItem(for: transaction.categoryId)
+        case .transfer:
+            return DraftVisualSummaryItem(
+                name: NSLocalizedString("record.kind.transfer", comment: ""),
+                iconName: "right-left",
+                colorHex: "#3B82F6"
+            )
+        }
+    }
+
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -127,19 +120,87 @@ struct TransactionsPage: View {
     }()
 }
 
-private struct DraftSummaryRow: View {
-    let titleKey: LocalizedStringKey
-    let value: String
+private struct TransactionSummaryCard: View {
+    let transaction: DraftTransaction
+    let localizedTitle: String
+    let accountItem: DraftVisualSummaryItem
+    let categoryItem: DraftVisualSummaryItem
+    let dateText: String
+
+    private var amountText: String {
+        switch transaction.kind {
+        case .expense:
+            return "-\(DraftAmountFormatter.currencyText(from: transaction.amountText))"
+        case .income:
+            return "+\(DraftAmountFormatter.currencyText(from: transaction.amountText))"
+        case .transfer:
+            return DraftAmountFormatter.currencyText(from: transaction.amountText)
+        }
+    }
+
+    private var amountColor: Color {
+        switch transaction.kind {
+        case .expense:
+            return .red
+        case .income:
+            return .green
+        case .transfer:
+            return .primary
+        }
+    }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(titleKey)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                DraftVisualBadge(iconName: categoryItem.iconName, colorHex: categoryItem.colorHex, size: 34)
 
-            Spacer(minLength: 16)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(categoryItem.name)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
 
-            Text(value)
-                .multilineTextAlignment(.trailing)
+                    Text(localizedTitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 12)
+
+                Text(amountText)
+                    .font(.headline)
+                    .foregroundStyle(amountColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+
+            HStack(spacing: 8) {
+                DraftVisualBadge(iconName: accountItem.iconName, colorHex: accountItem.colorHex, size: 22)
+
+                Text(accountItem.name)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Text(dateText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let location = transaction.location {
+                Label(location.displayName, systemImage: "location.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            if !transaction.note.isEmpty {
+                Text(transaction.note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
     }
 }
@@ -148,27 +209,6 @@ private struct DraftVisualSummaryItem {
     let name: String
     let iconName: String
     let colorHex: String
-}
-
-private struct DraftVisualSummaryRow: View {
-    let titleKey: LocalizedStringKey
-    let item: DraftVisualSummaryItem
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Text(titleKey)
-                .foregroundStyle(.secondary)
-
-            Spacer(minLength: 16)
-
-            HStack(spacing: 8) {
-                DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
-
-                Text(item.name)
-            }
-            .multilineTextAlignment(.trailing)
-        }
-    }
 }
 
 #Preview {

@@ -187,6 +187,7 @@ struct DraftLocation: Codable, Equatable {
 final class DraftBookkeepingStore: ObservableObject {
     @Published private(set) var accounts: [DraftAccount]
     @Published private(set) var categories: [DraftCategory]
+    @Published private(set) var transactions: [DraftTransaction]
     @Published private(set) var lastDraft: DraftTransaction?
     @Published private(set) var messageKey: String?
     @Published private(set) var localMetadataChangeToken = 0
@@ -200,6 +201,7 @@ final class DraftBookkeepingStore: ObservableObject {
     private enum DefaultsKey {
         static let accounts = "draftBookkeeping.accounts"
         static let categories = "draftBookkeeping.categories"
+        static let transactions = "draftBookkeeping.transactions"
         static let lastDraft = "draftBookkeeping.lastDraft"
         static let metadataRevision = "draftBookkeeping.metadata.revision"
         static let metadataUpdatedAt = "draftBookkeeping.metadata.updatedAt"
@@ -216,7 +218,16 @@ final class DraftBookkeepingStore: ObservableObject {
         let hasStoredMetadata = defaults.object(forKey: DefaultsKey.metadataRevision) != nil
         self.accounts = Self.load([DraftAccount].self, forKey: DefaultsKey.accounts, from: defaults) ?? Self.defaultAccounts
         self.categories = Self.load([DraftCategory].self, forKey: DefaultsKey.categories, from: defaults) ?? Self.defaultCategories
-        self.lastDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
+        let storedTransactions = Self.load([DraftTransaction].self, forKey: DefaultsKey.transactions, from: defaults) ?? []
+        let legacyDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
+        let initializedTransactions: [DraftTransaction]
+        if storedTransactions.isEmpty, let legacyDraft {
+            initializedTransactions = [legacyDraft]
+        } else {
+            initializedTransactions = storedTransactions.sorted(by: Self.transactionSort)
+        }
+        self.transactions = initializedTransactions
+        self.lastDraft = initializedTransactions.first
         if hasStoredMetadata {
             self.metadataRevision = defaults.integer(forKey: DefaultsKey.metadataRevision)
             self.metadataUpdatedAt = defaults.object(forKey: DefaultsKey.metadataUpdatedAt) as? Date ?? Date(timeIntervalSince1970: 0)
@@ -234,8 +245,10 @@ final class DraftBookkeepingStore: ObservableObject {
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
+        normalizeTransactionsAfterMetadataChange()
         persistAccounts()
         persistCategories()
+        persistTransactions()
         persistMetadata()
     }
 
@@ -326,10 +339,15 @@ final class DraftBookkeepingStore: ObservableObject {
         return categoryPath(for: id).map(\.name).joined(separator: " / ")
     }
 
-    func saveDraft(_ draft: DraftTransaction) {
-        lastDraft = draft
+    func saveTransaction(_ transaction: DraftTransaction) {
+        transactions.insert(transaction, at: 0)
+        transactions.sort(by: Self.transactionSort)
+        lastDraft = transactions.first
+        applyTransactionToAccountBalances(transaction)
+        persistAccounts()
+        persistTransactions()
         persistLastDraft()
-        messageKey = "record.draft.saved"
+        messageKey = "record.transaction.saved"
     }
 
     func backupMetadataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
@@ -463,7 +481,7 @@ final class DraftBookkeepingStore: ObservableObject {
         accounts.removeAll { $0.id == id }
         normalizeDefaultAccounts()
         persistAccounts()
-        normalizeLastDraftAfterAccountDeletion(id: id)
+        normalizeTransactionsAfterAccountDeletion(id: id)
         markMetadataChanged()
         messageKey = "management.account.deleted"
         return true
@@ -582,34 +600,41 @@ final class DraftBookkeepingStore: ObservableObject {
         categories.removeAll { deletedIds.contains($0.id) }
         normalizeDefaultCategories(kind: category.kind)
         persistCategories()
-        normalizeLastDraftAfterCategoryDeletion(ids: deletedIds)
+        normalizeTransactionsAfterCategoryDeletion(ids: deletedIds)
         markMetadataChanged()
         messageKey = "management.category.deleted"
         return true
     }
 
-    private func normalizeLastDraftAfterAccountDeletion(id: String) {
-        guard var draft = lastDraft else { return }
-
-        if draft.accountId == id {
-            draft.accountId = nil
+    private func normalizeTransactionsAfterAccountDeletion(id: String) {
+        transactions = transactions.map { transaction in
+            var normalized = transaction
+            if normalized.accountId == id {
+                normalized.accountId = nil
+            }
+            if normalized.fromAccountId == id {
+                normalized.fromAccountId = nil
+            }
+            if normalized.toAccountId == id {
+                normalized.toAccountId = nil
+            }
+            return normalized
         }
-        if draft.fromAccountId == id {
-            draft.fromAccountId = nil
-        }
-        if draft.toAccountId == id {
-            draft.toAccountId = nil
-        }
-
-        lastDraft = draft
+        lastDraft = transactions.first
+        persistTransactions()
         persistLastDraft()
     }
 
-    private func normalizeLastDraftAfterCategoryDeletion(ids: Set<String>) {
-        guard var draft = lastDraft, let categoryId = draft.categoryId, ids.contains(categoryId) else { return }
-
-        draft.categoryId = nil
-        lastDraft = draft
+    private func normalizeTransactionsAfterCategoryDeletion(ids: Set<String>) {
+        transactions = transactions.map { transaction in
+            var normalized = transaction
+            if let categoryId = normalized.categoryId, ids.contains(categoryId) {
+                normalized.categoryId = nil
+            }
+            return normalized
+        }
+        lastDraft = transactions.first
+        persistTransactions()
         persistLastDraft()
     }
 
@@ -633,9 +658,10 @@ final class DraftBookkeepingStore: ObservableObject {
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
-        normalizeLastDraftAfterMetadataImport()
+        normalizeTransactionsAfterMetadataChange()
         persistAccounts()
         persistCategories()
+        persistTransactions()
         persistLastDraft()
         persistMetadata()
     }
@@ -654,26 +680,28 @@ final class DraftBookkeepingStore: ObservableObject {
         defaults.set(metadataUpdatedByDeviceId, forKey: DefaultsKey.metadataUpdatedByDeviceId)
     }
 
-    private func normalizeLastDraftAfterMetadataImport() {
-        guard var draft = lastDraft else { return }
-
+    private func normalizeTransactionsAfterMetadataChange() {
         let accountIds = Set(accounts.map(\.id))
         let categoryIds = Set(categories.map(\.id))
 
-        if let accountId = draft.accountId, !accountIds.contains(accountId) {
-            draft.accountId = nil
-        }
-        if let fromAccountId = draft.fromAccountId, !accountIds.contains(fromAccountId) {
-            draft.fromAccountId = nil
-        }
-        if let toAccountId = draft.toAccountId, !accountIds.contains(toAccountId) {
-            draft.toAccountId = nil
-        }
-        if let categoryId = draft.categoryId, !categoryIds.contains(categoryId) {
-            draft.categoryId = nil
+        transactions = transactions.map { transaction in
+            var normalized = transaction
+            if let accountId = normalized.accountId, !accountIds.contains(accountId) {
+                normalized.accountId = nil
+            }
+            if let fromAccountId = normalized.fromAccountId, !accountIds.contains(fromAccountId) {
+                normalized.fromAccountId = nil
+            }
+            if let toAccountId = normalized.toAccountId, !accountIds.contains(toAccountId) {
+                normalized.toAccountId = nil
+            }
+            if let categoryId = normalized.categoryId, !categoryIds.contains(categoryId) {
+                normalized.categoryId = nil
+            }
+            return normalized
         }
 
-        lastDraft = draft
+        lastDraft = transactions.first
     }
 
     private func hierarchyItems(from category: DraftCategory, depth: Int, visitedIds: Set<String>) -> [DraftCategoryHierarchyItem] {
@@ -870,8 +898,43 @@ final class DraftBookkeepingStore: ObservableObject {
         Self.save(categories, forKey: DefaultsKey.categories, to: defaults)
     }
 
+    private func persistTransactions() {
+        Self.save(transactions, forKey: DefaultsKey.transactions, to: defaults)
+    }
+
     private func persistLastDraft() {
         Self.save(lastDraft, forKey: DefaultsKey.lastDraft, to: defaults)
+    }
+
+    private func applyTransactionToAccountBalances(_ transaction: DraftTransaction) {
+        switch transaction.kind {
+        case .expense:
+            guard let accountId = transaction.accountId else { return }
+            adjustAccountBalance(id: accountId, by: -decimalValue(from: transaction.amountText))
+        case .income:
+            guard let accountId = transaction.accountId else { return }
+            adjustAccountBalance(id: accountId, by: decimalValue(from: transaction.amountText))
+        case .transfer:
+            if let fromAccountId = transaction.fromAccountId {
+                adjustAccountBalance(id: fromAccountId, by: -decimalValue(from: transaction.amountText))
+            }
+            if let toAccountId = transaction.toAccountId {
+                adjustAccountBalance(id: toAccountId, by: decimalValue(from: transaction.transferInAmountText ?? transaction.amountText))
+            }
+        }
+    }
+
+    private func adjustAccountBalance(id: String, by delta: Decimal) {
+        guard let index = accounts.firstIndex(where: { $0.id == id }) else { return }
+
+        let currentBalance = decimalValue(from: accounts[index].balanceText)
+        let updatedBalance = currentBalance + delta
+        accounts[index].balanceText = Self.plainAmountText(from: updatedBalance)
+    }
+
+    private func decimalValue(from text: String) -> Decimal {
+        let normalizedText = DraftAmountFormatter.normalizedAmountText(text, allowNegative: true) ?? "0"
+        return Decimal(string: normalizedText, locale: Locale(identifier: "en_US_POSIX")) ?? 0
     }
 
     private static func load<Value: Decodable>(_ type: Value.Type, forKey key: String, from defaults: UserDefaults) -> Value? {
@@ -883,6 +946,29 @@ final class DraftBookkeepingStore: ObservableObject {
         guard let data = try? encoder.encode(value) else { return }
         defaults.set(data, forKey: key)
     }
+
+    private static func transactionSort(_ lhs: DraftTransaction, _ rhs: DraftTransaction) -> Bool {
+        if lhs.date == rhs.date {
+            return lhs.createdAt > rhs.createdAt
+        }
+
+        return lhs.date > rhs.date
+    }
+
+    private static func plainAmountText(from decimal: Decimal) -> String {
+        let number = NSDecimalNumber(decimal: decimal)
+        return plainAmountFormatter.string(from: number) ?? number.stringValue
+    }
+
+    private static let plainAmountFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = false
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        return formatter
+    }()
 
     private static let defaultNameKeyById = [
         "account.cash": "management.account.default.cash",
