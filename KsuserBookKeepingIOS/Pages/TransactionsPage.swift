@@ -289,20 +289,20 @@ private struct TransactionVisualSelectionRow: View {
 
             Spacer(minLength: 16)
 
-            HStack(spacing: 8) {
-                DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
+            VStack(alignment: .trailing, spacing: 3) {
+                HStack(spacing: 8) {
+                    DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
 
-                VStack(alignment: .trailing, spacing: 2) {
                     Text(item.name)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                }
 
-                    if !item.subtitle.isEmpty {
-                        Text(item.subtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                if !item.subtitle.isEmpty {
+                    Text(item.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    }
                 }
             }
             .frame(maxWidth: 220, alignment: .trailing)
@@ -555,16 +555,20 @@ private struct TransactionEditorPage: View {
     private func save() {
         draftStore.clearMessage()
 
-        guard isPositiveAmount(amountText) else {
+        guard let normalizedAmount = normalizedPositiveAmountText(amountText) else {
             errorKey = "record.error.invalidAmount"
             return
         }
 
+        let normalizedTransferInAmount: String?
         if transaction.kind == .transfer {
-            guard isPositiveAmount(transferInAmountText) else {
+            guard let amount = normalizedPositiveAmountText(transferInAmountText) else {
                 errorKey = "record.error.invalidTransferInAmount"
                 return
             }
+            normalizedTransferInAmount = amount
+        } else {
+            normalizedTransferInAmount = nil
         }
 
         switch transaction.kind {
@@ -593,8 +597,8 @@ private struct TransactionEditorPage: View {
         let updatedTransaction = DraftTransaction(
             id: transaction.id,
             kind: transaction.kind,
-            amountText: amountText.trimmingCharacters(in: .whitespacesAndNewlines),
-            transferInAmountText: transaction.kind == .transfer ? transferInAmountText.trimmingCharacters(in: .whitespacesAndNewlines) : nil,
+            amountText: normalizedAmount,
+            transferInAmountText: normalizedTransferInAmount,
             categoryId: transaction.kind == .transfer ? nil : selectedCategoryId,
             accountId: transaction.kind == .transfer ? nil : selectedAccountId,
             fromAccountId: transaction.kind == .transfer ? selectedFromAccountId : nil,
@@ -698,18 +702,23 @@ private struct TransactionEditorPage: View {
     }
 
     private func isPositiveAmount(_ text: String) -> Bool {
+        normalizedPositiveAmountText(text) != nil
+    }
+
+    private func normalizedPositiveAmountText(_ text: String) -> String? {
         let normalizedText = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")
 
         guard
-            let decimal = Decimal(string: normalizedText),
+            let amountText = DraftAmountFormatter.normalizedAmountText(normalizedText, allowNegative: false),
+            let decimal = Decimal(string: amountText, locale: Locale(identifier: "en_US_POSIX")),
             decimal > 0
         else {
-            return false
+            return nil
         }
 
-        return true
+        return amountText
     }
 }
 

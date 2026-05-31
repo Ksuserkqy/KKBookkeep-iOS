@@ -375,16 +375,20 @@ struct RecordPage: View {
     private func saveTransaction() {
         draftStore.clearMessage()
 
-        guard isPositiveAmount(amountText) else {
+        guard let normalizedAmount = normalizedPositiveAmountText(amountText) else {
             errorKey = "record.error.invalidAmount"
             return
         }
 
+        let normalizedTransferInAmount: String?
         if selectedKind == .transfer {
-            guard isPositiveAmount(transferInAmountText) else {
+            guard let amount = normalizedPositiveAmountText(transferInAmountText) else {
                 errorKey = "record.error.invalidTransferInAmount"
                 return
             }
+            normalizedTransferInAmount = amount
+        } else {
+            normalizedTransferInAmount = nil
         }
 
         switch selectedKind {
@@ -410,14 +414,12 @@ struct RecordPage: View {
             }
         }
 
-        let trimmedAmount = amountText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedTransferInAmount = transferInAmountText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let transaction = DraftTransaction(
             id: UUID().uuidString,
             kind: selectedKind,
-            amountText: trimmedAmount,
-            transferInAmountText: selectedKind == .transfer ? trimmedTransferInAmount : nil,
+            amountText: normalizedAmount,
+            transferInAmountText: normalizedTransferInAmount,
             categoryId: selectedKind == .transfer ? nil : selectedCategoryId,
             accountId: selectedKind == .transfer ? nil : selectedAccountId,
             fromAccountId: selectedKind == .transfer ? selectedFromAccountId : nil,
@@ -454,18 +456,23 @@ struct RecordPage: View {
     }
 
     private func isPositiveAmount(_ text: String) -> Bool {
+        normalizedPositiveAmountText(text) != nil
+    }
+
+    private func normalizedPositiveAmountText(_ text: String) -> String? {
         let normalizedText = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")
 
         guard
-            let decimal = Decimal(string: normalizedText),
+            let amountText = DraftAmountFormatter.normalizedAmountText(normalizedText, allowNegative: false),
+            let decimal = Decimal(string: amountText, locale: Locale(identifier: "en_US_POSIX")),
             decimal > 0
         else {
-            return false
+            return nil
         }
 
-        return true
+        return amountText
     }
 }
 
@@ -484,13 +491,23 @@ struct RecordAmountInputRow: View {
     let currencySymbol: String
     let tint: Color
 
+    private var sanitizedAmountText: Binding<String> {
+        Binding(
+            get: { amountText },
+            set: { newValue in
+                guard DraftAmountFormatter.canAcceptNumericAmountInput(newValue) else { return }
+                amountText = newValue
+            }
+        )
+    }
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(currencySymbol)
                 .font(.title2.weight(.bold))
                 .foregroundStyle(tint)
 
-            TextField(placeholderKey, text: $amountText)
+            TextField(placeholderKey, text: sanitizedAmountText)
                 .keyboardType(.decimalPad)
                 .font(.system(.largeTitle, design: .rounded).weight(.bold))
                 .foregroundStyle(tint)
@@ -511,20 +528,20 @@ private struct RecordVisualSelectionRow: View {
 
             Spacer(minLength: 16)
 
-            HStack(spacing: 8) {
-                DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
+            VStack(alignment: .trailing, spacing: 3) {
+                HStack(spacing: 8) {
+                    DraftVisualBadge(iconName: item.iconName, colorHex: item.colorHex, size: 24)
 
-                VStack(alignment: .trailing, spacing: 2) {
                     Text(item.name)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                }
 
-                    if !item.subtitle.isEmpty {
-                        Text(item.subtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                if !item.subtitle.isEmpty {
+                    Text(item.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
             .frame(maxWidth: 220, alignment: .trailing)

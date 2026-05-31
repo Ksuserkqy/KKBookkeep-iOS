@@ -24,11 +24,37 @@ enum DraftAmountFormatter {
         return result
     }
 
+    static func canAcceptNumericAmountInput(_ text: String) -> Bool {
+        var hasDecimalSeparator = false
+        var fractionalDigitCount = 0
+
+        for character in text {
+            if character.isNumber {
+                if hasDecimalSeparator {
+                    fractionalDigitCount += 1
+                    guard fractionalDigitCount <= 2 else { return false }
+                }
+            } else if character == "." || character == "。" {
+                guard !hasDecimalSeparator else { return false }
+                hasDecimalSeparator = true
+            } else {
+                return false
+            }
+        }
+
+        return true
+    }
+
     static func normalizedAmountText(_ text: String, allowNegative: Bool) -> String? {
         let trimmedText = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: "")
             .replacingOccurrences(of: "，", with: "")
+            .replacingOccurrences(of: "¥", with: "")
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: "€", with: "")
+            .replacingOccurrences(of: "￥", with: "")
+            .replacingOccurrences(of: " ", with: "")
 
         guard !trimmedText.isEmpty else { return "0" }
 

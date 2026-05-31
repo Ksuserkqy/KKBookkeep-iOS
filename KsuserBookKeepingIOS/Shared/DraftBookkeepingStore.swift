@@ -384,10 +384,11 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     func saveTransaction(_ transaction: DraftTransaction) {
-        transactions.insert(transaction, at: 0)
+        let normalizedTransaction = normalizedTransactionAmounts(transaction)
+        transactions.insert(normalizedTransaction, at: 0)
         transactions.sort(by: Self.transactionSort)
         lastDraft = transactions.first
-        applyTransactionToAccountBalances(transaction)
+        applyTransactionToAccountBalances(normalizedTransaction)
         persistAccounts()
         persistTransactions()
         persistLastDraft()
@@ -398,12 +399,13 @@ final class DraftBookkeepingStore: ObservableObject {
     func updateTransaction(_ transaction: DraftTransaction) -> Bool {
         guard let index = transactions.firstIndex(where: { $0.id == transaction.id }) else { return false }
 
+        let normalizedTransaction = normalizedTransactionAmounts(transaction)
         let originalTransaction = transactions[index]
         applyTransactionToAccountBalances(originalTransaction, multiplier: -1)
-        transactions[index] = transaction
+        transactions[index] = normalizedTransaction
         transactions.sort(by: Self.transactionSort)
         lastDraft = transactions.first
-        applyTransactionToAccountBalances(transaction)
+        applyTransactionToAccountBalances(normalizedTransaction)
         persistAccounts()
         persistTransactions()
         persistLastDraft()
@@ -997,6 +999,15 @@ final class DraftBookkeepingStore: ObservableObject {
                 adjustAccountBalance(id: toAccountId, by: decimalValue(from: transaction.transferInAmountText ?? transaction.amountText) * multiplier)
             }
         }
+    }
+
+    private func normalizedTransactionAmounts(_ transaction: DraftTransaction) -> DraftTransaction {
+        var normalized = transaction
+        normalized.amountText = DraftAmountFormatter.normalizedAmountText(transaction.amountText, allowNegative: false) ?? "0"
+        if let transferInAmountText = transaction.transferInAmountText {
+            normalized.transferInAmountText = DraftAmountFormatter.normalizedAmountText(transferInAmountText, allowNegative: false) ?? normalized.amountText
+        }
+        return normalized
     }
 
     private func adjustAccountBalance(id: String, by delta: Decimal) {
