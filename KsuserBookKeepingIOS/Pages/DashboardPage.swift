@@ -17,6 +17,68 @@ struct DashboardPage: View {
         Array(draftStore.accounts.filter { !$0.isArchived }.prefix(3))
     }
 
+    private var recentTransactions: [DraftTransaction] {
+        Array(draftStore.transactions.prefix(3))
+    }
+
+    private var monthSummary: DashboardMonthSummary {
+        let calendar = Calendar.current
+        let now = Date()
+        let monthInterval = calendar.dateInterval(of: .month, for: now)
+        let dayInterval = calendar.dateInterval(of: .day, for: now)
+        var income = Decimal(0)
+        var expense = Decimal(0)
+        var todayExpense = Decimal(0)
+        var expenseByCategory: [String: Decimal] = [:]
+        var transactionCount = 0
+
+        for transaction in draftStore.transactions {
+            if let monthInterval, monthInterval.contains(transaction.date) {
+                transactionCount += 1
+
+                switch transaction.kind {
+                case .income:
+                    income += decimalValue(from: transaction.amountText)
+                case .expense:
+                    let amount = decimalValue(from: transaction.amountText)
+                    expense += amount
+
+                    if let categoryId = transaction.categoryId {
+                        expenseByCategory[categoryId, default: 0] += amount
+                    }
+                case .transfer:
+                    break
+                }
+            }
+
+            if
+                transaction.kind == .expense,
+                let dayInterval,
+                dayInterval.contains(transaction.date)
+            {
+                todayExpense += decimalValue(from: transaction.amountText)
+            }
+        }
+
+        let topCategory = expenseByCategory.max { lhs, rhs in
+            if lhs.value == rhs.value {
+                return categoryDisplayName(for: lhs.key) > categoryDisplayName(for: rhs.key)
+            }
+
+            return lhs.value < rhs.value
+        }
+
+        return DashboardMonthSummary(
+            income: income,
+            expense: expense,
+            balance: income - expense,
+            todayExpense: todayExpense,
+            transactionCount: transactionCount,
+            topExpenseCategoryName: topCategory.map { categoryDisplayName(for: $0.key) },
+            topExpenseCategoryAmount: topCategory?.value
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -25,7 +87,6 @@ struct DashboardPage: View {
                     balanceCard
                     monthOverviewSection
                     quickActionsSection
-                    budgetSection
                     accountsSection
                     recentDraftSection
                 }
@@ -86,34 +147,70 @@ struct DashboardPage: View {
     }
 
     private var monthOverviewSection: some View {
-        DashboardSection(titleKey: "dashboard.monthOverview") {
+        let summary = monthSummary
+
+        return DashboardSection(titleKey: "dashboard.monthOverview") {
             HStack(spacing: 10) {
                 DashboardMetricTile(
                     titleKey: "dashboard.monthIncome",
-                    value: currencyText(from: 0),
+                    value: currencyText(from: summary.income),
                     systemImage: "arrow.down.circle.fill",
                     tint: .green
                 )
 
                 DashboardMetricTile(
                     titleKey: "dashboard.monthExpense",
-                    value: currencyText(from: 0),
+                    value: currencyText(from: summary.expense),
                     systemImage: "arrow.up.circle.fill",
                     tint: .red
                 )
 
                 DashboardMetricTile(
                     titleKey: "dashboard.monthBalance",
-                    value: currencyText(from: 0),
+                    value: currencyText(from: summary.balance),
                     systemImage: "equal.circle.fill",
                     tint: .accentColor
                 )
             }
 
-            Text("dashboard.monthOverview.empty")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            DashboardCard {
+                VStack(spacing: 12) {
+                    DashboardFactRow(
+                        titleKey: "dashboard.todayExpense",
+                        value: currencyText(from: summary.todayExpense),
+                        systemImage: "calendar.badge.clock",
+                        tint: .orange
+                    )
+
+                    Divider()
+
+                    DashboardFactRow(
+                        titleKey: "dashboard.monthTransactions",
+                        value: String(
+                            format: NSLocalizedString("dashboard.monthTransactions.valueFormat", comment: ""),
+                            summary.transactionCount
+                        ),
+                        systemImage: "list.bullet.rectangle.portrait.fill",
+                        tint: .blue
+                    )
+
+                    if let topExpenseCategoryName = summary.topExpenseCategoryName,
+                       let topExpenseCategoryAmount = summary.topExpenseCategoryAmount {
+                        Divider()
+
+                        DashboardFactRow(
+                            titleKey: "dashboard.topExpenseCategory",
+                            value: String(
+                                format: NSLocalizedString("dashboard.topExpenseCategory.valueFormat", comment: ""),
+                                topExpenseCategoryName,
+                                currencyText(from: topExpenseCategoryAmount)
+                            ),
+                            systemImage: "chart.bar.xaxis",
+                            tint: .purple
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -150,49 +247,25 @@ struct DashboardPage: View {
         }
     }
 
-    private var budgetSection: some View {
-        DashboardSection(titleKey: "dashboard.budget") {
-            DashboardCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "chart.pie.fill")
-                            .font(.title3)
-                            .foregroundStyle(.tint)
-                            .frame(width: 36, height: 36)
-                            .background(
-                                Circle()
-                                    .fill(Color.accentColor.opacity(0.14))
-                            )
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("dashboard.budget.emptyTitle")
-                                .font(.headline)
-
-                            Text("dashboard.budget.emptySubtitle")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-
-                    ProgressView(value: 0, total: 1)
-                        .tint(.accentColor)
-                }
-            }
-        }
-    }
-
     private var accountsSection: some View {
         DashboardSection(titleKey: "dashboard.accounts") {
             DashboardCard {
-                VStack(spacing: 0) {
-                    ForEach(displayedAccounts) { account in
-                        DashboardAccountRow(account: account)
+                if displayedAccounts.isEmpty {
+                    DashboardEmptyState(
+                        systemImage: "wallet.pass",
+                        titleKey: "dashboard.accounts.emptyTitle",
+                        subtitleKey: "dashboard.accounts.emptySubtitle"
+                    )
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(displayedAccounts) { account in
+                            DashboardAccountRow(account: account)
 
-                        if account.id != displayedAccounts.last?.id {
-                            Divider()
-                                .padding(.leading, 46)
-                                .padding(.vertical, 10)
+                            if account.id != displayedAccounts.last?.id {
+                                Divider()
+                                    .padding(.leading, 46)
+                                    .padding(.vertical, 10)
+                            }
                         }
                     }
                 }
@@ -204,18 +277,28 @@ struct DashboardPage: View {
     private var recentDraftSection: some View {
         DashboardSection(titleKey: "dashboard.recentDraft") {
             DashboardCard {
-                if let draft = draftStore.lastDraft {
-                    DashboardDraftSummary(
-                        draft: draft,
-                        accountName: accountName(for: draft),
-                        categoryName: categoryName(for: draft)
-                    )
-                } else {
+                if recentTransactions.isEmpty {
                     DashboardEmptyState(
                         systemImage: "doc.badge.clock",
                         titleKey: "dashboard.recentDraft.emptyTitle",
                         subtitleKey: "dashboard.recentDraft.emptySubtitle"
                     )
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(recentTransactions) { transaction in
+                            DashboardTransactionRow(
+                                transaction: transaction,
+                                accountName: accountName(for: transaction),
+                                categoryItem: categoryItem(for: transaction)
+                            )
+
+                            if transaction.id != recentTransactions.last?.id {
+                                Divider()
+                                    .padding(.leading, 46)
+                                    .padding(.vertical, 10)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -224,10 +307,10 @@ struct DashboardPage: View {
     private func accountName(for draft: DraftTransaction) -> String {
         switch draft.kind {
         case .expense, .income:
-            return draftStore.accountName(for: draft.accountId)
+            return accountDisplayName(for: draft.accountId)
         case .transfer:
-            let fromAccount = draftStore.accountName(for: draft.fromAccountId)
-            let toAccount = draftStore.accountName(for: draft.toAccountId)
+            let fromAccount = accountDisplayName(for: draft.fromAccountId)
+            let toAccount = accountDisplayName(for: draft.toAccountId)
             return String(
                 format: NSLocalizedString("dashboard.transferAccountFormat", comment: ""),
                 fromAccount,
@@ -236,13 +319,54 @@ struct DashboardPage: View {
         }
     }
 
-    private func categoryName(for draft: DraftTransaction) -> String {
+    private func categoryItem(for draft: DraftTransaction) -> DashboardVisualItem {
         switch draft.kind {
         case .expense, .income:
-            return draftStore.categoryName(for: draft.categoryId)
+            guard
+                let categoryId = draft.categoryId,
+                let category = draftStore.categories.first(where: { $0.id == categoryId })
+            else {
+                return DashboardVisualItem(
+                    name: NSLocalizedString("draft.item.missing", comment: ""),
+                    iconName: "circle-question",
+                    colorHex: "#64748B"
+                )
+            }
+
+            return DashboardVisualItem(
+                name: archivedAwareName(categoryDisplayName(for: category.id), isArchived: category.isArchived),
+                iconName: category.iconName,
+                colorHex: category.colorHex
+            )
         case .transfer:
-            return NSLocalizedString("record.kind.transfer", comment: "")
+            return DashboardVisualItem(
+                name: NSLocalizedString("record.kind.transfer", comment: ""),
+                iconName: "right-left",
+                colorHex: "#3B82F6"
+            )
         }
+    }
+
+    private func accountDisplayName(for id: String?) -> String {
+        guard
+            let id,
+            let account = draftStore.accounts.first(where: { $0.id == id })
+        else {
+            return NSLocalizedString("draft.item.missing", comment: "")
+        }
+
+        return archivedAwareName(account.name, isArchived: account.isArchived)
+    }
+
+    private func categoryDisplayName(for id: String) -> String {
+        let name = draftStore.categoryDisplayName(for: id)
+        let isArchived = draftStore.categories.first(where: { $0.id == id })?.isArchived ?? false
+        return archivedAwareName(name, isArchived: isArchived)
+    }
+
+    private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
+        guard isArchived else { return name }
+        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
     }
 
     private func decimalValue(from text: String) -> Decimal {
@@ -253,6 +377,22 @@ struct DashboardPage: View {
     private func currencyText(from decimal: Decimal) -> String {
         DraftAmountFormatter.currencyText(from: NSDecimalNumber(decimal: decimal).stringValue)
     }
+}
+
+private struct DashboardMonthSummary {
+    let income: Decimal
+    let expense: Decimal
+    let balance: Decimal
+    let todayExpense: Decimal
+    let transactionCount: Int
+    let topExpenseCategoryName: String?
+    let topExpenseCategoryAmount: Decimal?
+}
+
+private struct DashboardVisualItem {
+    let name: String
+    let iconName: String
+    let colorHex: String
 }
 
 private struct DashboardSection<Content: View>: View {
@@ -287,6 +427,38 @@ private struct DashboardCard<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color(.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct DashboardFactRow: View {
+    let titleKey: LocalizedStringKey
+    let value: String
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(
+                    Circle()
+                        .fill(tint.opacity(0.14))
+                )
+
+            Text(titleKey)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 12)
+
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .multilineTextAlignment(.trailing)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
     }
 }
 
@@ -379,67 +551,80 @@ private struct DashboardAccountRow: View {
     }
 }
 
-private struct DashboardDraftSummary: View {
-    let draft: DraftTransaction
+private struct DashboardTransactionRow: View {
+    let transaction: DraftTransaction
     let accountName: String
-    let categoryName: String
+    let categoryItem: DashboardVisualItem
 
     private var amountText: String {
-        switch draft.kind {
-        case .expense, .income:
-            return DraftAmountFormatter.currencyText(from: draft.amountText)
+        switch transaction.kind {
+        case .expense:
+            return "-\(DraftAmountFormatter.currencyText(from: transaction.amountText))"
+        case .income:
+            return "+\(DraftAmountFormatter.currencyText(from: transaction.amountText))"
         case .transfer:
-            return DraftAmountFormatter.currencyText(from: draft.amountText)
+            return DraftAmountFormatter.currencyText(from: transaction.amountText)
+        }
+    }
+
+    private var amountColor: Color {
+        switch transaction.kind {
+        case .expense:
+            return .red
+        case .income:
+            return .green
+        case .transfer:
+            return .primary
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(LocalizedStringKey(draft.kind.localizationKey))
-                        .font(.headline)
+        HStack(alignment: .center, spacing: 12) {
+            DraftVisualBadge(iconName: categoryItem.iconName, colorHex: categoryItem.colorHex, size: 34)
 
-                    Text(categoryName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(categoryItem.name)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+
+                HStack(spacing: 5) {
+                    Text(LocalizedStringKey(transaction.kind.localizationKey))
+
+                    Text("·")
+
+                    Text(accountName)
+
+                    if let location = transaction.location {
+                        Text("·")
+
+                        Image(systemName: "location.fill")
+                            .accessibilityLabel(Text(location.displayName))
+                    }
                 }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
 
-                Spacer(minLength: 12)
-
-                Text(amountText)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "creditcard.fill")
-                    .foregroundStyle(.secondary)
-
-                Text(accountName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                Text(Self.dateFormatter.string(from: draft.date))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if let location = draft.location {
-                HStack(spacing: 8) {
-                    Image(systemName: "location.fill")
-                        .foregroundStyle(.secondary)
-
-                    Text(location.displayName)
+                if !transaction.note.isEmpty {
+                    Text(transaction.note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+            }
+
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(amountText)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(amountColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+
+                Text(Self.dateFormatter.string(from: transaction.date))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
