@@ -98,6 +98,9 @@ struct ContentView: View {
         .onChange(of: quickActionRouter.pendingAction) { _, action in
             handleQuickAction(action)
         }
+        .onOpenURL { url in
+            handleDeepLink(url)
+        }
         .onReceive(draftBookkeepingStore.$localMetadataChangeToken.dropFirst()) { _ in
             scheduleLedgerDataBackup()
         }
@@ -179,6 +182,30 @@ struct ContentView: View {
         requestedRecordKind = action.recordKind
         selectedTab = .record
         quickActionRouter.clearPendingAction()
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == WidgetDeepLink.scheme else { return }
+
+        switch url.host {
+        case "record":
+            let kindValue = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "kind" })?
+                .value
+            if let kindValue, let kind = DraftEntryKind(rawValue: kindValue) {
+                requestedRecordKind = kind
+            } else {
+                requestedRecordKind = .expense
+            }
+            selectedTab = .record
+        case "reports":
+            selectedTab = .reports
+        case "dashboard":
+            selectedTab = .dashboard
+        default:
+            break
+        }
     }
 
     private func scheduleLedgerDataBackup() {

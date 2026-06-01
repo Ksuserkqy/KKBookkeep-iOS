@@ -41,6 +41,18 @@
 "quickAction.income.title" = "记一笔收入";
 "quickAction.transfer.title" = "记一笔转账";
 
+"widget.quickRecord.title" = "快捷记账";
+"widget.quickRecord.description" = "从主屏幕直接打开支出、收入或转账记账页。";
+"widget.quickRecord.expense" = "记支出";
+"widget.quickRecord.income" = "记收入";
+"widget.quickRecord.transfer" = "记转账";
+"widget.overview.title" = "账本总览";
+"widget.overview.description" = "在主屏幕查看余额、本月收支和今日支出。";
+"widget.report.title" = "本月报表";
+"widget.report.description" = "查看本月收支趋势、顶部分类和近期流水。";
+"widget.report.emptyTopCategory" = "保存支出后显示最高分类";
+"widget.report.emptyRecent" = "暂无近期流水";
+
 "dashboard.placeholder" = "查看账户余额、预算进度和本月收支。";
 "dashboard.greeting" = "今天也记一笔";
 "dashboard.subtitle" = "快速查看本机账本状态。";

@@ -1,0 +1,20 @@
+"widget.quickRecord.title" = "快捷记账";
+"widget.quickRecord.description" = "从主屏幕直接打开支出、收入或转账记账页。";
+"widget.quickRecord.expense" = "记支出";
+"widget.quickRecord.income" = "记收入";
+"widget.quickRecord.transfer" = "记转账";
+"widget.overview.title" = "账本总览";
+"widget.overview.description" = "在主屏幕查看余额、本月收支和今日支出。";
+"widget.report.title" = "本月报表";
+"widget.report.description" = "查看本月收支趋势、顶部分类和近期流水。";
+"widget.report.emptyTopCategory" = "保存支出后显示最高分类";
+"widget.report.emptyRecent" = "暂无近期流水";
+
+"dashboard.totalBalance" = "总资产";
+"dashboard.monthIncome" = "收入";
+"dashboard.monthExpense" = "支出";
+"dashboard.monthBalance" = "结余";
+"dashboard.todayExpense" = "今日支出";
+"dashboard.monthTransactions.valueFormat" = "%d 笔";
+"dashboard.topExpenseCategory" = "最大支出分类";
+"reports.empty.trend.title" = "暂无趋势数据";

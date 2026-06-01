@@ -41,6 +41,18 @@
 "quickAction.income.title" = "Record Income";
 "quickAction.transfer.title" = "Record Transfer";
 
+"widget.quickRecord.title" = "Quick Entry";
+"widget.quickRecord.description" = "Open expense, income, or transfer entry directly from the Home Screen.";
+"widget.quickRecord.expense" = "Expense";
+"widget.quickRecord.income" = "Income";
+"widget.quickRecord.transfer" = "Transfer";
+"widget.overview.title" = "Ledger Overview";
+"widget.overview.description" = "See balance, monthly cash flow, and today's spending on the Home Screen.";
+"widget.report.title" = "Monthly Report";
+"widget.report.description" = "Review this month's trend, top category, and recent entries.";
+"widget.report.emptyTopCategory" = "Top category appears after expense entries";
+"widget.report.emptyRecent" = "No recent entries";
+
 "dashboard.placeholder" = "View balances, budgets, and this month's cash flow.";
 "dashboard.greeting" = "Ready for today's entry";
 "dashboard.subtitle" = "Check the local ledger at a glance.";

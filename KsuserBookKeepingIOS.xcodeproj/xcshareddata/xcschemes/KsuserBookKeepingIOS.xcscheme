@@ -21,6 +21,20 @@
                ReferencedContainer = "container:KsuserBookKeepingIOS.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "NO"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "7A1000072FD0000000010001"
+               BuildableName = "KsuserBookKeepingWidget.appex"
+               BlueprintName = "KsuserBookKeepingWidget"
+               ReferencedContainer = "container:KsuserBookKeepingIOS.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

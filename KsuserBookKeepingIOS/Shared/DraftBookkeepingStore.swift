@@ -1,6 +1,9 @@
 import Combine
 import Foundation
 import SwiftUI
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 enum DraftEntryKind: String, CaseIterable, Codable, Identifiable {
     case expense
@@ -396,6 +399,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistTransactionsMetadata()
         persistTransactionSyncState()
         persistTemplateSyncState()
+        persistWidgetSnapshot()
     }
 
     func clearMessage() {
@@ -539,6 +543,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistTransactions()
         persistLastDraft()
         appendLocalTransactionOp(action: .create, transaction: normalizedTransaction, occurredAt: normalizedTransaction.createdAt)
+        persistWidgetSnapshot()
         messageKey = "record.transaction.saved"
     }
 
@@ -557,6 +562,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistTransactions()
         persistLastDraft()
         appendLocalTransactionOp(action: .update, transaction: normalizedTransaction)
+        persistWidgetSnapshot()
         messageKey = "transactions.message.updated"
         return true
     }
@@ -572,6 +578,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistTransactions()
         persistLastDraft()
         appendLocalTransactionOp(action: .delete, transaction: transaction)
+        persistWidgetSnapshot()
         messageKey = "transactions.message.deleted"
         return true
     }
@@ -853,6 +860,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactionSyncState()
         appendLocalMetadataOp(entity: .account, action: .create, account: account, category: nil)
+        persistWidgetSnapshot()
         messageKey = "management.account.saved"
         return true
     }
@@ -878,6 +886,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistAccounts()
         persistTransactionSyncState()
         appendLocalMetadataOp(entity: .account, action: .update, account: accounts[index], category: nil)
+        persistWidgetSnapshot()
         messageKey = "management.account.saved"
         return true
     }
@@ -887,6 +896,7 @@ final class DraftBookkeepingStore: ObservableObject {
         accounts.move(fromOffsets: source, toOffset: destination)
         persistAccounts()
         appendLocalMetadataSnapshotOps(for: .account)
+        persistWidgetSnapshot()
     }
 
     func setDefaultAccount(id: String) {
@@ -900,6 +910,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
         persistAccounts()
         appendLocalMetadataSnapshotOps(for: .account)
+        persistWidgetSnapshot()
         messageKey = "management.account.defaultSet"
     }
 
@@ -934,6 +945,7 @@ final class DraftBookkeepingStore: ObservableObject {
         } else if let opAccount {
             appendLocalMetadataOp(entity: .account, action: .archive, account: opAccount, category: nil)
         }
+        persistWidgetSnapshot()
         return true
     }
 
@@ -958,6 +970,7 @@ final class DraftBookkeepingStore: ObservableObject {
         categories.append(category)
         persistCategories()
         appendLocalMetadataOp(entity: .category, action: .create, account: nil, category: category)
+        persistWidgetSnapshot()
         messageKey = "management.category.saved"
         return true
     }
@@ -984,6 +997,7 @@ final class DraftBookkeepingStore: ObservableObject {
         normalizeDefaultCategories(kind: kind)
         persistCategories()
         appendLocalMetadataOp(entity: .category, action: .update, account: nil, category: categories[index])
+        persistWidgetSnapshot()
         messageKey = "management.category.saved"
         return true
     }
@@ -1021,6 +1035,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
         persistCategories()
         appendLocalMetadataSnapshotOps(for: .category)
+        persistWidgetSnapshot()
     }
 
     func setDefaultCategory(id: String) {
@@ -1037,6 +1052,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
         persistCategories()
         appendLocalMetadataSnapshotOps(for: .category)
+        persistWidgetSnapshot()
         messageKey = "management.category.defaultSet"
     }
 
@@ -1084,6 +1100,7 @@ final class DraftBookkeepingStore: ObservableObject {
                 appendLocalMetadataOp(entity: .category, action: .archive, account: nil, category: opCategory)
             }
         }
+        persistWidgetSnapshot()
         return true
     }
 
@@ -1125,6 +1142,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistTransactions()
         persistLastDraft()
         persistMetadata()
+        persistWidgetSnapshot()
     }
 
     private func backupPendingMetadataOps(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
@@ -1186,6 +1204,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistMetadata()
         persistMetadataSyncState()
         persistTransactionSyncState()
+        persistWidgetSnapshot()
         return true
     }
 
@@ -1464,6 +1483,7 @@ final class DraftBookkeepingStore: ObservableObject {
         persistLastDraft()
         persistTransactionsMetadata()
         persistTransactionSyncState()
+        persistWidgetSnapshot()
         return true
     }
 
@@ -2050,6 +2070,118 @@ final class DraftBookkeepingStore: ObservableObject {
         Self.save(lastDraft, forKey: DefaultsKey.lastDraft, to: defaults)
     }
 
+    private func persistWidgetSnapshot() {
+        WidgetSnapshotStore.save(makeWidgetSnapshot())
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
+    }
+
+    private func makeWidgetSnapshot(now: Date = Date(), calendar: Calendar = .current) -> WidgetLedgerSnapshot {
+        let activeAccounts = accounts.filter { !$0.isArchived }
+        let totalBalance = activeAccounts.reduce(Decimal(0)) { partialResult, account in
+            partialResult + decimalValue(from: account.balanceText)
+        }
+        let monthInterval = calendar.dateInterval(of: .month, for: now)
+        let dayInterval = calendar.dateInterval(of: .day, for: now)
+        var monthIncome = Decimal(0)
+        var monthExpense = Decimal(0)
+        var todayExpense = Decimal(0)
+        var monthTransactionCount = 0
+        var expenseByCategoryId: [String: Decimal] = [:]
+        var dailyIncomeByDay: [Int: Decimal] = [:]
+        var dailyExpenseByDay: [Int: Decimal] = [:]
+
+        for transaction in transactions {
+            guard let monthInterval, monthInterval.contains(transaction.date) else {
+                continue
+            }
+
+            monthTransactionCount += 1
+            let day = calendar.component(.day, from: transaction.date)
+
+            switch transaction.kind {
+            case .income:
+                let amount = decimalValue(from: transaction.amountText)
+                monthIncome += amount
+                dailyIncomeByDay[day, default: 0] += amount
+            case .expense:
+                let amount = decimalValue(from: transaction.amountText)
+                monthExpense += amount
+                dailyExpenseByDay[day, default: 0] += amount
+
+                if let dayInterval, dayInterval.contains(transaction.date) {
+                    todayExpense += amount
+                }
+                if let categoryId = transaction.categoryId {
+                    expenseByCategoryId[categoryId, default: 0] += amount
+                }
+            case .transfer:
+                break
+            }
+        }
+
+        let topCategory = expenseByCategoryId.max { lhs, rhs in
+            if lhs.value == rhs.value {
+                return categoryDisplayName(for: lhs.key) > categoryDisplayName(for: rhs.key)
+            }
+
+            return lhs.value < rhs.value
+        }
+        let monthDayCount = monthInterval.map { calendar.range(of: .day, in: .month, for: $0.start)?.count ?? 31 } ?? 31
+        let dailyPoints = (1...monthDayCount).map { day in
+            WidgetDailyPoint(
+                day: day,
+                income: Self.doubleValue(from: dailyIncomeByDay[day] ?? 0),
+                expense: Self.doubleValue(from: dailyExpenseByDay[day] ?? 0)
+            )
+        }
+        let recentItems = transactions.prefix(3).map { transaction in
+            WidgetRecentTransaction(
+                id: transaction.id,
+                kind: WidgetRecordKind(rawValue: transaction.kind.rawValue) ?? .expense,
+                title: widgetTransactionTitle(for: transaction),
+                amountText: widgetAmountText(for: transaction),
+                dateText: Self.widgetDateFormatter.string(from: transaction.date)
+            )
+        }
+
+        return WidgetLedgerSnapshot(
+            generatedAt: now,
+            totalBalanceText: DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: totalBalance)),
+            monthIncomeText: DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: monthIncome)),
+            monthExpenseText: DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: monthExpense)),
+            monthBalanceText: DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: monthIncome - monthExpense)),
+            todayExpenseText: DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: todayExpense)),
+            monthTransactionCount: monthTransactionCount,
+            topExpenseCategoryName: topCategory.map { categoryDisplayName(for: $0.key) },
+            topExpenseCategoryAmountText: topCategory.map { DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: $0.value)) },
+            recentTransactions: Array(recentItems),
+            dailyPoints: dailyPoints
+        )
+    }
+
+    private func widgetTransactionTitle(for transaction: DraftTransaction) -> String {
+        switch transaction.kind {
+        case .expense, .income:
+            return categoryDisplayName(for: transaction.categoryId)
+        case .transfer:
+            return "\(accountName(for: transaction.fromAccountId)) -> \(accountName(for: transaction.toAccountId))"
+        }
+    }
+
+    private func widgetAmountText(for transaction: DraftTransaction) -> String {
+        let amountText = DraftAmountFormatter.currencyText(from: transaction.amountText)
+        switch transaction.kind {
+        case .expense:
+            return "-\(amountText)"
+        case .income:
+            return "+\(amountText)"
+        case .transfer:
+            return amountText
+        }
+    }
+
     private func applyTransactionToAccountBalances(_ transaction: DraftTransaction, multiplier: Decimal = 1) {
         switch transaction.kind {
         case .expense:
@@ -2157,6 +2289,10 @@ final class DraftBookkeepingStore: ObservableObject {
         return plainAmountFormatter.string(from: number) ?? number.stringValue
     }
 
+    private static func doubleValue(from decimal: Decimal) -> Double {
+        NSDecimalNumber(decimal: decimal).doubleValue
+    }
+
     private static func normalizedPositiveAmountText(_ text: String) -> String? {
         let normalizedText = text
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2180,6 +2316,12 @@ final class DraftBookkeepingStore: ObservableObject {
         formatter.usesGroupingSeparator = false
         formatter.minimumFractionDigits = 0
         formatter.maximumFractionDigits = 2
+        return formatter
+    }()
+
+    private static let widgetDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("M/d")
         return formatter
     }()
 

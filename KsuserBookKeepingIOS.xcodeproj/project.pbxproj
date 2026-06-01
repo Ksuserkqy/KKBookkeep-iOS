@@ -6,8 +6,38 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7A10000B2FD0000000010001 /* KsuserBookKeepingWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 7A1000012FD0000000010001 /* KsuserBookKeepingWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7A10000D2FD0000000010001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 69E803342FC9CBCC002A4EC1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A1000072FD0000000010001;
+			remoteInfo = KsuserBookKeepingWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7A10000C2FD0000000010001 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7A10000B2FD0000000010001 /* KsuserBookKeepingWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		69E8033C2FC9CBCC002A4EC1 /* KsuserBookKeepingIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KsuserBookKeepingIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "KsuserBookKeepingWidget-Info.plist"; sourceTree = "<group>"; };
+		7A1000012FD0000000010001 /* KsuserBookKeepingWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KsuserBookKeepingWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +46,27 @@
 			path = KsuserBookKeepingIOS;
 			sourceTree = "<group>";
 		};
+		7A1000022FD0000000010001 /* KsuserBookKeepingWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KsuserBookKeepingWidget;
+			sourceTree = "<group>";
+		};
+		7A1000032FD0000000010001 /* SharedWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SharedWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		69E803392FC9CBCC002A4EC1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A1000052FD0000000010001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,14 +80,26 @@
 			isa = PBXGroup;
 			children = (
 				69E8033E2FC9CBCC002A4EC1 /* KsuserBookKeepingIOS */,
+				7A1000022FD0000000010001 /* KsuserBookKeepingWidget */,
+				7A1000032FD0000000010001 /* SharedWidget */,
+				7A1000102FD0000000010001 /* Config */,
 				69E8033D2FC9CBCC002A4EC1 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		7A1000102FD0000000010001 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		69E8033D2FC9CBCC002A4EC1 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				69E8033C2FC9CBCC002A4EC1 /* KsuserBookKeepingIOS.app */,
+				7A1000012FD0000000010001 /* KsuserBookKeepingWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,13 +114,16 @@
 				69E803382FC9CBCC002A4EC1 /* Sources */,
 				69E803392FC9CBCC002A4EC1 /* Frameworks */,
 				69E8033A2FC9CBCC002A4EC1 /* Resources */,
+				7A10000C2FD0000000010001 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				7A10000E2FD0000000010001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				69E8033E2FC9CBCC002A4EC1 /* KsuserBookKeepingIOS */,
+				7A1000032FD0000000010001 /* SharedWidget */,
 			);
 			name = KsuserBookKeepingIOS;
 			packageProductDependencies = (
@@ -69,6 +131,29 @@
 			productName = KsuserBookKeepingIOS;
 			productReference = 69E8033C2FC9CBCC002A4EC1 /* KsuserBookKeepingIOS.app */;
 			productType = "com.apple.product-type.application";
+		};
+		7A1000072FD0000000010001 /* KsuserBookKeepingWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A1000082FD0000000010001 /* Build configuration list for PBXNativeTarget "KsuserBookKeepingWidget" */;
+			buildPhases = (
+				7A1000042FD0000000010001 /* Sources */,
+				7A1000052FD0000000010001 /* Frameworks */,
+				7A1000062FD0000000010001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				7A1000022FD0000000010001 /* KsuserBookKeepingWidget */,
+				7A1000032FD0000000010001 /* SharedWidget */,
+			);
+			name = KsuserBookKeepingWidget;
+			packageProductDependencies = (
+			);
+			productName = KsuserBookKeepingWidget;
+			productReference = 7A1000012FD0000000010001 /* KsuserBookKeepingWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -82,6 +167,19 @@
 				TargetAttributes = {
 					69E8033B2FC9CBCC002A4EC1 = {
 						CreatedOnToolsVersion = 26.5;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
+					};
+					7A1000072FD0000000010001 = {
+						CreatedOnToolsVersion = 26.5;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
@@ -101,12 +199,20 @@
 			projectRoot = "";
 			targets = (
 				69E8033B2FC9CBCC002A4EC1 /* KsuserBookKeepingIOS */,
+				7A1000072FD0000000010001 /* KsuserBookKeepingWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		69E8033A2FC9CBCC002A4EC1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A1000062FD0000000010001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -123,7 +229,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A1000042FD0000000010001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7A10000E2FD0000000010001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A1000072FD0000000010001 /* KsuserBookKeepingWidget */;
+			targetProxy = 7A10000D2FD0000000010001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		69E803452FC9CBCD002A4EC1 /* Debug */ = {
@@ -252,11 +373,20 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingIOS/KsuserBookKeepingIOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = (
+					{
+						CFBundleURLName = "cn.ksuser.bookkeeping.KsuserBookKeepingIOS";
+						CFBundleURLSchemes = (
+							kkbookkeep,
+						);
+					},
+				);
 				INFOPLIST_KEY_CFBundleDisplayName = "羊羊记账";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
@@ -291,11 +421,20 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingIOS/KsuserBookKeepingIOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleURLTypes = (
+					{
+						CFBundleURLName = "cn.ksuser.bookkeeping.KsuserBookKeepingIOS";
+						CFBundleURLSchemes = (
+							kkbookkeep,
+						);
+					},
+				);
 				INFOPLIST_KEY_CFBundleDisplayName = "羊羊记账";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
@@ -325,6 +464,66 @@
 			};
 			name = Release;
 		};
+		7A1000092FD0000000010001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingWidget/KsuserBookKeepingWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8LDARH2S3X;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/KsuserBookKeepingWidget-Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.ksuser.bookkeeping.KsuserBookKeepingIOS.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7A10000A2FD0000000010001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingWidget/KsuserBookKeepingWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8LDARH2S3X;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Config/KsuserBookKeepingWidget-Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.ksuser.bookkeeping.KsuserBookKeepingIOS.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -342,6 +541,15 @@
 			buildConfigurations = (
 				69E803482FC9CBCD002A4EC1 /* Debug */,
 				69E803492FC9CBCD002A4EC1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7A1000082FD0000000010001 /* Build configuration list for PBXNativeTarget "KsuserBookKeepingWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A1000092FD0000000010001 /* Debug */,
+				7A10000A2FD0000000010001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
