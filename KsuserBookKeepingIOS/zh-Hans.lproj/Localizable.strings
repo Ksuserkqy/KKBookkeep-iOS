@@ -593,7 +593,12 @@
 "settings.theme.footer" = "选择羊羊记账在此设备上的显示风格。";
 "settings.liveActivities.section" = "实时活动";
 "settings.liveActivities.enabled" = "在灵动岛显示最近一笔流水";
-"settings.liveActivities.footer" = "保存流水后，若设备支持，羊羊记账会在灵动岛显示账户图标、金额和详情。";
+"settings.liveActivities.duration" = "灵动岛停留时间";
+"settings.liveActivities.duration.30s" = "30 秒";
+"settings.liveActivities.duration.1m" = "1 分钟";
+"settings.liveActivities.duration.3m" = "3 分钟";
+"settings.liveActivities.duration.5m" = "5 分钟";
+"settings.liveActivities.footer" = "保存流水后，若设备支持，羊羊记账会在灵动岛显示账户图标、金额和详情。停留时间只保存在本机，不参与备份或同步。";
 "settings.security.section" = "安全";
 "settings.security.appLock" = "进入应用时需要密码";
 "settings.security.changePassword" = "修改解锁密码";

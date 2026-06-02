@@ -10,6 +10,14 @@ enum RecentTransactionLiveActivityManager {
         UserDefaults.standard.object(forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey) as? Bool ?? true
     }
 
+    static var displayDurationSeconds: TimeInterval {
+        let storedValue = UserDefaults.standard.integer(forKey: WidgetSharedConfiguration.liveActivityDisplayDurationKey)
+        let allowedValues = [30, 60, 180, 300]
+        let seconds = allowedValues.contains(storedValue) ? storedValue : 60
+
+        return TimeInterval(seconds)
+    }
+
     static func setFeatureEnabled(_ isEnabled: Bool) {
         UserDefaults.standard.set(isEnabled, forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey)
 
@@ -39,19 +47,21 @@ enum RecentTransactionLiveActivityManager {
         let attributes = RecentTransactionActivityAttributes(ledgerId: "default")
         let content = ActivityContent(
             state: state,
-            staleDate: Date().addingTimeInterval(60 * 60),
+            staleDate: Date().addingTimeInterval(displayDurationSeconds),
             relevanceScore: 100
         )
+        let displayDuration = displayDurationSeconds
 
         Task {
             await endAll()
 
             do {
-                _ = try Activity<RecentTransactionActivityAttributes>.request(
+                let activity = try Activity<RecentTransactionActivityAttributes>.request(
                     attributes: attributes,
                     content: content,
                     pushType: nil
                 )
+                scheduleEnd(activity, after: displayDuration)
             } catch {
                 // Live Activities can be unavailable because of system settings, device support, or quota limits.
             }
@@ -70,6 +80,19 @@ enum RecentTransactionLiveActivityManager {
     }
 
     #if canImport(ActivityKit)
+    @available(iOS 16.2, *)
+    private static func scheduleEnd(
+        _ activity: Activity<RecentTransactionActivityAttributes>,
+        after displayDuration: TimeInterval
+    ) {
+        Task {
+            let nanoseconds = UInt64(max(displayDuration, 1) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanoseconds)
+
+            await activity.end(activity.content, dismissalPolicy: .immediate)
+        }
+    }
+
     @available(iOS 16.2, *)
     private static func makeState(
         for transaction: DraftTransaction,

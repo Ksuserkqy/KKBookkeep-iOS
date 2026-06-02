@@ -5,6 +5,7 @@ struct AppSettingsPage: View {
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
     @AppStorage(WidgetSharedConfiguration.liveActivitiesEnabledKey) private var liveActivitiesEnabled = true
+    @AppStorage(WidgetSharedConfiguration.liveActivityDisplayDurationKey) private var liveActivityDisplayDuration = LiveActivityDisplayDuration.oneMinute.rawValue
     @State private var passwordSheetMode = PasswordSheetMode.setup
     @State private var isPasswordSheetPresented = false
 
@@ -38,6 +39,13 @@ struct AppSettingsPage: View {
                         RecentTransactionLiveActivityManager.setFeatureEnabled(enabled)
                     }
                 ))
+
+                Picker("settings.liveActivities.duration", selection: $liveActivityDisplayDuration) {
+                    ForEach(LiveActivityDisplayDuration.allCases) { option in
+                        Text(option.titleKey).tag(option.rawValue)
+                    }
+                }
+                .disabled(!liveActivitiesEnabled)
             } header: {
                 Text("settings.liveActivities.section")
             } footer: {
@@ -105,6 +113,28 @@ struct AppSettingsPage: View {
             ToolbarItem(placement: .topBarLeading) {
                 AppBackButton()
             }
+        }
+    }
+}
+
+private enum LiveActivityDisplayDuration: Int, CaseIterable, Identifiable {
+    case thirtySeconds = 30
+    case oneMinute = 60
+    case threeMinutes = 180
+    case fiveMinutes = 300
+
+    var id: Int { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .thirtySeconds:
+            return "settings.liveActivities.duration.30s"
+        case .oneMinute:
+            return "settings.liveActivities.duration.1m"
+        case .threeMinutes:
+            return "settings.liveActivities.duration.3m"
+        case .fiveMinutes:
+            return "settings.liveActivities.duration.5m"
         }
     }
 }

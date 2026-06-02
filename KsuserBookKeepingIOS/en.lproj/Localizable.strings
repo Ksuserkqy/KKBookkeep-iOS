@@ -593,7 +593,12 @@
 "settings.theme.footer" = "Choose how KKBookkeep looks on this device.";
 "settings.liveActivities.section" = "Live Activities";
 "settings.liveActivities.enabled" = "Show Recent Transaction in Dynamic Island";
-"settings.liveActivities.footer" = "After saving a transaction, KKBookkeep shows the account icon, amount, and details in Dynamic Island when the device supports it.";
+"settings.liveActivities.duration" = "Dynamic Island Display Time";
+"settings.liveActivities.duration.30s" = "30 seconds";
+"settings.liveActivities.duration.1m" = "1 minute";
+"settings.liveActivities.duration.3m" = "3 minutes";
+"settings.liveActivities.duration.5m" = "5 minutes";
+"settings.liveActivities.footer" = "After saving a transaction, KKBookkeep shows the account icon, amount, and details in Dynamic Island when the device supports it. The display time stays on this device and is not backed up or synced.";
 "settings.security.section" = "Security";
 "settings.security.appLock" = "Require Password on Launch";
 "settings.security.changePassword" = "Change Unlock Password";

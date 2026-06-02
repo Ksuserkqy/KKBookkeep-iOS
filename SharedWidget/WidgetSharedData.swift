@@ -8,6 +8,7 @@ enum WidgetSharedConfiguration {
     static let appGroupIdentifier = "group.cn.ksuser.bookkeeping.KsuserBookKeepingIOS"
     static let snapshotFileName = "widget-ledger-snapshot.json"
     static let liveActivitiesEnabledKey = "app.liveActivities.enabled"
+    static let liveActivityDisplayDurationKey = "app.liveActivities.displayDurationSeconds"
 
     static func snapshotURL(fileManager: FileManager = .default) -> URL? {
         let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)
