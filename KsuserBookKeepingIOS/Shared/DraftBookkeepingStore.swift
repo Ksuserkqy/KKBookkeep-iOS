@@ -672,16 +672,20 @@ final class DraftBookkeepingStore: ObservableObject {
         return true
     }
 
-    func backupLedgerDataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+    func backupLedgerDataNow(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        forceFullUpload: Bool = false
+    ) async -> Bool {
         guard configuration.backupEnabled else {
             messageKey = "bookkeeping.ledger.sync.error.backupDisabled"
             return false
         }
 
         do {
-            try await backupPendingMetadataOps(configuration: configuration, secrets: secrets)
-            try await backupPendingTransactionOps(configuration: configuration, secrets: secrets)
-            try await backupPendingTemplateOps(configuration: configuration, secrets: secrets)
+            try await backupPendingMetadataOps(configuration: configuration, secrets: secrets, forceFullUpload: forceFullUpload)
+            try await backupPendingTransactionOps(configuration: configuration, secrets: secrets, forceFullUpload: forceFullUpload)
+            try await backupPendingTemplateOps(configuration: configuration, secrets: secrets, forceFullUpload: forceFullUpload)
             messageKey = "bookkeeping.ledger.sync.backupSucceeded"
             return true
         } catch {
@@ -766,17 +770,6 @@ final class DraftBookkeepingStore: ObservableObject {
             return true
         } catch {
             messageKey = "bookkeeping.templates.sync.error.backupFailed"
-            return false
-        }
-    }
-
-    func backupTemplatesAfterLocalChange(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
-        guard configuration.backupEnabled else { return false }
-
-        do {
-            try await backupPendingTemplateOps(configuration: configuration, secrets: secrets)
-            return true
-        } catch {
             return false
         }
     }
@@ -1145,15 +1138,19 @@ final class DraftBookkeepingStore: ObservableObject {
         persistWidgetSnapshot()
     }
 
-    private func backupPendingMetadataOps(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
+    private func backupPendingMetadataOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        forceFullUpload: Bool = false
+    ) async throws {
         initializeMetadataSyncStateIfNeeded()
-        let pendingOps = localMetadataOps.filter { !uploadedMetadataOpIds.contains($0.opId) }
-        guard !pendingOps.isEmpty else { return }
+        let uploadCandidates = forceFullUpload ? localMetadataOps : localMetadataOps.filter { !uploadedMetadataOpIds.contains($0.opId) }
+        guard !uploadCandidates.isEmpty else { return }
 
-        let pendingFileIndexes = Set(pendingOps.map(\.fileIndex))
+        let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
         let opsToWrite = localMetadataOps.filter { pendingFileIndexes.contains($0.fileIndex) }
         try await syncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
-        uploadedMetadataOpIds.formUnion(pendingOps.map(\.opId))
+        uploadedMetadataOpIds.formUnion(opsToWrite.map(\.opId))
         persistMetadataSyncState()
     }
 
@@ -1268,6 +1265,8 @@ final class DraftBookkeepingStore: ObservableObject {
 
     private func applyRemoteMetadataOp(_ op: BookkeepingMetadataOp) {
         guard op.schemaVersion == 1 else { return }
+        guard op.ledgerId == "default", !op.deviceId.isEmpty, op.seq > 0, !op.entityId.isEmpty else { return }
+        guard hasValidMetadataPayload(for: op) else { return }
         guard !processedMetadataOpIds.contains(op.opId) else { return }
         guard shouldApplyMetadataOp(op) else {
             processedMetadataOpIds.insert(op.opId)
@@ -1292,6 +1291,7 @@ final class DraftBookkeepingStore: ObservableObject {
         switch op.action {
         case .create, .update, .archive, .upsert:
             guard var account = op.payload?.account else { return }
+            account.id = op.entityId
             let baseBalanceText = Self.normalizedBalanceText(account.balanceText)
             accountBaseBalanceTextById[account.id] = baseBalanceText
             account.balanceText = baseBalanceText
@@ -1314,7 +1314,8 @@ final class DraftBookkeepingStore: ObservableObject {
     private func applyRemoteCategoryOp(_ op: BookkeepingMetadataOp) {
         switch op.action {
         case .create, .update, .archive, .upsert:
-            guard let category = op.payload?.category else { return }
+            guard var category = op.payload?.category else { return }
+            category.id = op.entityId
             if let index = categories.firstIndex(where: { $0.id == op.entityId }) {
                 categories[index] = category
             } else {
@@ -1327,6 +1328,19 @@ final class DraftBookkeepingStore: ObservableObject {
             } else {
                 categories.removeAll { $0.id == op.entityId }
             }
+        }
+    }
+
+    private func hasValidMetadataPayload(for op: BookkeepingMetadataOp) -> Bool {
+        if op.action == .delete {
+            return true
+        }
+
+        switch op.entity {
+        case .account:
+            return op.payload?.account != nil
+        case .category:
+            return op.payload?.category != nil
         }
     }
 
@@ -1404,26 +1418,35 @@ final class DraftBookkeepingStore: ObservableObject {
         persistMetadataSyncState()
     }
 
-    private func backupPendingTransactionOps(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
-        let pendingOps = localTransactionOps.filter { !uploadedTransactionOpIds.contains($0.opId) }
-        guard !pendingOps.isEmpty else { return }
+    private func backupPendingTransactionOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        forceFullUpload: Bool = false
+    ) async throws {
+        initializeTransactionSyncStateIfNeeded()
+        let uploadCandidates = forceFullUpload ? localTransactionOps : localTransactionOps.filter { !uploadedTransactionOpIds.contains($0.opId) }
+        guard !uploadCandidates.isEmpty else { return }
 
-        let pendingFileIndexes = Set(pendingOps.map(\.fileIndex))
+        let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
         let opsToWrite = localTransactionOps.filter { pendingFileIndexes.contains($0.fileIndex) }
         try await transactionsSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
-        uploadedTransactionOpIds.formUnion(pendingOps.map(\.opId))
+        uploadedTransactionOpIds.formUnion(opsToWrite.map(\.opId))
         persistTransactionSyncState()
     }
 
-    private func backupPendingTemplateOps(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
+    private func backupPendingTemplateOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        forceFullUpload: Bool = false
+    ) async throws {
         initializeTemplateSyncStateIfNeeded()
-        let pendingOps = localTemplateOps.filter { !uploadedTemplateOpIds.contains($0.opId) }
-        guard !pendingOps.isEmpty else { return }
+        let uploadCandidates = forceFullUpload ? localTemplateOps : localTemplateOps.filter { !uploadedTemplateOpIds.contains($0.opId) }
+        guard !uploadCandidates.isEmpty else { return }
 
-        let pendingFileIndexes = Set(pendingOps.map(\.fileIndex))
+        let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
         let opsToWrite = localTemplateOps.filter { pendingFileIndexes.contains($0.fileIndex) }
         try await templatesSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
-        uploadedTemplateOpIds.formUnion(pendingOps.map(\.opId))
+        uploadedTemplateOpIds.formUnion(opsToWrite.map(\.opId))
         persistTemplateSyncState()
     }
 
@@ -1550,6 +1573,8 @@ final class DraftBookkeepingStore: ObservableObject {
 
     private func applyRemoteTransactionOp(_ op: BookkeepingTransactionOp) {
         guard op.schemaVersion == 1, op.entity == "transaction" else { return }
+        guard op.ledgerId == "default", !op.deviceId.isEmpty, op.seq > 0, !op.entityId.isEmpty else { return }
+        guard op.action == .delete || op.payload != nil else { return }
         guard !processedTransactionOpIds.contains(op.opId) else { return }
         guard shouldApplyTransactionOp(op) else {
             processedTransactionOpIds.insert(op.opId)
@@ -1560,7 +1585,8 @@ final class DraftBookkeepingStore: ObservableObject {
         switch op.action {
         case .create, .update:
             guard let payload = op.payload else { break }
-            let normalized = normalizedTransactionAmounts(payload)
+            var normalized = normalizedTransactionAmounts(payload)
+            normalized.id = op.entityId
             if let index = transactions.firstIndex(where: { $0.id == op.entityId }) {
                 transactions[index] = normalized
             } else {
@@ -1604,6 +1630,8 @@ final class DraftBookkeepingStore: ObservableObject {
 
     private func applyRemoteTemplateOp(_ op: BookkeepingTemplateOp) {
         guard op.schemaVersion == 1, op.entity == "transactionTemplate" else { return }
+        guard op.ledgerId == "default", !op.deviceId.isEmpty, op.seq > 0, !op.entityId.isEmpty else { return }
+        guard op.action == .delete || op.payload != nil else { return }
         guard !processedTemplateOpIds.contains(op.opId) else { return }
         guard shouldApplyTemplateOp(op) else {
             processedTemplateOpIds.insert(op.opId)

@@ -51,6 +51,17 @@ enum BackupInterval: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
+    var timeInterval: TimeInterval {
+        switch self {
+        case .oneMinute:
+            return 60
+        case .fiveMinutes:
+            return 5 * 60
+        case .tenMinutes:
+            return 10 * 60
+        }
+    }
+
     var titleKey: LocalizedStringKey {
         switch self {
         case .oneMinute:
@@ -172,12 +183,22 @@ final class SyncSettingsStore: ObservableObject {
 
     func save(_ draft: SyncSettingsDraft) throws {
         let data = try Self.encoder.encode(draft.configuration)
+        let oldPassword = credentialStore.read(account: .password) ?? ""
+        let oldAccessToken = credentialStore.read(account: .accessToken) ?? ""
+        let oldEncryptionPassword = credentialStore.read(account: .encryptionPassword) ?? ""
+
+        do {
+            try credentialStore.save(draft.password, account: .password)
+            try credentialStore.save(draft.accessToken, account: .accessToken)
+            try credentialStore.save(draft.encryptionPassword, account: .encryptionPassword)
+        } catch {
+            try? credentialStore.save(oldPassword, account: .password)
+            try? credentialStore.save(oldAccessToken, account: .accessToken)
+            try? credentialStore.save(oldEncryptionPassword, account: .encryptionPassword)
+            throw error
+        }
+
         defaults.set(data, forKey: DefaultsKey.configuration)
-
-        try credentialStore.save(draft.password, account: .password)
-        try credentialStore.save(draft.accessToken, account: .accessToken)
-        try credentialStore.save(draft.encryptionPassword, account: .encryptionPassword)
-
         configuration = draft.configuration
     }
 

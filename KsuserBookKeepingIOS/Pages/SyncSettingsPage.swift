@@ -266,7 +266,8 @@ struct SyncSettingsPage: View {
                 let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
                 let ledgerDataBackedUp = await draftBookkeepingStore.backupLedgerDataNow(
                     configuration: configuration,
-                    secrets: secrets
+                    secrets: secrets,
+                    forceFullUpload: true
                 )
 
                 if profileBackedUp, ledgerDataBackedUp {
@@ -302,7 +303,8 @@ struct SyncSettingsPage: View {
             let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
             let ledgerDataBackedUp = await draftBookkeepingStore.backupLedgerDataNow(
                 configuration: configuration,
-                secrets: secrets
+                secrets: secrets,
+                forceFullUpload: true
             )
 
             if profileBackedUp, ledgerDataBackedUp {

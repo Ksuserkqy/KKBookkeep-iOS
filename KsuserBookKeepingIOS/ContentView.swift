@@ -23,6 +23,8 @@ struct ContentView: View {
     @State private var isBackingUpLedgerData = false
     @State private var hasPendingLedgerDataBackup = false
     @State private var ledgerDataBackupTask: Task<Void, Never>?
+    @State private var fallbackSyncTask: Task<Void, Never>?
+    @State private var fallbackSyncConfiguration: SyncConfiguration?
     @State private var isShowingInitialSyncSetup = false
     @State private var selectedTab = AppTab.dashboard
     @State private var requestedRecordKind: DraftEntryKind?
@@ -94,9 +96,13 @@ struct ContentView: View {
             } else {
                 await importRemoteDataIfNeeded(force: true)
             }
+            restartFallbackSyncCheck()
         }
         .onChange(of: quickActionRouter.pendingAction) { _, action in
             handleQuickAction(action)
+        }
+        .onChange(of: syncSettingsStore.configuration) { _, _ in
+            restartFallbackSyncCheck()
         }
         .onOpenURL { url in
             handleDeepLink(url)
@@ -105,6 +111,9 @@ struct ContentView: View {
             scheduleLedgerDataBackup()
         }
         .onReceive(draftBookkeepingStore.$localTransactionsChangeToken.dropFirst()) { _ in
+            scheduleLedgerDataBackup()
+        }
+        .onReceive(draftBookkeepingStore.$localTemplatesChangeToken.dropFirst()) { _ in
             scheduleLedgerDataBackup()
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -119,11 +128,15 @@ struct ContentView: View {
                         await importRemoteDataIfNeeded()
                     }
                 }
+                restartFallbackSyncCheck()
             case .inactive:
                 isPrivacyCovered = appLock.isPasswordEnabled && !appLock.isLocked
             case .background:
                 isPrivacyCovered = false
                 appLock.lockIfNeeded()
+                fallbackSyncTask?.cancel()
+                fallbackSyncTask = nil
+                fallbackSyncConfiguration = nil
             @unknown default:
                 break
             }
@@ -174,6 +187,45 @@ struct ContentView: View {
         )
         lastRemoteDataImportAt = Date()
         isImportingRemoteData = false
+    }
+
+    private func restartFallbackSyncCheck() {
+        let configuration = syncSettingsStore.configuration
+        if
+            fallbackSyncTask != nil,
+            let fallbackSyncConfiguration,
+            hasSameSyncParameters(fallbackSyncConfiguration, configuration)
+        {
+            return
+        }
+
+        fallbackSyncTask?.cancel()
+        fallbackSyncTask = nil
+        fallbackSyncConfiguration = nil
+
+        guard configuration.backupEnabled, configuration.autoImport || configuration.backupOnChange else { return }
+
+        fallbackSyncConfiguration = configuration
+        fallbackSyncTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(configuration.backupInterval.timeInterval * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                await runFallbackSyncCheck(expectedConfiguration: configuration)
+            }
+        }
+    }
+
+    private func runFallbackSyncCheck(expectedConfiguration: SyncConfiguration) async {
+        let configuration = syncSettingsStore.configuration
+        guard hasSameSyncParameters(configuration, expectedConfiguration), configuration.backupEnabled else { return }
+
+        if configuration.autoImport {
+            await importRemoteDataIfNeeded(force: true)
+        }
+
+        if configuration.backupOnChange {
+            await backupLedgerDataIfNeeded(configuration: configuration)
+        }
     }
 
     private func handleQuickAction(_ action: HomeScreenQuickAction?) {
@@ -232,7 +284,7 @@ struct ContentView: View {
             hasPendingLedgerDataBackup = true
             return
         }
-        guard configuration == syncSettingsStore.configuration else { return }
+        guard hasSameSyncParameters(configuration, syncSettingsStore.configuration) else { return }
 
         isBackingUpLedgerData = true
         let didBackup = await draftBookkeepingStore.backupLedgerDataNow(
@@ -248,6 +300,18 @@ struct ContentView: View {
             hasPendingLedgerDataBackup = false
             scheduleLedgerDataBackup()
         }
+    }
+
+    private func hasSameSyncParameters(_ lhs: SyncConfiguration, _ rhs: SyncConfiguration) -> Bool {
+        lhs.backupEnabled == rhs.backupEnabled &&
+            lhs.provider == rhs.provider &&
+            lhs.webDAVAuthentication == rhs.webDAVAuthentication &&
+            lhs.webDAVServerURL == rhs.webDAVServerURL &&
+            lhs.webDAVUsername == rhs.webDAVUsername &&
+            lhs.backupOnChange == rhs.backupOnChange &&
+            lhs.autoImport == rhs.autoImport &&
+            lhs.backupInterval == rhs.backupInterval &&
+            lhs.encryptionEnabled == rhs.encryptionEnabled
     }
 }
 

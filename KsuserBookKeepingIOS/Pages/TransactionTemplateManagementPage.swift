@@ -3,14 +3,11 @@ import SwiftUI
 struct TransactionTemplateManagementPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @EnvironmentObject private var profileStore: ProfileStore
-    @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
     @State private var selectedKind = DraftEntryKind.expense
     @State private var editingTemplate: DraftTransactionTemplate?
     @State private var deletingTemplate: DraftTransactionTemplate?
     @State private var draft = TransactionTemplateEditorDraft.empty
     @State private var isEditorPresented = false
-    @State private var isSyncingTemplates = false
-    @State private var hasPendingTemplateSync = false
 
     private var filteredTemplates: [DraftTransactionTemplate] {
         draftStore.transactionTemplates.filter { $0.kind == selectedKind }
@@ -164,7 +161,6 @@ struct TransactionTemplateManagementPage: View {
             ) {
                 selectedKind = draft.kind
                 isEditorPresented = false
-                syncTemplatesAfterMutation()
             }
         } else if draftStore.addTransactionTemplate(
             name: draft.name,
@@ -176,47 +172,14 @@ struct TransactionTemplateManagementPage: View {
         ) {
             selectedKind = draft.kind
             isEditorPresented = false
-            syncTemplatesAfterMutation()
-        }
-    }
-
-    private func syncTemplatesAfterMutation() {
-        let configuration = syncSettingsStore.configuration
-        guard configuration.backupEnabled else { return }
-
-        guard !isSyncingTemplates else {
-            hasPendingTemplateSync = true
-            return
-        }
-
-        isSyncingTemplates = true
-        let secrets = syncSettingsStore.secrets(for: configuration)
-
-        Task {
-            let didBackup = await draftStore.backupTemplatesAfterLocalChange(
-                configuration: configuration,
-                secrets: secrets
-            )
-            if didBackup {
-                try? syncSettingsStore.markBackupCompleted()
-            }
-            isSyncingTemplates = false
-
-            if hasPendingTemplateSync {
-                hasPendingTemplateSync = false
-                syncTemplatesAfterMutation()
-            }
         }
     }
 
     private func deletePendingTemplate() {
         guard let deletingTemplate else { return }
 
-        let didDelete = draftStore.deleteTransactionTemplate(id: deletingTemplate.id)
+        _ = draftStore.deleteTransactionTemplate(id: deletingTemplate.id)
         self.deletingTemplate = nil
-        if didDelete {
-            syncTemplatesAfterMutation()
-        }
     }
 
     private func normalizeDraftSelections() {

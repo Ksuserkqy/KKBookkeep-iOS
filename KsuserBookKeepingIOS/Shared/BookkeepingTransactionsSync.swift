@@ -129,7 +129,13 @@ struct BookkeepingTransactionsSyncService {
         var importedOps: [BookkeepingTransactionOp] = []
         for deviceId in deviceIds {
             let path = "\(devicesPath)/\(deviceId)"
-            let files = (try? await storage.listFiles(at: path)) ?? []
+            let files: [String]
+            do {
+                files = try await storage.listFiles(at: path)
+            } catch SyncStorageError.fileNotFound {
+                continue
+            }
+
             for file in files where file.hasSuffix(".jsonl") {
                 let remoteData = try await storage.readFile(at: "\(path)/\(file)")
                 let data = try SyncFileEncryption.decryptIfNeeded(remoteData, password: secrets.encryptionPassword)
