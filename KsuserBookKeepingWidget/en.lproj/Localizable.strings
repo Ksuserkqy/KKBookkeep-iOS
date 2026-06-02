@@ -9,6 +9,10 @@
 "widget.report.description" = "Review this month's trend, top category, and recent entries.";
 "widget.report.emptyTopCategory" = "Top category appears after expense entries";
 "widget.report.emptyRecent" = "No recent entries";
+"liveActivity.title" = "Recent Transaction";
+"liveActivity.kind.expense" = "Expense";
+"liveActivity.kind.income" = "Income";
+"liveActivity.kind.transfer" = "Transfer";
 
 "dashboard.totalBalance" = "Total Balance";
 "dashboard.monthIncome" = "Income";

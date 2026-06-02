@@ -4,6 +4,7 @@ struct AppSettingsPage: View {
     @EnvironmentObject private var appLock: AppLockManager
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
+    @AppStorage(WidgetSharedConfiguration.liveActivitiesEnabledKey) private var liveActivitiesEnabled = true
     @State private var passwordSheetMode = PasswordSheetMode.setup
     @State private var isPasswordSheetPresented = false
 
@@ -27,6 +28,20 @@ struct AppSettingsPage: View {
                 }
             } footer: {
                 Text("settings.theme.footer")
+            }
+
+            Section {
+                Toggle("settings.liveActivities.enabled", isOn: Binding(
+                    get: { liveActivitiesEnabled },
+                    set: { enabled in
+                        liveActivitiesEnabled = enabled
+                        RecentTransactionLiveActivityManager.setFeatureEnabled(enabled)
+                    }
+                ))
+            } header: {
+                Text("settings.liveActivities.section")
+            } footer: {
+                Text("settings.liveActivities.footer")
             }
 
             Section {

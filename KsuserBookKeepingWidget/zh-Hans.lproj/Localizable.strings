@@ -9,6 +9,10 @@
 "widget.report.description" = "查看本月收支趋势、顶部分类和近期流水。";
 "widget.report.emptyTopCategory" = "保存支出后显示最高分类";
 "widget.report.emptyRecent" = "暂无近期流水";
+"liveActivity.title" = "最近一笔流水";
+"liveActivity.kind.expense" = "支出";
+"liveActivity.kind.income" = "收入";
+"liveActivity.kind.transfer" = "转账";
 
 "dashboard.totalBalance" = "总资产";
 "dashboard.monthIncome" = "收入";

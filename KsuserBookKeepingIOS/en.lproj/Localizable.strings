@@ -591,6 +591,9 @@
 "settings.theme.light" = "Light";
 "settings.theme.dark" = "Dark";
 "settings.theme.footer" = "Choose how KKBookkeep looks on this device.";
+"settings.liveActivities.section" = "Live Activities";
+"settings.liveActivities.enabled" = "Show Recent Transaction in Dynamic Island";
+"settings.liveActivities.footer" = "After saving a transaction, KKBookkeep shows the account icon, amount, and details in Dynamic Island when the device supports it.";
 "settings.security.section" = "Security";
 "settings.security.appLock" = "Require Password on Launch";
 "settings.security.changePassword" = "Change Unlock Password";

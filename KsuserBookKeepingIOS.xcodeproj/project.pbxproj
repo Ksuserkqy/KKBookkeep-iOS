@@ -36,8 +36,8 @@
 
 /* Begin PBXFileReference section */
 		69E8033C2FC9CBCC002A4EC1 /* KsuserBookKeepingIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KsuserBookKeepingIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "KsuserBookKeepingWidget-Info.plist"; sourceTree = "<group>"; };
 		7A1000012FD0000000010001 /* KsuserBookKeepingWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KsuserBookKeepingWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "KsuserBookKeepingWidget-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -87,14 +87,6 @@
 			);
 			sourceTree = "<group>";
 		};
-		7A1000102FD0000000010001 /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */,
-			);
-			path = Config;
-			sourceTree = "<group>";
-		};
 		69E8033D2FC9CBCC002A4EC1 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -102,6 +94,14 @@
 				7A1000012FD0000000010001 /* KsuserBookKeepingWidget.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		7A1000102FD0000000010001 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -375,23 +375,17 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingIOS/KsuserBookKeepingIOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "cn.ksuser.bookkeeping.KsuserBookKeepingIOS";
-						CFBundleURLSchemes = (
-							kkbookkeep,
-						);
-					},
-				);
 				INFOPLIST_KEY_CFBundleDisplayName = "羊羊记账";
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"cn.ksuser.bookkeeping.KsuserBookKeepingIOS\";\n    CFBundleURLSchemes =     (\n        kkbookkeep\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "用于解锁羊羊记账。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于在用户主动记账时录入当前位置。";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIAppFonts = "FontAwesome7Free-Solid-900.otf FontAwesome7Brands-Regular-400.otf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -423,23 +417,17 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingIOS/KsuserBookKeepingIOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleURLName = "cn.ksuser.bookkeeping.KsuserBookKeepingIOS";
-						CFBundleURLSchemes = (
-							kkbookkeep,
-						);
-					},
-				);
 				INFOPLIST_KEY_CFBundleDisplayName = "羊羊记账";
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"cn.ksuser.bookkeeping.KsuserBookKeepingIOS\";\n    CFBundleURLSchemes =     (\n        kkbookkeep\n    );\n}";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "用于解锁羊羊记账。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于在用户主动记账时录入当前位置。";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIAppFonts = "FontAwesome7Free-Solid-900.otf FontAwesome7Brands-Regular-400.otf";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -474,7 +462,7 @@
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Config/KsuserBookKeepingWidget-Info.plist;
+				INFOPLIST_FILE = "Config/KsuserBookKeepingWidget-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -504,7 +492,7 @@
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Config/KsuserBookKeepingWidget-Info.plist;
+				INFOPLIST_FILE = "Config/KsuserBookKeepingWidget-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

@@ -1,5 +1,8 @@
 import SwiftUI
 import WidgetKit
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
 
 struct LedgerWidgetEntry: TimelineEntry {
     let date: Date
@@ -29,6 +32,7 @@ struct KsuserBookKeepingWidgetBundle: WidgetBundle {
         QuickRecordWidget()
         LedgerOverviewWidget()
         LedgerReportWidget()
+        RecentTransactionLiveActivityWidget()
     }
 }
 
@@ -64,6 +68,41 @@ struct LedgerReportWidget: Widget {
         .supportedFamilies([.systemMedium, .systemLarge])
     }
 }
+
+#if canImport(ActivityKit)
+struct RecentTransactionLiveActivityWidget: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: RecentTransactionActivityAttributes.self) { context in
+            RecentTransactionLockScreenView(state: context.state)
+                .activityBackgroundTint(Color(.systemBackground))
+                .activitySystemActionForegroundColor(Color(hex: context.state.accountColorHex))
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.center) {
+                    LiveActivityExpandedHeader(state: context.state)
+                }
+
+                DynamicIslandExpandedRegion(.bottom) {
+                    LiveActivityExpandedDetails(state: context.state)
+                }
+            } compactLeading: {
+                LiveActivityAccountBadge(state: context.state, size: 22)
+            } compactTrailing: {
+                Text(context.state.amountText)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(context.state.amountColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            } minimal: {
+                WidgetFontAwesomeIcon(name: context.state.accountIconName, size: 12)
+                    .foregroundStyle(Color(hex: context.state.accountColorHex))
+            }
+            .widgetURL(WidgetDeepLink.transactions)
+            .keylineTint(Color(hex: context.state.accountColorHex))
+        }
+    }
+}
+#endif
 
 private struct QuickRecordWidgetView: View {
     @Environment(\.widgetFamily) private var family
@@ -615,6 +654,198 @@ private struct QuickRecordLink: View {
     }
 }
 
+#if canImport(ActivityKit)
+private struct RecentTransactionLockScreenView: View {
+    let state: RecentTransactionActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 12) {
+            LiveActivityAccountBadge(state: state, size: 42)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("liveActivity.title")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(state.title)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Text(state.accountName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            LiveActivityAmountBlock(state: state, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+}
+
+private struct LiveActivityExpandedHeader: View {
+    let state: RecentTransactionActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            LiveActivityAccountBadge(state: state, size: 42)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    LiveActivityAppIcon(size: 15)
+
+                    Text("liveActivity.title")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Text(state.title)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+
+            LiveActivityAmountBlock(state: state, alignment: .trailing)
+                .frame(minWidth: 88, alignment: .trailing)
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+private struct LiveActivityExpandedDetails: View {
+    let state: RecentTransactionActivityAttributes.ContentState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+                .overlay(Color.white.opacity(0.2))
+
+            HStack(spacing: 8) {
+                LiveActivityDetailPill(
+                    systemImage: "wallet.pass.fill",
+                    text: state.accountName
+                )
+
+                if let counterpartyAccountName = state.counterpartyAccountName {
+                    LiveActivityDetailPill(
+                        systemImage: "arrow.right",
+                        text: counterpartyAccountName
+                    )
+                } else if let categoryName = state.categoryName {
+                    LiveActivityDetailPill(
+                        systemImage: "tag.fill",
+                        text: categoryName
+                    )
+                }
+            }
+
+            if !state.note.isEmpty {
+                Text(state.note)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+private struct LiveActivityDetailPill: View {
+    let systemImage: String
+    let text: String
+
+    var body: some View {
+        Label {
+            Text(text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } icon: {
+            Image(systemName: systemImage)
+                .font(.caption2.weight(.semibold))
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.12), in: Capsule())
+    }
+}
+
+private struct LiveActivityAccountBadge: View {
+    let state: RecentTransactionActivityAttributes.ContentState
+    let size: CGFloat
+
+    var body: some View {
+        WidgetFontAwesomeIcon(name: state.accountIconName, size: max(size * 0.42, 11))
+            .foregroundStyle(Color(hex: state.accountColorHex))
+            .frame(width: size, height: size)
+            .background(Color(hex: state.accountColorHex).opacity(0.18), in: Circle())
+            .accessibilityLabel(Text(state.accountName))
+    }
+}
+
+private struct LiveActivityAmountBlock: View {
+    let state: RecentTransactionActivityAttributes.ContentState
+    let alignment: HorizontalAlignment
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: 3) {
+            Text(state.kind.liveActivityTitleKey)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(state.amountText)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(state.amountColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+private struct LiveActivityAppIcon: View {
+    var size: CGFloat
+
+    var body: some View {
+        Text("¥")
+            .font(.system(size: size * 0.68, weight: .heavy))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(hex: "#F6C343"))
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+    }
+}
+
+private struct WidgetFontAwesomeIcon: View {
+    let name: String
+    var size: CGFloat = 16
+
+    init(name: String, size: CGFloat = 16) {
+        self.name = name
+        self.size = size
+        WidgetFontAwesomeFontLoader.registerIfNeeded()
+    }
+
+    var body: some View {
+        Text(WidgetAccountIconMapper.glyph(for: name))
+            .font(.custom(WidgetAccountIconMapper.fontName(for: name), fixedSize: size))
+            .accessibilityHidden(true)
+    }
+}
+#endif
+
 private struct WidgetHeader: View {
     let titleKey: LocalizedStringKey
     let systemImage: String
@@ -696,6 +927,63 @@ private extension WidgetRecordKind {
         case .transfer:
             return .blue
         }
+    }
+
+    var liveActivityTitleKey: LocalizedStringKey {
+        switch self {
+        case .expense:
+            return "liveActivity.kind.expense"
+        case .income:
+            return "liveActivity.kind.income"
+        case .transfer:
+            return "liveActivity.kind.transfer"
+        }
+    }
+}
+
+#if canImport(ActivityKit)
+private extension RecentTransactionActivityAttributes.ContentState {
+    var amountColor: Color {
+        switch kind {
+        case .expense:
+            return .red
+        case .income:
+            return .green
+        case .transfer:
+            return .blue
+        }
+    }
+}
+#endif
+
+private extension Color {
+    init(hex: String) {
+        let normalizedHex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var value: UInt64 = 0
+        Scanner(string: normalizedHex).scanHexInt64(&value)
+
+        let red: UInt64
+        let green: UInt64
+        let blue: UInt64
+
+        switch normalizedHex.count {
+        case 6:
+            red = (value & 0xFF0000) >> 16
+            green = (value & 0x00FF00) >> 8
+            blue = value & 0x0000FF
+        default:
+            red = 0xF6
+            green = 0xC3
+            blue = 0x43
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(red) / 255,
+            green: Double(green) / 255,
+            blue: Double(blue) / 255,
+            opacity: 1
+        )
     }
 }
 

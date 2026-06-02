@@ -25,5 +25,12 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>FontAwesome7Free-Solid-900.otf</string>
+		<string>FontAwesome7Brands-Regular-400.otf</string>
+	</array>
 </dict>
 </plist>

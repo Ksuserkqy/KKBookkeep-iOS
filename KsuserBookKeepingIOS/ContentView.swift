@@ -201,6 +201,8 @@ struct ContentView: View {
             selectedTab = .record
         case "reports":
             selectedTab = .reports
+        case "transactions":
+            selectedTab = .transactions
         case "dashboard":
             selectedTab = .dashboard
         default:

@@ -488,6 +488,11 @@ struct RecordPage: View {
         )
 
         draftStore.saveTransaction(transaction)
+        RecentTransactionLiveActivityManager.showRecentTransaction(
+            transaction,
+            accounts: draftStore.accounts,
+            categoryName: draftStore.categoryDisplayName(for: transaction.categoryId)
+        )
         resetFormForNextTransaction()
         draftStore.clearMessage()
         selectedTab = .transactions
