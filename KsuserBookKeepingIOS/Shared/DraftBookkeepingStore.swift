@@ -274,7 +274,7 @@ final class DraftBookkeepingStore: ObservableObject {
     @Published private(set) var localTemplatesChangeToken = 0
     @Published private(set) var localBudgetsChangeToken = 0
 
-    private let defaults: UserDefaults
+    private let sqliteStore: LedgerSQLiteStore
     private let syncService: BookkeepingMetadataSyncService
     private let transactionsSyncService: BookkeepingTransactionsSyncService
     private let templatesSyncService: BookkeepingTemplatesSyncService
@@ -289,7 +289,6 @@ final class DraftBookkeepingStore: ObservableObject {
     private var importedMetadataSeqByDeviceId: [String: Int]
     private var metadataOpSortKeysById: [String: MetadataOpSortKey]
     private var deletedMetadataOpSortKeysById: [String: MetadataOpSortKey]
-    private var didImportLegacyMetadataSeed: Bool
     private var transactionsRevision: Int
     private var transactionsUpdatedAt: Date
     private var transactionsUpdatedByDeviceId: String
@@ -301,7 +300,6 @@ final class DraftBookkeepingStore: ObservableObject {
     private var transactionOpSortKeysById: [String: TransactionOpSortKey]
     private var deletedTransactionOpSortKeysById: [String: TransactionOpSortKey]
     private var accountBaseBalanceTextById: [String: String]
-    private var didImportLegacyTransactionsSeed: Bool
     private var nextTemplateOpSeq: Int
     private var localTemplateOps: [BookkeepingTemplateOp]
     private var uploadedTemplateOpIds: Set<String>
@@ -317,145 +315,64 @@ final class DraftBookkeepingStore: ObservableObject {
     private var budgetOpSortKeysById: [String: BudgetOpSortKey]
     private var deletedBudgetOpSortKeysById: [String: BudgetOpSortKey]
 
-    private enum DefaultsKey {
-        static let accounts = "draftBookkeeping.accounts"
-        static let categories = "draftBookkeeping.categories"
-        static let transactions = "draftBookkeeping.transactions"
-        static let transactionTemplates = "draftBookkeeping.transactionTemplates"
-        static let budgets = "draftBookkeeping.budgets"
-        static let lastDraft = "draftBookkeeping.lastDraft"
-        static let metadataRevision = "draftBookkeeping.metadata.revision"
-        static let metadataUpdatedAt = "draftBookkeeping.metadata.updatedAt"
-        static let metadataUpdatedByDeviceId = "draftBookkeeping.metadata.updatedByDeviceId"
-        static let metadataNextSeq = "draftBookkeeping.metadata.nextSeq"
-        static let metadataLocalOps = "draftBookkeeping.metadata.localOps"
-        static let metadataUploadedOpIds = "draftBookkeeping.metadata.uploadedOpIds"
-        static let metadataProcessedOpIds = "draftBookkeeping.metadata.processedOpIds"
-        static let metadataImportedSeqByDeviceId = "draftBookkeeping.metadata.importedSeqByDeviceId"
-        static let metadataOpSortKeysById = "draftBookkeeping.metadata.opSortKeysById"
-        static let deletedMetadataOpSortKeysById = "draftBookkeeping.metadata.deletedOpSortKeysById"
-        static let didImportLegacyMetadataSeed = "draftBookkeeping.metadata.didImportLegacySeed"
-        static let transactionsRevision = "draftBookkeeping.transactions.revision"
-        static let transactionsUpdatedAt = "draftBookkeeping.transactions.updatedAt"
-        static let transactionsUpdatedByDeviceId = "draftBookkeeping.transactions.updatedByDeviceId"
-        static let transactionNextSeq = "draftBookkeeping.transactions.nextSeq"
-        static let transactionLocalOps = "draftBookkeeping.transactions.localOps"
-        static let transactionUploadedOpIds = "draftBookkeeping.transactions.uploadedOpIds"
-        static let transactionProcessedOpIds = "draftBookkeeping.transactions.processedOpIds"
-        static let transactionImportedSeqByDeviceId = "draftBookkeeping.transactions.importedSeqByDeviceId"
-        static let transactionOpSortKeysById = "draftBookkeeping.transactions.opSortKeysById"
-        static let deletedTransactionOpSortKeysById = "draftBookkeeping.transactions.deletedOpSortKeysById"
-        static let accountBaseBalanceTextById = "draftBookkeeping.accounts.baseBalanceTextById"
-        static let didImportLegacyTransactionsSeed = "draftBookkeeping.transactions.didImportLegacySeed"
-        static let templateNextSeq = "draftBookkeeping.templates.nextSeq"
-        static let templateLocalOps = "draftBookkeeping.templates.localOps"
-        static let templateUploadedOpIds = "draftBookkeeping.templates.uploadedOpIds"
-        static let templateProcessedOpIds = "draftBookkeeping.templates.processedOpIds"
-        static let templateImportedSeqByDeviceId = "draftBookkeeping.templates.importedSeqByDeviceId"
-        static let templateOpSortKeysById = "draftBookkeeping.templates.opSortKeysById"
-        static let deletedTemplateOpSortKeysById = "draftBookkeeping.templates.deletedOpSortKeysById"
-        static let budgetNextSeq = "draftBookkeeping.budgets.nextSeq"
-        static let budgetLocalOps = "draftBookkeeping.budgets.localOps"
-        static let budgetUploadedOpIds = "draftBookkeeping.budgets.uploadedOpIds"
-        static let budgetProcessedOpIds = "draftBookkeeping.budgets.processedOpIds"
-        static let budgetImportedSeqByDeviceId = "draftBookkeeping.budgets.importedSeqByDeviceId"
-        static let budgetOpSortKeysById = "draftBookkeeping.budgets.opSortKeysById"
-        static let deletedBudgetOpSortKeysById = "draftBookkeeping.budgets.deletedOpSortKeysById"
-    }
-
     private static let maxCategoryDepth = 3
 
     init(
-        defaults: UserDefaults = .standard,
+        sqliteStore: LedgerSQLiteStore = .shared,
         syncService: BookkeepingMetadataSyncService = BookkeepingMetadataSyncService(),
         transactionsSyncService: BookkeepingTransactionsSyncService = BookkeepingTransactionsSyncService(),
         templatesSyncService: BookkeepingTemplatesSyncService = BookkeepingTemplatesSyncService(),
         budgetsSyncService: BookkeepingBudgetsSyncService = BookkeepingBudgetsSyncService()
     ) {
-        self.defaults = defaults
+        self.sqliteStore = sqliteStore
         self.syncService = syncService
         self.transactionsSyncService = transactionsSyncService
         self.templatesSyncService = templatesSyncService
         self.budgetsSyncService = budgetsSyncService
-        let hasStoredAccounts = defaults.data(forKey: DefaultsKey.accounts) != nil
-        let hasStoredCategories = defaults.data(forKey: DefaultsKey.categories) != nil
-        let hasStoredMetadata = defaults.object(forKey: DefaultsKey.metadataRevision) != nil
-        let hasStoredTransactionsMetadata = defaults.object(forKey: DefaultsKey.transactionsRevision) != nil
-        self.accounts = Self.load([DraftAccount].self, forKey: DefaultsKey.accounts, from: defaults) ?? Self.defaultAccounts
-        self.categories = Self.load([DraftCategory].self, forKey: DefaultsKey.categories, from: defaults) ?? Self.defaultCategories
-        let storedTransactions = Self.load([DraftTransaction].self, forKey: DefaultsKey.transactions, from: defaults) ?? []
-        self.transactionTemplates = Self.load([DraftTransactionTemplate].self, forKey: DefaultsKey.transactionTemplates, from: defaults) ?? []
-        self.budgets = Self.load([DraftBudget].self, forKey: DefaultsKey.budgets, from: defaults) ?? []
-        let legacyDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
-        let initializedTransactions: [DraftTransaction]
-        if storedTransactions.isEmpty, let legacyDraft {
-            initializedTransactions = [legacyDraft]
-        } else {
-            initializedTransactions = storedTransactions.sorted(by: Self.transactionSort)
-        }
-        self.transactions = initializedTransactions
-        self.lastDraft = initializedTransactions.first
-        if hasStoredMetadata {
-            self.metadataRevision = defaults.integer(forKey: DefaultsKey.metadataRevision)
-            self.metadataUpdatedAt = defaults.object(forKey: DefaultsKey.metadataUpdatedAt) as? Date ?? Date(timeIntervalSince1970: 0)
-            self.metadataUpdatedByDeviceId = defaults.string(forKey: DefaultsKey.metadataUpdatedByDeviceId) ?? DeviceIdentity.currentDeviceId
-        } else if hasStoredAccounts || hasStoredCategories {
-            self.metadataRevision = 1
-            self.metadataUpdatedAt = Date()
-            self.metadataUpdatedByDeviceId = DeviceIdentity.currentDeviceId
-        } else {
-            self.metadataRevision = 0
-            self.metadataUpdatedAt = Date(timeIntervalSince1970: 0)
-            self.metadataUpdatedByDeviceId = DeviceIdentity.currentDeviceId
-        }
-        let storedMetadataNextSeq = defaults.integer(forKey: DefaultsKey.metadataNextSeq)
-        self.nextMetadataOpSeq = storedMetadataNextSeq > 0 ? storedMetadataNextSeq : 1
-        self.localMetadataOps = Self.load([BookkeepingMetadataOp].self, forKey: DefaultsKey.metadataLocalOps, from: defaults) ?? []
-        self.uploadedMetadataOpIds = Set(Self.load([String].self, forKey: DefaultsKey.metadataUploadedOpIds, from: defaults) ?? [])
-        self.processedMetadataOpIds = Set(Self.load([String].self, forKey: DefaultsKey.metadataProcessedOpIds, from: defaults) ?? [])
-        self.importedMetadataSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.metadataImportedSeqByDeviceId, from: defaults) ?? [:]
-        self.metadataOpSortKeysById = Self.load([String: MetadataOpSortKey].self, forKey: DefaultsKey.metadataOpSortKeysById, from: defaults) ?? [:]
-        self.deletedMetadataOpSortKeysById = Self.load([String: MetadataOpSortKey].self, forKey: DefaultsKey.deletedMetadataOpSortKeysById, from: defaults) ?? [:]
-        self.didImportLegacyMetadataSeed = defaults.bool(forKey: DefaultsKey.didImportLegacyMetadataSeed)
-        if hasStoredTransactionsMetadata {
-            self.transactionsRevision = defaults.integer(forKey: DefaultsKey.transactionsRevision)
-            self.transactionsUpdatedAt = defaults.object(forKey: DefaultsKey.transactionsUpdatedAt) as? Date ?? Date(timeIntervalSince1970: 0)
-            self.transactionsUpdatedByDeviceId = defaults.string(forKey: DefaultsKey.transactionsUpdatedByDeviceId) ?? DeviceIdentity.currentDeviceId
-        } else if !initializedTransactions.isEmpty {
-            self.transactionsRevision = 1
-            self.transactionsUpdatedAt = Date()
-            self.transactionsUpdatedByDeviceId = DeviceIdentity.currentDeviceId
-        } else {
-            self.transactionsRevision = 0
-            self.transactionsUpdatedAt = Date(timeIntervalSince1970: 0)
-            self.transactionsUpdatedByDeviceId = DeviceIdentity.currentDeviceId
-        }
-        let storedNextSeq = defaults.integer(forKey: DefaultsKey.transactionNextSeq)
-        self.nextTransactionOpSeq = storedNextSeq > 0 ? storedNextSeq : 1
-        self.localTransactionOps = Self.load([BookkeepingTransactionOp].self, forKey: DefaultsKey.transactionLocalOps, from: defaults) ?? []
-        self.uploadedTransactionOpIds = Set(Self.load([String].self, forKey: DefaultsKey.transactionUploadedOpIds, from: defaults) ?? [])
-        self.processedTransactionOpIds = Set(Self.load([String].self, forKey: DefaultsKey.transactionProcessedOpIds, from: defaults) ?? [])
-        self.importedTransactionSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.transactionImportedSeqByDeviceId, from: defaults) ?? [:]
-        self.transactionOpSortKeysById = Self.load([String: TransactionOpSortKey].self, forKey: DefaultsKey.transactionOpSortKeysById, from: defaults) ?? [:]
-        self.deletedTransactionOpSortKeysById = Self.load([String: TransactionOpSortKey].self, forKey: DefaultsKey.deletedTransactionOpSortKeysById, from: defaults) ?? [:]
-        self.accountBaseBalanceTextById = Self.load([String: String].self, forKey: DefaultsKey.accountBaseBalanceTextById, from: defaults) ?? [:]
-        self.didImportLegacyTransactionsSeed = defaults.bool(forKey: DefaultsKey.didImportLegacyTransactionsSeed)
-        let storedTemplateNextSeq = defaults.integer(forKey: DefaultsKey.templateNextSeq)
-        self.nextTemplateOpSeq = storedTemplateNextSeq > 0 ? storedTemplateNextSeq : 1
-        self.localTemplateOps = Self.load([BookkeepingTemplateOp].self, forKey: DefaultsKey.templateLocalOps, from: defaults) ?? []
-        self.uploadedTemplateOpIds = Set(Self.load([String].self, forKey: DefaultsKey.templateUploadedOpIds, from: defaults) ?? [])
-        self.processedTemplateOpIds = Set(Self.load([String].self, forKey: DefaultsKey.templateProcessedOpIds, from: defaults) ?? [])
-        self.importedTemplateSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.templateImportedSeqByDeviceId, from: defaults) ?? [:]
-        self.templateOpSortKeysById = Self.load([String: TemplateOpSortKey].self, forKey: DefaultsKey.templateOpSortKeysById, from: defaults) ?? [:]
-        self.deletedTemplateOpSortKeysById = Self.load([String: TemplateOpSortKey].self, forKey: DefaultsKey.deletedTemplateOpSortKeysById, from: defaults) ?? [:]
-        let storedBudgetNextSeq = defaults.integer(forKey: DefaultsKey.budgetNextSeq)
-        self.nextBudgetOpSeq = storedBudgetNextSeq > 0 ? storedBudgetNextSeq : 1
-        self.localBudgetOps = Self.load([BookkeepingBudgetOp].self, forKey: DefaultsKey.budgetLocalOps, from: defaults) ?? []
-        self.uploadedBudgetOpIds = Set(Self.load([String].self, forKey: DefaultsKey.budgetUploadedOpIds, from: defaults) ?? [])
-        self.processedBudgetOpIds = Set(Self.load([String].self, forKey: DefaultsKey.budgetProcessedOpIds, from: defaults) ?? [])
-        self.importedBudgetSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.budgetImportedSeqByDeviceId, from: defaults) ?? [:]
-        self.budgetOpSortKeysById = Self.load([String: BudgetOpSortKey].self, forKey: DefaultsKey.budgetOpSortKeysById, from: defaults) ?? [:]
-        self.deletedBudgetOpSortKeysById = Self.load([String: BudgetOpSortKey].self, forKey: DefaultsKey.deletedBudgetOpSortKeysById, from: defaults) ?? [:]
+        let snapshot = Self.initialSnapshot(from: sqliteStore)
+        let sortedTransactions = snapshot.transactions.sorted(by: Self.transactionSort)
+
+        self.accounts = snapshot.accounts
+        self.categories = snapshot.categories
+        self.transactions = sortedTransactions
+        self.transactionTemplates = snapshot.transactionTemplates
+        self.budgets = snapshot.budgets
+        self.lastDraft = snapshot.lastDraft ?? sortedTransactions.first
+        self.metadataRevision = snapshot.metadataRevision
+        self.metadataUpdatedAt = snapshot.metadataUpdatedAt
+        self.metadataUpdatedByDeviceId = snapshot.metadataUpdatedByDeviceId
+        self.nextMetadataOpSeq = max(1, snapshot.nextMetadataOpSeq)
+        self.localMetadataOps = snapshot.localMetadataOps
+        self.uploadedMetadataOpIds = snapshot.uploadedMetadataOpIds
+        self.processedMetadataOpIds = snapshot.processedMetadataOpIds
+        self.importedMetadataSeqByDeviceId = snapshot.importedMetadataSeqByDeviceId
+        self.metadataOpSortKeysById = snapshot.metadataOpSortKeysById
+        self.deletedMetadataOpSortKeysById = snapshot.deletedMetadataOpSortKeysById
+        self.transactionsRevision = snapshot.transactionsRevision
+        self.transactionsUpdatedAt = snapshot.transactionsUpdatedAt
+        self.transactionsUpdatedByDeviceId = snapshot.transactionsUpdatedByDeviceId
+        self.nextTransactionOpSeq = max(1, snapshot.nextTransactionOpSeq)
+        self.localTransactionOps = snapshot.localTransactionOps
+        self.uploadedTransactionOpIds = snapshot.uploadedTransactionOpIds
+        self.processedTransactionOpIds = snapshot.processedTransactionOpIds
+        self.importedTransactionSeqByDeviceId = snapshot.importedTransactionSeqByDeviceId
+        self.transactionOpSortKeysById = snapshot.transactionOpSortKeysById
+        self.deletedTransactionOpSortKeysById = snapshot.deletedTransactionOpSortKeysById
+        self.accountBaseBalanceTextById = snapshot.accountBaseBalanceTextById
+        self.nextTemplateOpSeq = max(1, snapshot.nextTemplateOpSeq)
+        self.localTemplateOps = snapshot.localTemplateOps
+        self.uploadedTemplateOpIds = snapshot.uploadedTemplateOpIds
+        self.processedTemplateOpIds = snapshot.processedTemplateOpIds
+        self.importedTemplateSeqByDeviceId = snapshot.importedTemplateSeqByDeviceId
+        self.templateOpSortKeysById = snapshot.templateOpSortKeysById
+        self.deletedTemplateOpSortKeysById = snapshot.deletedTemplateOpSortKeysById
+        self.nextBudgetOpSeq = max(1, snapshot.nextBudgetOpSeq)
+        self.localBudgetOps = snapshot.localBudgetOps
+        self.uploadedBudgetOpIds = snapshot.uploadedBudgetOpIds
+        self.processedBudgetOpIds = snapshot.processedBudgetOpIds
+        self.importedBudgetSeqByDeviceId = snapshot.importedBudgetSeqByDeviceId
+        self.budgetOpSortKeysById = snapshot.budgetOpSortKeysById
+        self.deletedBudgetOpSortKeysById = snapshot.deletedBudgetOpSortKeysById
 
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
@@ -467,18 +384,43 @@ final class DraftBookkeepingStore: ObservableObject {
         initializeBudgetSyncStateIfNeeded()
         initializeTransactionSyncStateIfNeeded()
         recomputeAccountBalancesFromBase()
-        persistAccounts()
-        persistCategories()
-        persistTransactions()
-        persistTransactionTemplates()
-        persistBudgets()
-        persistMetadata()
-        persistMetadataSyncState()
-        persistTransactionsMetadata()
-        persistTransactionSyncState()
-        persistTemplateSyncState()
-        persistBudgetSyncState()
+        persistLedgerSnapshot()
         persistWidgetSnapshot()
+    }
+
+    private static func initialSnapshot(from sqliteStore: LedgerSQLiteStore) -> LedgerSnapshot {
+        guard var snapshot = sqliteStore.loadLedgerSnapshot() else {
+            return LedgerSnapshot(accounts: defaultAccounts, categories: defaultCategories)
+        }
+
+        let hasLedgerData = !snapshot.accounts.isEmpty
+            || !snapshot.categories.isEmpty
+            || !snapshot.transactions.isEmpty
+            || !snapshot.transactionTemplates.isEmpty
+            || !snapshot.budgets.isEmpty
+            || snapshot.lastDraft != nil
+            || !snapshot.localMetadataOps.isEmpty
+            || !snapshot.localTransactionOps.isEmpty
+            || !snapshot.localTemplateOps.isEmpty
+            || !snapshot.localBudgetOps.isEmpty
+            || !snapshot.processedMetadataOpIds.isEmpty
+            || !snapshot.processedTransactionOpIds.isEmpty
+            || !snapshot.processedTemplateOpIds.isEmpty
+            || !snapshot.processedBudgetOpIds.isEmpty
+            || !snapshot.importedMetadataSeqByDeviceId.isEmpty
+            || !snapshot.importedTransactionSeqByDeviceId.isEmpty
+            || !snapshot.importedTemplateSeqByDeviceId.isEmpty
+            || !snapshot.importedBudgetSeqByDeviceId.isEmpty
+
+        if !hasLedgerData {
+            snapshot.accounts = defaultAccounts
+            snapshot.categories = defaultCategories
+            snapshot.accountBaseBalanceTextById = Dictionary(
+                uniqueKeysWithValues: defaultAccounts.map { ($0.id, normalizedBalanceText($0.balanceText)) }
+            )
+        }
+
+        return snapshot
     }
 
     func clearMessage() {
@@ -910,6 +852,25 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func importRemoteLedgerDataBeforeBackup(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.ledger.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            _ = try await importMetadataOps(configuration: configuration, secrets: secrets)
+            _ = try await importTransactionOps(configuration: configuration, secrets: secrets)
+            _ = try await importTemplateOps(configuration: configuration, secrets: secrets)
+            _ = try await importBudgetOps(configuration: configuration, secrets: secrets)
+            return true
+        } catch {
+            messageKey = "bookkeeping.ledger.sync.error.importFailed"
+            return false
+        }
+    }
+
     func backupMetadataNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
         guard configuration.backupEnabled else {
             messageKey = "bookkeeping.metadata.sync.error.backupDisabled"
@@ -933,7 +894,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         do {
-            let didImport = try await importMetadataOps(configuration: configuration, secrets: secrets, includeLegacySeed: true)
+            let didImport = try await importMetadataOps(configuration: configuration, secrets: secrets)
             messageKey = didImport ? "bookkeeping.metadata.sync.importSucceeded" : "bookkeeping.metadata.sync.importNoRemoteMetadata"
             return true
         } catch {
@@ -965,7 +926,7 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         do {
-            let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets, includeLegacySeed: true)
+            let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets)
             messageKey = didImport ? "bookkeeping.transactions.sync.importSucceeded" : "bookkeeping.transactions.sync.importNoRemoteTransactions"
             return true
         } catch {
@@ -1042,7 +1003,7 @@ final class DraftBookkeepingStore: ObservableObject {
         guard configuration.backupEnabled else { return }
 
         do {
-            let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets, includeLegacySeed: false)
+            let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets)
             if didImport {
                 messageKey = "bookkeeping.transactions.sync.importSucceeded"
             }
@@ -1081,7 +1042,7 @@ final class DraftBookkeepingStore: ObservableObject {
         guard configuration.backupEnabled else { return }
 
         do {
-            let didImport = try await importMetadataOps(configuration: configuration, secrets: secrets, includeLegacySeed: false)
+            let didImport = try await importMetadataOps(configuration: configuration, secrets: secrets)
             if didImport {
                 messageKey = "bookkeeping.metadata.sync.importSucceeded"
             }
@@ -1377,79 +1338,35 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
-    private func applyLegacyMetadata(_ document: BookkeepingMetadataSyncDocument) {
-        accounts = document.accounts.isEmpty ? Self.defaultAccounts : document.accounts
-        categories = document.categories.isEmpty ? Self.defaultCategories : document.categories
-        accountBaseBalanceTextById = Dictionary(
-            uniqueKeysWithValues: accounts.map { account in
-                (account.id, Self.normalizedBalanceText(account.balanceText))
-            }
-        )
-        metadataRevision = document.revision
-        metadataUpdatedAt = document.updatedAt
-        metadataUpdatedByDeviceId = document.updatedByDeviceId
-
-        normalizeDefaultNames()
-        normalizeCategoryHierarchy()
-        normalizeDefaultSelections()
-        normalizeTransactionsAfterMetadataChange()
-        initializeMissingBaseBalances()
-        recomputeAccountBalancesFromBase()
-        persistAccounts()
-        persistCategories()
-        persistTransactions()
-        persistLastDraft()
-        persistMetadata()
-        persistWidgetSnapshot()
-    }
-
     private func backupPendingMetadataOps(
         configuration: SyncConfiguration,
         secrets: SyncSecrets,
         forceFullUpload: Bool = false
     ) async throws {
         initializeMetadataSyncStateIfNeeded()
-        let uploadCandidates = forceFullUpload ? localMetadataOps : localMetadataOps.filter { !uploadedMetadataOpIds.contains($0.opId) }
+        let uploadCandidates = sqliteStore.pendingMetadataOps(forceFullUpload: forceFullUpload)
         guard !uploadCandidates.isEmpty else { return }
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
-        let opsToWrite = localMetadataOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        let opsToWrite = sqliteStore.metadataOps(fileIndexes: pendingFileIndexes)
         try await syncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
         uploadedMetadataOpIds.formUnion(opsToWrite.map(\.opId))
+        sqliteStore.markOpsUploaded(domain: .metadata, opIds: opsToWrite.map(\.opId))
         persistMetadataSyncState()
     }
 
     @discardableResult
     private func importMetadataOps(
         configuration: SyncConfiguration,
-        secrets: SyncSecrets,
-        includeLegacySeed: Bool
+        secrets: SyncSecrets
     ) async throws -> Bool {
-        var didImport = false
-
-        if
-            includeLegacySeed,
-            !didImportLegacyMetadataSeed,
-            localMetadataOps.isEmpty,
-            let legacyDocument = try await syncService.importLegacyDocument(configuration: configuration, secrets: secrets)
-        {
-            applyLegacyMetadata(legacyDocument)
-            initializeMetadataSyncStateIfNeeded()
-            didImportLegacyMetadataSeed = true
-            persistAccounts()
-            persistCategories()
-            persistMetadata()
-            persistMetadataSyncState()
-            didImport = true
-        }
-
         let remoteOps = try await syncService.importRemoteOps(configuration: configuration, secrets: secrets)
         let unappliedOps = remoteOps
             .filter { !processedMetadataOpIds.contains($0.opId) }
             .sorted(by: Self.metadataOpReplaySort)
 
         guard !unappliedOps.isEmpty else {
-            return didImport
+            return false
         }
 
         for op in unappliedOps {
@@ -1538,6 +1455,9 @@ final class DraftBookkeepingStore: ObservableObject {
         guard shouldApplyMetadataOp(op) else {
             processedMetadataOpIds.insert(op.opId)
             importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            sqliteStore.recordRemoteMetadataOp(op)
+            sqliteStore.recordProcessedOp(domain: .metadata, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: false, skippedReason: "stale")
+            persistMetadataSyncState()
             return
         }
 
@@ -1550,6 +1470,8 @@ final class DraftBookkeepingStore: ObservableObject {
 
         processedMetadataOpIds.insert(op.opId)
         importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        sqliteStore.recordRemoteMetadataOp(op)
+        sqliteStore.recordProcessedOp(domain: .metadata, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: true)
         applyMetadataOpState(op)
         updateMetadataSyncMetadata(at: op.occurredAt, deviceId: op.deviceId)
     }
@@ -1691,13 +1613,14 @@ final class DraftBookkeepingStore: ObservableObject {
         forceFullUpload: Bool = false
     ) async throws {
         initializeTransactionSyncStateIfNeeded()
-        let uploadCandidates = forceFullUpload ? localTransactionOps : localTransactionOps.filter { !uploadedTransactionOpIds.contains($0.opId) }
+        let uploadCandidates = sqliteStore.pendingTransactionOps(forceFullUpload: forceFullUpload)
         guard !uploadCandidates.isEmpty else { return }
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
-        let opsToWrite = localTransactionOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        let opsToWrite = sqliteStore.transactionOps(fileIndexes: pendingFileIndexes)
         try await transactionsSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
         uploadedTransactionOpIds.formUnion(opsToWrite.map(\.opId))
+        sqliteStore.markOpsUploaded(domain: .transactions, opIds: opsToWrite.map(\.opId))
         persistTransactionSyncState()
     }
 
@@ -1707,13 +1630,14 @@ final class DraftBookkeepingStore: ObservableObject {
         forceFullUpload: Bool = false
     ) async throws {
         initializeTemplateSyncStateIfNeeded()
-        let uploadCandidates = forceFullUpload ? localTemplateOps : localTemplateOps.filter { !uploadedTemplateOpIds.contains($0.opId) }
+        let uploadCandidates = sqliteStore.pendingTemplateOps(forceFullUpload: forceFullUpload)
         guard !uploadCandidates.isEmpty else { return }
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
-        let opsToWrite = localTemplateOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        let opsToWrite = sqliteStore.templateOps(fileIndexes: pendingFileIndexes)
         try await templatesSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
         uploadedTemplateOpIds.formUnion(opsToWrite.map(\.opId))
+        sqliteStore.markOpsUploaded(domain: .templates, opIds: opsToWrite.map(\.opId))
         persistTemplateSyncState()
     }
 
@@ -1723,58 +1647,29 @@ final class DraftBookkeepingStore: ObservableObject {
         forceFullUpload: Bool = false
     ) async throws {
         initializeBudgetSyncStateIfNeeded()
-        let uploadCandidates = forceFullUpload ? localBudgetOps : localBudgetOps.filter { !uploadedBudgetOpIds.contains($0.opId) }
+        let uploadCandidates = sqliteStore.pendingBudgetOps(forceFullUpload: forceFullUpload)
         guard !uploadCandidates.isEmpty else { return }
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
-        let opsToWrite = localBudgetOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        let opsToWrite = sqliteStore.budgetOps(fileIndexes: pendingFileIndexes)
         try await budgetsSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
         uploadedBudgetOpIds.formUnion(opsToWrite.map(\.opId))
+        sqliteStore.markOpsUploaded(domain: .budgets, opIds: opsToWrite.map(\.opId))
         persistBudgetSyncState()
     }
 
     @discardableResult
     private func importTransactionOps(
         configuration: SyncConfiguration,
-        secrets: SyncSecrets,
-        includeLegacySeed: Bool
+        secrets: SyncSecrets
     ) async throws -> Bool {
-        var didImport = false
-
-        if
-            includeLegacySeed,
-            !didImportLegacyTransactionsSeed,
-            localTransactionOps.isEmpty,
-            let legacyTransactions = try await transactionsSyncService.importLegacyTransactions(configuration: configuration, secrets: secrets),
-            !legacyTransactions.isEmpty
-        {
-            transactions = legacyTransactions.sorted(by: Self.transactionSort)
-            lastDraft = transactions.first
-            for transaction in transactions {
-                let key = TransactionOpSortKey(
-                    occurredAt: transaction.createdAt,
-                    deviceId: transactionsUpdatedByDeviceId,
-                    seq: transactionOpSortKeysById.count + 1
-                )
-                transactionOpSortKeysById[transaction.id] = key
-            }
-            didImportLegacyTransactionsSeed = true
-            initializeMissingBaseBalances()
-            recomputeAccountBalancesFromBase()
-            persistAccounts()
-            persistTransactions()
-            persistLastDraft()
-            persistTransactionSyncState()
-            didImport = true
-        }
-
         let remoteOps = try await transactionsSyncService.importRemoteOps(configuration: configuration, secrets: secrets)
         let unappliedOps = remoteOps
             .filter { !processedTransactionOpIds.contains($0.opId) }
             .sorted(by: Self.transactionOpReplaySort)
 
         guard !unappliedOps.isEmpty else {
-            return didImport
+            return false
         }
 
         for op in unappliedOps {
@@ -1905,6 +1800,9 @@ final class DraftBookkeepingStore: ObservableObject {
         guard shouldApplyTransactionOp(op) else {
             processedTransactionOpIds.insert(op.opId)
             importedTransactionSeqByDeviceId[op.deviceId] = max(importedTransactionSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            sqliteStore.recordRemoteTransactionOp(op)
+            sqliteStore.recordProcessedOp(domain: .transactions, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: false, skippedReason: "stale")
+            persistTransactionSyncState()
             return
         }
 
@@ -1925,6 +1823,8 @@ final class DraftBookkeepingStore: ObservableObject {
 
         processedTransactionOpIds.insert(op.opId)
         importedTransactionSeqByDeviceId[op.deviceId] = max(importedTransactionSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        sqliteStore.recordRemoteTransactionOp(op)
+        sqliteStore.recordProcessedOp(domain: .transactions, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: true)
         applyTransactionOpState(op)
         updateTransactionsSyncMetadata(at: op.occurredAt, deviceId: op.deviceId)
     }
@@ -1962,6 +1862,9 @@ final class DraftBookkeepingStore: ObservableObject {
         guard shouldApplyTemplateOp(op) else {
             processedTemplateOpIds.insert(op.opId)
             importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            sqliteStore.recordRemoteTemplateOp(op)
+            sqliteStore.recordProcessedOp(domain: .templates, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: false, skippedReason: "stale")
+            persistTemplateSyncState()
             return
         }
 
@@ -1973,6 +1876,9 @@ final class DraftBookkeepingStore: ObservableObject {
             guard !normalized.name.isEmpty, normalized.kind != .transfer, Self.normalizedPositiveAmountText(normalized.amountText) != nil else {
                 processedTemplateOpIds.insert(op.opId)
                 importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+                sqliteStore.recordRemoteTemplateOp(op)
+                sqliteStore.recordProcessedOp(domain: .templates, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: false, skippedReason: "invalidPayload")
+                persistTemplateSyncState()
                 return
             }
             if let index = transactionTemplates.firstIndex(where: { $0.id == op.entityId }) {
@@ -1987,6 +1893,8 @@ final class DraftBookkeepingStore: ObservableObject {
 
         processedTemplateOpIds.insert(op.opId)
         importedTemplateSeqByDeviceId[op.deviceId] = max(importedTemplateSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        sqliteStore.recordRemoteTemplateOp(op)
+        sqliteStore.recordProcessedOp(domain: .templates, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: true)
         applyTemplateOpState(op)
     }
 
@@ -2023,6 +1931,9 @@ final class DraftBookkeepingStore: ObservableObject {
         guard shouldApplyBudgetOp(op) else {
             processedBudgetOpIds.insert(op.opId)
             importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            sqliteStore.recordRemoteBudgetOp(op)
+            sqliteStore.recordProcessedOp(domain: .budgets, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: false, skippedReason: "stale")
+            persistBudgetSyncState()
             return
         }
 
@@ -2034,6 +1945,9 @@ final class DraftBookkeepingStore: ObservableObject {
             guard hasValidBudgetTarget(normalized), Self.normalizedPositiveAmountText(normalized.amountText) != nil else {
                 processedBudgetOpIds.insert(op.opId)
                 importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+                sqliteStore.recordRemoteBudgetOp(op)
+                sqliteStore.recordProcessedOp(domain: .budgets, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: false, skippedReason: "invalidPayload")
+                persistBudgetSyncState()
                 return
             }
             if let index = budgets.firstIndex(where: { $0.id == op.entityId }) {
@@ -2048,6 +1962,8 @@ final class DraftBookkeepingStore: ObservableObject {
 
         processedBudgetOpIds.insert(op.opId)
         importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        sqliteStore.recordRemoteBudgetOp(op)
+        sqliteStore.recordProcessedOp(domain: .budgets, opId: op.opId, deviceId: op.deviceId, seq: op.seq, applied: true)
         applyBudgetOpState(op)
     }
 
@@ -2235,58 +2151,27 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func persistMetadata() {
-        defaults.set(metadataRevision, forKey: DefaultsKey.metadataRevision)
-        defaults.set(metadataUpdatedAt, forKey: DefaultsKey.metadataUpdatedAt)
-        defaults.set(metadataUpdatedByDeviceId, forKey: DefaultsKey.metadataUpdatedByDeviceId)
+        persistLedgerSnapshot()
     }
 
     private func persistTransactionsMetadata() {
-        defaults.set(transactionsRevision, forKey: DefaultsKey.transactionsRevision)
-        defaults.set(transactionsUpdatedAt, forKey: DefaultsKey.transactionsUpdatedAt)
-        defaults.set(transactionsUpdatedByDeviceId, forKey: DefaultsKey.transactionsUpdatedByDeviceId)
+        persistLedgerSnapshot()
     }
 
     private func persistMetadataSyncState() {
-        defaults.set(nextMetadataOpSeq, forKey: DefaultsKey.metadataNextSeq)
-        Self.save(localMetadataOps, forKey: DefaultsKey.metadataLocalOps, to: defaults)
-        Self.save(Array(uploadedMetadataOpIds), forKey: DefaultsKey.metadataUploadedOpIds, to: defaults)
-        Self.save(Array(processedMetadataOpIds), forKey: DefaultsKey.metadataProcessedOpIds, to: defaults)
-        Self.save(importedMetadataSeqByDeviceId, forKey: DefaultsKey.metadataImportedSeqByDeviceId, to: defaults)
-        Self.save(metadataOpSortKeysById, forKey: DefaultsKey.metadataOpSortKeysById, to: defaults)
-        Self.save(deletedMetadataOpSortKeysById, forKey: DefaultsKey.deletedMetadataOpSortKeysById, to: defaults)
-        defaults.set(didImportLegacyMetadataSeed, forKey: DefaultsKey.didImportLegacyMetadataSeed)
+        persistLedgerSnapshot()
     }
 
     private func persistTransactionSyncState() {
-        defaults.set(nextTransactionOpSeq, forKey: DefaultsKey.transactionNextSeq)
-        Self.save(localTransactionOps, forKey: DefaultsKey.transactionLocalOps, to: defaults)
-        Self.save(Array(uploadedTransactionOpIds), forKey: DefaultsKey.transactionUploadedOpIds, to: defaults)
-        Self.save(Array(processedTransactionOpIds), forKey: DefaultsKey.transactionProcessedOpIds, to: defaults)
-        Self.save(importedTransactionSeqByDeviceId, forKey: DefaultsKey.transactionImportedSeqByDeviceId, to: defaults)
-        Self.save(transactionOpSortKeysById, forKey: DefaultsKey.transactionOpSortKeysById, to: defaults)
-        Self.save(deletedTransactionOpSortKeysById, forKey: DefaultsKey.deletedTransactionOpSortKeysById, to: defaults)
-        Self.save(accountBaseBalanceTextById, forKey: DefaultsKey.accountBaseBalanceTextById, to: defaults)
-        defaults.set(didImportLegacyTransactionsSeed, forKey: DefaultsKey.didImportLegacyTransactionsSeed)
+        persistLedgerSnapshot()
     }
 
     private func persistTemplateSyncState() {
-        defaults.set(nextTemplateOpSeq, forKey: DefaultsKey.templateNextSeq)
-        Self.save(localTemplateOps, forKey: DefaultsKey.templateLocalOps, to: defaults)
-        Self.save(Array(uploadedTemplateOpIds), forKey: DefaultsKey.templateUploadedOpIds, to: defaults)
-        Self.save(Array(processedTemplateOpIds), forKey: DefaultsKey.templateProcessedOpIds, to: defaults)
-        Self.save(importedTemplateSeqByDeviceId, forKey: DefaultsKey.templateImportedSeqByDeviceId, to: defaults)
-        Self.save(templateOpSortKeysById, forKey: DefaultsKey.templateOpSortKeysById, to: defaults)
-        Self.save(deletedTemplateOpSortKeysById, forKey: DefaultsKey.deletedTemplateOpSortKeysById, to: defaults)
+        persistLedgerSnapshot()
     }
 
     private func persistBudgetSyncState() {
-        defaults.set(nextBudgetOpSeq, forKey: DefaultsKey.budgetNextSeq)
-        Self.save(localBudgetOps, forKey: DefaultsKey.budgetLocalOps, to: defaults)
-        Self.save(Array(uploadedBudgetOpIds), forKey: DefaultsKey.budgetUploadedOpIds, to: defaults)
-        Self.save(Array(processedBudgetOpIds), forKey: DefaultsKey.budgetProcessedOpIds, to: defaults)
-        Self.save(importedBudgetSeqByDeviceId, forKey: DefaultsKey.budgetImportedSeqByDeviceId, to: defaults)
-        Self.save(budgetOpSortKeysById, forKey: DefaultsKey.budgetOpSortKeysById, to: defaults)
-        Self.save(deletedBudgetOpSortKeysById, forKey: DefaultsKey.deletedBudgetOpSortKeysById, to: defaults)
+        persistLedgerSnapshot()
     }
 
     private func normalizeTransactionsAfterMetadataChange() {
@@ -2609,27 +2494,77 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func persistAccounts() {
-        Self.save(accounts, forKey: DefaultsKey.accounts, to: defaults)
+        persistLedgerSnapshot()
     }
 
     private func persistCategories() {
-        Self.save(categories, forKey: DefaultsKey.categories, to: defaults)
+        persistLedgerSnapshot()
     }
 
     private func persistTransactions() {
-        Self.save(transactions, forKey: DefaultsKey.transactions, to: defaults)
+        persistLedgerSnapshot()
     }
 
     private func persistTransactionTemplates() {
-        Self.save(transactionTemplates, forKey: DefaultsKey.transactionTemplates, to: defaults)
+        persistLedgerSnapshot()
     }
 
     private func persistBudgets() {
-        Self.save(budgets, forKey: DefaultsKey.budgets, to: defaults)
+        persistLedgerSnapshot()
     }
 
     private func persistLastDraft() {
-        Self.save(lastDraft, forKey: DefaultsKey.lastDraft, to: defaults)
+        persistLedgerSnapshot()
+    }
+
+    private func persistLedgerSnapshot() {
+        sqliteStore.saveLedgerSnapshot(makeLedgerSnapshot())
+    }
+
+    private func makeLedgerSnapshot() -> LedgerSnapshot {
+        LedgerSnapshot(
+            accounts: accounts,
+            categories: categories,
+            transactions: transactions,
+            transactionTemplates: transactionTemplates,
+            budgets: budgets,
+            lastDraft: lastDraft,
+            metadataRevision: metadataRevision,
+            metadataUpdatedAt: metadataUpdatedAt,
+            metadataUpdatedByDeviceId: metadataUpdatedByDeviceId,
+            nextMetadataOpSeq: nextMetadataOpSeq,
+            localMetadataOps: localMetadataOps,
+            uploadedMetadataOpIds: uploadedMetadataOpIds,
+            processedMetadataOpIds: processedMetadataOpIds,
+            importedMetadataSeqByDeviceId: importedMetadataSeqByDeviceId,
+            metadataOpSortKeysById: metadataOpSortKeysById,
+            deletedMetadataOpSortKeysById: deletedMetadataOpSortKeysById,
+            transactionsRevision: transactionsRevision,
+            transactionsUpdatedAt: transactionsUpdatedAt,
+            transactionsUpdatedByDeviceId: transactionsUpdatedByDeviceId,
+            nextTransactionOpSeq: nextTransactionOpSeq,
+            localTransactionOps: localTransactionOps,
+            uploadedTransactionOpIds: uploadedTransactionOpIds,
+            processedTransactionOpIds: processedTransactionOpIds,
+            importedTransactionSeqByDeviceId: importedTransactionSeqByDeviceId,
+            transactionOpSortKeysById: transactionOpSortKeysById,
+            deletedTransactionOpSortKeysById: deletedTransactionOpSortKeysById,
+            accountBaseBalanceTextById: accountBaseBalanceTextById,
+            nextTemplateOpSeq: nextTemplateOpSeq,
+            localTemplateOps: localTemplateOps,
+            uploadedTemplateOpIds: uploadedTemplateOpIds,
+            processedTemplateOpIds: processedTemplateOpIds,
+            importedTemplateSeqByDeviceId: importedTemplateSeqByDeviceId,
+            templateOpSortKeysById: templateOpSortKeysById,
+            deletedTemplateOpSortKeysById: deletedTemplateOpSortKeysById,
+            nextBudgetOpSeq: nextBudgetOpSeq,
+            localBudgetOps: localBudgetOps,
+            uploadedBudgetOpIds: uploadedBudgetOpIds,
+            processedBudgetOpIds: processedBudgetOpIds,
+            importedBudgetSeqByDeviceId: importedBudgetSeqByDeviceId,
+            budgetOpSortKeysById: budgetOpSortKeysById,
+            deletedBudgetOpSortKeysById: deletedBudgetOpSortKeysById
+        )
     }
 
     private func persistWidgetSnapshot() {
@@ -2782,16 +2717,6 @@ final class DraftBookkeepingStore: ObservableObject {
     private func decimalValue(from text: String) -> Decimal {
         let normalizedText = DraftAmountFormatter.normalizedAmountText(text, allowNegative: true) ?? "0"
         return Decimal(string: normalizedText, locale: Locale(identifier: "en_US_POSIX")) ?? 0
-    }
-
-    private static func load<Value: Decodable>(_ type: Value.Type, forKey key: String, from defaults: UserDefaults) -> Value? {
-        guard let data = defaults.data(forKey: key) else { return nil }
-        return try? decoder.decode(type, from: data)
-    }
-
-    private static func save<Value: Encodable>(_ value: Value, forKey key: String, to defaults: UserDefaults) {
-        guard let data = try? encoder.encode(value) else { return }
-        defaults.set(data, forKey: key)
     }
 
     private static func transactionSort(_ lhs: DraftTransaction, _ rhs: DraftTransaction) -> Bool {
@@ -2983,7 +2908,7 @@ final class DraftBookkeepingStore: ObservableObject {
         DraftAmountFormatter.normalizedAmountText(text, allowNegative: false) ?? "0"
     }
 
-    private static func fontAwesomeName(for legacyName: String) -> String {
+    private static func fontAwesomeName(for symbolName: String) -> String {
         let mapping = [
             "banknote.fill": "money-bill",
             "creditcard.fill": "credit-card",
@@ -3009,18 +2934,6 @@ final class DraftBookkeepingStore: ObservableObject {
             "tag.fill": "tag"
         ]
 
-        return mapping[legacyName] ?? legacyName
+        return mapping[symbolName] ?? symbolName
     }
-
-    private static let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-
-    private static let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
 }

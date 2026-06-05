@@ -91,40 +91,10 @@ struct MetadataOpSortKey: Codable, Equatable, Comparable {
     }
 }
 
-struct BookkeepingMetadataSyncDocument: Codable, Equatable {
-    let schemaVersion: Int
-    let entity: String
-    var ledgerId: String
-    var revision: Int
-    var updatedAt: Date
-    var updatedByDeviceId: String
-    var accounts: [DraftAccount]
-    var categories: [DraftCategory]
-
-    init(
-        ledgerId: String = "default",
-        revision: Int,
-        updatedAt: Date,
-        updatedByDeviceId: String,
-        accounts: [DraftAccount],
-        categories: [DraftCategory]
-    ) {
-        self.schemaVersion = 1
-        self.entity = "bookkeepingMetadata"
-        self.ledgerId = ledgerId
-        self.revision = revision
-        self.updatedAt = updatedAt
-        self.updatedByDeviceId = updatedByDeviceId
-        self.accounts = accounts
-        self.categories = categories
-    }
-}
-
 struct BookkeepingMetadataSyncService {
     static let opsPerFile = 100
 
     private let ledgerPath = "KKBookKeep/v1/ledgers/default"
-    private let legacyMetadataPath = "KKBookKeep/v1/ledgers/default/accounts-categories.json"
 
     func backup(ops: [BookkeepingMetadataOp], configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
         guard !ops.isEmpty else { return }
@@ -136,14 +106,21 @@ struct BookkeepingMetadataSyncService {
 
         for (fileName, fileOps) in groupedOps {
             let sortedOps = fileOps.sorted(by: Self.opSort)
-            var data = try Self.encodeJSONL(sortedOps)
+            let deviceId = sortedOps.first?.deviceId ?? DeviceIdentity.currentDeviceId
+            let path = "\(devicePath(for: deviceId))/\(fileName)"
+            let mergedOps = try await Self.mergedOpsForBackup(
+                localOps: sortedOps,
+                at: path,
+                storage: storage,
+                secrets: secrets
+            )
+            var data = try Self.encodeJSONL(mergedOps)
 
             if configuration.encryptionEnabled {
                 data = try SyncFileEncryption.encrypt(data, password: secrets.encryptionPassword)
             }
 
-            let deviceId = sortedOps.first?.deviceId ?? DeviceIdentity.currentDeviceId
-            try await storage.writeFileAtomic(data, to: "\(devicePath(for: deviceId))/\(fileName)")
+            try await storage.writeFileAtomic(data, to: path)
         }
     }
 
@@ -178,18 +155,6 @@ struct BookkeepingMetadataSyncService {
         return importedOps.sorted(by: Self.opSort)
     }
 
-    func importLegacyDocument(configuration: SyncConfiguration, secrets: SyncSecrets) async throws -> BookkeepingMetadataSyncDocument? {
-        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
-
-        do {
-            let remoteData = try await storage.readFile(at: legacyMetadataPath)
-            let data = try SyncFileEncryption.decryptIfNeeded(remoteData, password: secrets.encryptionPassword)
-            return try Self.decoder.decode(BookkeepingMetadataSyncDocument.self, from: data)
-        } catch SyncStorageError.fileNotFound {
-            return nil
-        }
-    }
-
     private func devicePath(for deviceId: String) -> String {
         "\(ledgerPath)/metadata-devices/\(deviceId)"
     }
@@ -216,6 +181,26 @@ struct BookkeepingMetadataSyncService {
             .map { line in
                 try decoder.decode(BookkeepingMetadataOp.self, from: Data(line.utf8))
             }
+    }
+
+    private static func mergedOpsForBackup(
+        localOps: [BookkeepingMetadataOp],
+        at path: String,
+        storage: any SyncStorage,
+        secrets: SyncSecrets
+    ) async throws -> [BookkeepingMetadataOp] {
+        do {
+            let remoteData = try await storage.readFile(at: path)
+            let data = try SyncFileEncryption.decryptIfNeeded(remoteData, password: secrets.encryptionPassword)
+            let remoteOps = try decodeJSONL(data)
+            var opsById = Dictionary(uniqueKeysWithValues: remoteOps.map { ($0.opId, $0) })
+            for op in localOps {
+                opsById[op.opId] = op
+            }
+            return opsById.values.sorted(by: opSort)
+        } catch SyncStorageError.fileNotFound {
+            return localOps
+        }
     }
 
     private static func opSort(_ lhs: BookkeepingMetadataOp, _ rhs: BookkeepingMetadataOp) -> Bool {

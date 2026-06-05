@@ -584,6 +584,7 @@
 "sync.import.error.failed" = "数据未能全部导入，请检查 WebDAV 地址、同步密码和凭据。";
 "sync.settings.savedAndBackedUp" = "同步设置已保存，数据备份完成。";
 "sync.settings.savedButBackupFailed" = "同步设置已保存，但数据备份失败。请检查 WebDAV 地址、同步密码和凭据。";
+"sync.settings.savedButImportFailed" = "同步设置已保存，但导入远端数据失败。为避免覆盖云端，请检查 WebDAV 地址、同步密码和凭据后重试。";
 "sync.settings.message.title" = "同步设置";
 "sync.settings.error.saveFailed" = "同步设置保存失败，请稍后重试。";
 "sync.settings.error.providerUnavailable" = "iCloud云盘同步暂不可用，请先使用 WebDAV。";

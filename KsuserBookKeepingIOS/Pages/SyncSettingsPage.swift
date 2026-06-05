@@ -263,11 +263,22 @@ struct SyncSettingsPage: View {
             if configuration.backupEnabled {
                 syncSettingsStore.completeInitialSetup(.syncSpace)
                 let secrets = currentSyncSecrets()
+                let profileImported = await profileStore.importRemoteProfileBeforeBackup(configuration: configuration, secrets: secrets)
+                let ledgerDataImported = await draftBookkeepingStore.importRemoteLedgerDataBeforeBackup(
+                    configuration: configuration,
+                    secrets: secrets
+                )
+                guard profileImported, ledgerDataImported else {
+                    showSettingsMessage("sync.settings.savedButImportFailed")
+                    isSaving = false
+                    return
+                }
+
                 let profileBackedUp = await profileStore.backupNow(configuration: configuration, secrets: secrets)
                 let ledgerDataBackedUp = await draftBookkeepingStore.backupLedgerDataNow(
                     configuration: configuration,
                     secrets: secrets,
-                    forceFullUpload: true
+                    forceFullUpload: false
                 )
 
                 if profileBackedUp, ledgerDataBackedUp {

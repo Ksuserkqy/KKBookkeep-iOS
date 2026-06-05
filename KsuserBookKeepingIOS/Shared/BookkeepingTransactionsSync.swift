@@ -78,21 +78,10 @@ struct TransactionOpSortKey: Codable, Equatable, Comparable {
     }
 }
 
-struct BookkeepingTransactionsSyncDocument: Codable, Equatable {
-    let schemaVersion: Int
-    let entity: String
-    var ledgerId: String
-    var revision: Int
-    var updatedAt: Date
-    var updatedByDeviceId: String
-    var transactions: [DraftTransaction]
-}
-
 struct BookkeepingTransactionsSyncService {
     static let opsPerFile = 100
 
     private let ledgerPath = "KKBookKeep/v1/ledgers/default"
-    private let legacyTransactionsPath = "KKBookKeep/v1/ledgers/default/transactions.json"
 
     func backup(ops: [BookkeepingTransactionOp], configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
         guard !ops.isEmpty else { return }
@@ -104,14 +93,21 @@ struct BookkeepingTransactionsSyncService {
 
         for (fileName, fileOps) in groupedOps {
             let sortedOps = fileOps.sorted(by: Self.opSort)
-            var data = try Self.encodeJSONL(sortedOps)
+            let deviceId = sortedOps.first?.deviceId ?? DeviceIdentity.currentDeviceId
+            let path = "\(devicePath(for: deviceId))/\(fileName)"
+            let mergedOps = try await Self.mergedOpsForBackup(
+                localOps: sortedOps,
+                at: path,
+                storage: storage,
+                secrets: secrets
+            )
+            var data = try Self.encodeJSONL(mergedOps)
 
             if configuration.encryptionEnabled {
                 data = try SyncFileEncryption.encrypt(data, password: secrets.encryptionPassword)
             }
 
-            let deviceId = sortedOps.first?.deviceId ?? DeviceIdentity.currentDeviceId
-            try await storage.writeFileAtomic(data, to: "\(devicePath(for: deviceId))/\(fileName)")
+            try await storage.writeFileAtomic(data, to: path)
         }
     }
 
@@ -146,18 +142,6 @@ struct BookkeepingTransactionsSyncService {
         return importedOps.sorted(by: Self.opSort)
     }
 
-    func importLegacyTransactions(configuration: SyncConfiguration, secrets: SyncSecrets) async throws -> [DraftTransaction]? {
-        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
-
-        do {
-            let remoteData = try await storage.readFile(at: legacyTransactionsPath)
-            let data = try SyncFileEncryption.decryptIfNeeded(remoteData, password: secrets.encryptionPassword)
-            return try Self.decoder.decode(BookkeepingTransactionsSyncDocument.self, from: data).transactions
-        } catch SyncStorageError.fileNotFound {
-            return nil
-        }
-    }
-
     private func devicePath(for deviceId: String) -> String {
         "\(ledgerPath)/devices/\(deviceId)"
     }
@@ -184,6 +168,26 @@ struct BookkeepingTransactionsSyncService {
             .map { line in
                 try decoder.decode(BookkeepingTransactionOp.self, from: Data(line.utf8))
             }
+    }
+
+    private static func mergedOpsForBackup(
+        localOps: [BookkeepingTransactionOp],
+        at path: String,
+        storage: any SyncStorage,
+        secrets: SyncSecrets
+    ) async throws -> [BookkeepingTransactionOp] {
+        do {
+            let remoteData = try await storage.readFile(at: path)
+            let data = try SyncFileEncryption.decryptIfNeeded(remoteData, password: secrets.encryptionPassword)
+            let remoteOps = try decodeJSONL(data)
+            var opsById = Dictionary(uniqueKeysWithValues: remoteOps.map { ($0.opId, $0) })
+            for op in localOps {
+                opsById[op.opId] = op
+            }
+            return opsById.values.sorted(by: opSort)
+        } catch SyncStorageError.fileNotFound {
+            return localOps
+        }
     }
 
     private static func opSort(_ lhs: BookkeepingTransactionOp, _ rhs: BookkeepingTransactionOp) -> Bool {

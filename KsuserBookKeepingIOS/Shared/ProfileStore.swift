@@ -127,6 +127,31 @@ final class ProfileStore: ObservableObject {
         }
     }
 
+    @discardableResult
+    func importRemoteProfileBeforeBackup(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "profile.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            guard let remoteProfile = try await syncService.importProfile(configuration: configuration, secrets: secrets) else {
+                return true
+            }
+
+            if remoteProfile.isNewer(than: profile) {
+                try repository.save(remoteProfile)
+                profile = remoteProfile
+                messageKey = "profile.sync.importSucceeded"
+            }
+
+            return true
+        } catch {
+            messageKey = "profile.sync.error.importFailed"
+            return false
+        }
+    }
+
     func testSyncLocation(configuration: SyncConfiguration, secrets: SyncSecrets) async {
         guard configuration.backupEnabled else {
             messageKey = "profile.sync.error.backupDisabled"

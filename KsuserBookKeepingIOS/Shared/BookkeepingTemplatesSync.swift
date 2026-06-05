@@ -93,14 +93,21 @@ struct BookkeepingTemplatesSyncService {
 
         for (fileName, fileOps) in groupedOps {
             let sortedOps = fileOps.sorted(by: Self.opSort)
-            var data = try Self.encodeJSONL(sortedOps)
+            let deviceId = sortedOps.first?.deviceId ?? DeviceIdentity.currentDeviceId
+            let path = "\(devicePath(for: deviceId))/\(fileName)"
+            let mergedOps = try await Self.mergedOpsForBackup(
+                localOps: sortedOps,
+                at: path,
+                storage: storage,
+                secrets: secrets
+            )
+            var data = try Self.encodeJSONL(mergedOps)
 
             if configuration.encryptionEnabled {
                 data = try SyncFileEncryption.encrypt(data, password: secrets.encryptionPassword)
             }
 
-            let deviceId = sortedOps.first?.deviceId ?? DeviceIdentity.currentDeviceId
-            try await storage.writeFileAtomic(data, to: "\(devicePath(for: deviceId))/\(fileName)")
+            try await storage.writeFileAtomic(data, to: path)
         }
     }
 
@@ -161,6 +168,26 @@ struct BookkeepingTemplatesSyncService {
             .map { line in
                 try decoder.decode(BookkeepingTemplateOp.self, from: Data(line.utf8))
             }
+    }
+
+    private static func mergedOpsForBackup(
+        localOps: [BookkeepingTemplateOp],
+        at path: String,
+        storage: any SyncStorage,
+        secrets: SyncSecrets
+    ) async throws -> [BookkeepingTemplateOp] {
+        do {
+            let remoteData = try await storage.readFile(at: path)
+            let data = try SyncFileEncryption.decryptIfNeeded(remoteData, password: secrets.encryptionPassword)
+            let remoteOps = try decodeJSONL(data)
+            var opsById = Dictionary(uniqueKeysWithValues: remoteOps.map { ($0.opId, $0) })
+            for op in localOps {
+                opsById[op.opId] = op
+            }
+            return opsById.values.sorted(by: opSort)
+        } catch SyncStorageError.fileNotFound {
+            return localOps
+        }
     }
 
     private static func opSort(_ lhs: BookkeepingTemplateOp, _ rhs: BookkeepingTemplateOp) -> Bool {
