@@ -1076,14 +1076,32 @@ private extension View {
         containerBackground(for: .widget) {
             LinearGradient(
                 colors: [
-                    Color(red: 1, green: 0.96, blue: 0.84),
-                    Color(.systemBackground)
+                    Color.widgetContainerGradientStart,
+                    Color.widgetContainerGradientEnd
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         }
     }
+}
+
+private extension Color {
+    static let widgetContainerGradientStart = Color(UIColor { traits in
+        if traits.userInterfaceStyle == .dark {
+            return UIColor(red: 0.18, green: 0.15, blue: 0.08, alpha: 1)
+        }
+
+        return UIColor(red: 1, green: 0.96, blue: 0.84, alpha: 1)
+    })
+
+    static let widgetContainerGradientEnd = Color(UIColor { traits in
+        if traits.userInterfaceStyle == .dark {
+            return UIColor(red: 0.08, green: 0.08, blue: 0.07, alpha: 1)
+        }
+
+        return UIColor.systemBackground
+    })
 }
 
 private extension WidgetRecordKind {

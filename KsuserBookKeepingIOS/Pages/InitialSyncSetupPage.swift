@@ -23,6 +23,7 @@ struct InitialSyncSetupPage: View {
     @State private var isWorking = false
     @State private var messageKey: String?
     @State private var isShowingMessage = false
+    @State private var safariPage: SafariPage?
 
     private let userAgreementURL = URL(string: "https://www.ksuser.cn/agreement/user.html")!
     private let privacyPolicyURL = URL(string: "https://www.ksuser.cn/agreement/privacy.html")!
@@ -54,6 +55,9 @@ struct InitialSyncSetupPage: View {
             }
         }
         .interactiveDismissDisabled()
+        .sheet(item: $safariPage) { page in
+            SafariView(url: page.url)
+        }
         .task {
             guard !didLoadExistingDraft else { return }
             didLoadExistingDraft = true
@@ -92,13 +96,19 @@ struct InitialSyncSetupPage: View {
             }
 
             Section {
-                Link(destination: userAgreementURL) {
+                Button {
+                    safariPage = SafariPage(url: userAgreementURL)
+                } label: {
                     Label("initialSync.legal.terms", systemImage: "doc.plaintext")
                 }
+                .foregroundStyle(.primary)
 
-                Link(destination: privacyPolicyURL) {
+                Button {
+                    safariPage = SafariPage(url: privacyPolicyURL)
+                } label: {
                     Label("initialSync.legal.privacy", systemImage: "lock.shield")
                 }
+                .foregroundStyle(.primary)
             } footer: {
                 Text("initialSync.legal.footer")
             }
