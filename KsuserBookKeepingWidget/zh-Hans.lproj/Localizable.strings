@@ -13,6 +13,10 @@
 "liveActivity.kind.expense" = "支出";
 "liveActivity.kind.income" = "收入";
 "liveActivity.kind.transfer" = "转账";
+"liveActivity.budget.title" = "预算消耗";
+"liveActivity.budget.remaining" = "剩余";
+"liveActivity.budget.over" = "已超预算";
+"liveActivity.budget.spentFormat" = "%@ / %@";
 
 "dashboard.totalBalance" = "总资产";
 "dashboard.monthIncome" = "收入";

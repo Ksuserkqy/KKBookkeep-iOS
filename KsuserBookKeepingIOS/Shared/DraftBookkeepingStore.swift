@@ -201,6 +201,52 @@ struct DraftTransactionTemplate: Codable, Identifiable, Equatable {
     var updatedAt: Date
 }
 
+enum DraftBudgetScope: String, CaseIterable, Codable, Identifiable {
+    case overall
+    case category
+    case account
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        LocalizedStringKey(localizationKey)
+    }
+
+    var localizationKey: String {
+        switch self {
+        case .overall:
+            return "budgets.scope.overall"
+        case .category:
+            return "budgets.scope.category"
+        case .account:
+            return "budgets.scope.account"
+        }
+    }
+}
+
+struct DraftBudget: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var scope: DraftBudgetScope
+    var targetId: String?
+    var amountText: String
+    var isEnabled: Bool
+    var createdAt: Date
+    var updatedAt: Date
+}
+
+struct DraftBudgetUsage: Identifiable, Equatable {
+    var budget: DraftBudget
+    var targetName: String
+    var spentText: String
+    var limitText: String
+    var remainingText: String
+    var percentUsed: Double
+    var isOverLimit: Bool
+
+    var id: String { budget.id }
+}
+
 struct DraftLocation: Codable, Equatable {
     var displayName: String
     var address: String
@@ -220,16 +266,19 @@ final class DraftBookkeepingStore: ObservableObject {
     @Published private(set) var categories: [DraftCategory]
     @Published private(set) var transactions: [DraftTransaction]
     @Published private(set) var transactionTemplates: [DraftTransactionTemplate]
+    @Published private(set) var budgets: [DraftBudget]
     @Published private(set) var lastDraft: DraftTransaction?
     @Published private(set) var messageKey: String?
     @Published private(set) var localMetadataChangeToken = 0
     @Published private(set) var localTransactionsChangeToken = 0
     @Published private(set) var localTemplatesChangeToken = 0
+    @Published private(set) var localBudgetsChangeToken = 0
 
     private let defaults: UserDefaults
     private let syncService: BookkeepingMetadataSyncService
     private let transactionsSyncService: BookkeepingTransactionsSyncService
     private let templatesSyncService: BookkeepingTemplatesSyncService
+    private let budgetsSyncService: BookkeepingBudgetsSyncService
     private var metadataRevision: Int
     private var metadataUpdatedAt: Date
     private var metadataUpdatedByDeviceId: String
@@ -260,12 +309,20 @@ final class DraftBookkeepingStore: ObservableObject {
     private var importedTemplateSeqByDeviceId: [String: Int]
     private var templateOpSortKeysById: [String: TemplateOpSortKey]
     private var deletedTemplateOpSortKeysById: [String: TemplateOpSortKey]
+    private var nextBudgetOpSeq: Int
+    private var localBudgetOps: [BookkeepingBudgetOp]
+    private var uploadedBudgetOpIds: Set<String>
+    private var processedBudgetOpIds: Set<String>
+    private var importedBudgetSeqByDeviceId: [String: Int]
+    private var budgetOpSortKeysById: [String: BudgetOpSortKey]
+    private var deletedBudgetOpSortKeysById: [String: BudgetOpSortKey]
 
     private enum DefaultsKey {
         static let accounts = "draftBookkeeping.accounts"
         static let categories = "draftBookkeeping.categories"
         static let transactions = "draftBookkeeping.transactions"
         static let transactionTemplates = "draftBookkeeping.transactionTemplates"
+        static let budgets = "draftBookkeeping.budgets"
         static let lastDraft = "draftBookkeeping.lastDraft"
         static let metadataRevision = "draftBookkeeping.metadata.revision"
         static let metadataUpdatedAt = "draftBookkeeping.metadata.updatedAt"
@@ -297,6 +354,13 @@ final class DraftBookkeepingStore: ObservableObject {
         static let templateImportedSeqByDeviceId = "draftBookkeeping.templates.importedSeqByDeviceId"
         static let templateOpSortKeysById = "draftBookkeeping.templates.opSortKeysById"
         static let deletedTemplateOpSortKeysById = "draftBookkeeping.templates.deletedOpSortKeysById"
+        static let budgetNextSeq = "draftBookkeeping.budgets.nextSeq"
+        static let budgetLocalOps = "draftBookkeeping.budgets.localOps"
+        static let budgetUploadedOpIds = "draftBookkeeping.budgets.uploadedOpIds"
+        static let budgetProcessedOpIds = "draftBookkeeping.budgets.processedOpIds"
+        static let budgetImportedSeqByDeviceId = "draftBookkeeping.budgets.importedSeqByDeviceId"
+        static let budgetOpSortKeysById = "draftBookkeeping.budgets.opSortKeysById"
+        static let deletedBudgetOpSortKeysById = "draftBookkeeping.budgets.deletedOpSortKeysById"
     }
 
     private static let maxCategoryDepth = 3
@@ -305,12 +369,14 @@ final class DraftBookkeepingStore: ObservableObject {
         defaults: UserDefaults = .standard,
         syncService: BookkeepingMetadataSyncService = BookkeepingMetadataSyncService(),
         transactionsSyncService: BookkeepingTransactionsSyncService = BookkeepingTransactionsSyncService(),
-        templatesSyncService: BookkeepingTemplatesSyncService = BookkeepingTemplatesSyncService()
+        templatesSyncService: BookkeepingTemplatesSyncService = BookkeepingTemplatesSyncService(),
+        budgetsSyncService: BookkeepingBudgetsSyncService = BookkeepingBudgetsSyncService()
     ) {
         self.defaults = defaults
         self.syncService = syncService
         self.transactionsSyncService = transactionsSyncService
         self.templatesSyncService = templatesSyncService
+        self.budgetsSyncService = budgetsSyncService
         let hasStoredAccounts = defaults.data(forKey: DefaultsKey.accounts) != nil
         let hasStoredCategories = defaults.data(forKey: DefaultsKey.categories) != nil
         let hasStoredMetadata = defaults.object(forKey: DefaultsKey.metadataRevision) != nil
@@ -319,6 +385,7 @@ final class DraftBookkeepingStore: ObservableObject {
         self.categories = Self.load([DraftCategory].self, forKey: DefaultsKey.categories, from: defaults) ?? Self.defaultCategories
         let storedTransactions = Self.load([DraftTransaction].self, forKey: DefaultsKey.transactions, from: defaults) ?? []
         self.transactionTemplates = Self.load([DraftTransactionTemplate].self, forKey: DefaultsKey.transactionTemplates, from: defaults) ?? []
+        self.budgets = Self.load([DraftBudget].self, forKey: DefaultsKey.budgets, from: defaults) ?? []
         let legacyDraft = Self.load(DraftTransaction.self, forKey: DefaultsKey.lastDraft, from: defaults)
         let initializedTransactions: [DraftTransaction]
         if storedTransactions.isEmpty, let legacyDraft {
@@ -381,24 +448,36 @@ final class DraftBookkeepingStore: ObservableObject {
         self.importedTemplateSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.templateImportedSeqByDeviceId, from: defaults) ?? [:]
         self.templateOpSortKeysById = Self.load([String: TemplateOpSortKey].self, forKey: DefaultsKey.templateOpSortKeysById, from: defaults) ?? [:]
         self.deletedTemplateOpSortKeysById = Self.load([String: TemplateOpSortKey].self, forKey: DefaultsKey.deletedTemplateOpSortKeysById, from: defaults) ?? [:]
+        let storedBudgetNextSeq = defaults.integer(forKey: DefaultsKey.budgetNextSeq)
+        self.nextBudgetOpSeq = storedBudgetNextSeq > 0 ? storedBudgetNextSeq : 1
+        self.localBudgetOps = Self.load([BookkeepingBudgetOp].self, forKey: DefaultsKey.budgetLocalOps, from: defaults) ?? []
+        self.uploadedBudgetOpIds = Set(Self.load([String].self, forKey: DefaultsKey.budgetUploadedOpIds, from: defaults) ?? [])
+        self.processedBudgetOpIds = Set(Self.load([String].self, forKey: DefaultsKey.budgetProcessedOpIds, from: defaults) ?? [])
+        self.importedBudgetSeqByDeviceId = Self.load([String: Int].self, forKey: DefaultsKey.budgetImportedSeqByDeviceId, from: defaults) ?? [:]
+        self.budgetOpSortKeysById = Self.load([String: BudgetOpSortKey].self, forKey: DefaultsKey.budgetOpSortKeysById, from: defaults) ?? [:]
+        self.deletedBudgetOpSortKeysById = Self.load([String: BudgetOpSortKey].self, forKey: DefaultsKey.deletedBudgetOpSortKeysById, from: defaults) ?? [:]
 
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
         normalizeTransactionsAfterMetadataChange()
         normalizeTransactionTemplates()
+        normalizeBudgets()
         initializeTemplateSyncStateIfNeeded()
+        initializeBudgetSyncStateIfNeeded()
         initializeTransactionSyncStateIfNeeded()
         recomputeAccountBalancesFromBase()
         persistAccounts()
         persistCategories()
         persistTransactions()
         persistTransactionTemplates()
+        persistBudgets()
         persistMetadata()
         persistMetadataSyncState()
         persistTransactionsMetadata()
         persistTransactionSyncState()
         persistTemplateSyncState()
+        persistBudgetSyncState()
         persistWidgetSnapshot()
     }
 
@@ -531,6 +610,142 @@ final class DraftBookkeepingStore: ObservableObject {
             DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: income)),
             DraftAmountFormatter.currencyText(from: Self.plainAmountText(from: expense))
         )
+    }
+
+    func budgetDisplayName(_ budget: DraftBudget) -> String {
+        guard budget.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return budget.name
+        }
+
+        switch budget.scope {
+        case .overall:
+            return NSLocalizedString("budgets.defaultName.overall", comment: "")
+        case .category:
+            return categoryDisplayName(for: budget.targetId)
+        case .account:
+            return accountName(for: budget.targetId)
+        }
+    }
+
+    func budgetTargetName(_ budget: DraftBudget) -> String {
+        switch budget.scope {
+        case .overall:
+            return NSLocalizedString("budgets.scope.overall", comment: "")
+        case .category:
+            return categoryDisplayName(for: budget.targetId)
+        case .account:
+            return accountName(for: budget.targetId)
+        }
+    }
+
+    func budgetUsages(now: Date = Date(), calendar: Calendar = .current) -> [DraftBudgetUsage] {
+        budgets
+            .filter(\.isEnabled)
+            .sorted(by: Self.budgetSort)
+            .map { budgetUsage(for: $0, now: now, calendar: calendar) }
+    }
+
+    func budgetUsage(for budget: DraftBudget, now: Date = Date(), calendar: Calendar = .current) -> DraftBudgetUsage {
+        let spent = monthlyExpense(for: budget, now: now, calendar: calendar)
+        let limit = decimalValue(from: budget.amountText)
+        let remaining = limit - spent
+        let percentUsed: Double
+        if limit > 0 {
+            percentUsed = min(Self.doubleValue(from: spent) / Self.doubleValue(from: limit), 9.99)
+        } else {
+            percentUsed = 0
+        }
+
+        return DraftBudgetUsage(
+            budget: budget,
+            targetName: budgetTargetName(budget),
+            spentText: Self.plainAmountText(from: spent),
+            limitText: budget.amountText,
+            remainingText: Self.plainAmountText(from: remaining),
+            percentUsed: percentUsed,
+            isOverLimit: spent > limit
+        )
+    }
+
+    func budgetUsageForRecentExpense(
+        _ transaction: DraftTransaction,
+        preferredBudgetId: String?,
+        now: Date? = nil,
+        calendar: Calendar = .current
+    ) -> DraftBudgetUsage? {
+        guard transaction.kind == .expense else { return nil }
+
+        let referenceDate = now ?? transaction.date
+        let enabledUsages = budgetUsages(now: referenceDate, calendar: calendar)
+        if
+            let preferredBudgetId,
+            let usage = enabledUsages.first(where: { $0.budget.id == preferredBudgetId })
+        {
+            return usage
+        }
+
+        return enabledUsages.first { usage in
+            budgetIncludes(usage.budget, transaction: transaction)
+        }
+    }
+
+    @discardableResult
+    func addBudget(name: String, scope: DraftBudgetScope, targetId: String?, amountText: String, isEnabled: Bool) -> Bool {
+        guard let normalizedBudget = makeBudget(
+            id: UUID().uuidString,
+            existingCreatedAt: nil,
+            name: name,
+            scope: scope,
+            targetId: targetId,
+            amountText: amountText,
+            isEnabled: isEnabled
+        ) else {
+            return false
+        }
+
+        initializeBudgetSyncStateIfNeeded()
+        budgets.insert(normalizedBudget, at: 0)
+        budgets.sort(by: Self.budgetSort)
+        persistBudgets()
+        appendLocalBudgetOp(action: .create, budget: normalizedBudget, occurredAt: normalizedBudget.createdAt)
+        messageKey = "budgets.message.saved"
+        return true
+    }
+
+    @discardableResult
+    func updateBudget(id: String, name: String, scope: DraftBudgetScope, targetId: String?, amountText: String, isEnabled: Bool) -> Bool {
+        guard let index = budgets.firstIndex(where: { $0.id == id }) else { return false }
+        guard let normalizedBudget = makeBudget(
+            id: id,
+            existingCreatedAt: budgets[index].createdAt,
+            name: name,
+            scope: scope,
+            targetId: targetId,
+            amountText: amountText,
+            isEnabled: isEnabled
+        ) else {
+            return false
+        }
+
+        initializeBudgetSyncStateIfNeeded()
+        budgets[index] = normalizedBudget
+        budgets.sort(by: Self.budgetSort)
+        persistBudgets()
+        appendLocalBudgetOp(action: .update, budget: normalizedBudget)
+        messageKey = "budgets.message.saved"
+        return true
+    }
+
+    @discardableResult
+    func deleteBudget(id: String) -> Bool {
+        guard let index = budgets.firstIndex(where: { $0.id == id }) else { return false }
+
+        initializeBudgetSyncStateIfNeeded()
+        let budget = budgets.remove(at: index)
+        persistBudgets()
+        appendLocalBudgetOp(action: .delete, budget: budget)
+        messageKey = "budgets.message.deleted"
+        return true
     }
 
     func saveTransaction(_ transaction: DraftTransaction) {
@@ -686,6 +901,7 @@ final class DraftBookkeepingStore: ObservableObject {
             try await backupPendingMetadataOps(configuration: configuration, secrets: secrets, forceFullUpload: forceFullUpload)
             try await backupPendingTransactionOps(configuration: configuration, secrets: secrets, forceFullUpload: forceFullUpload)
             try await backupPendingTemplateOps(configuration: configuration, secrets: secrets, forceFullUpload: forceFullUpload)
+            try await backupPendingBudgetOps(configuration: configuration, secrets: secrets, forceFullUpload: forceFullUpload)
             messageKey = "bookkeeping.ledger.sync.backupSucceeded"
             return true
         } catch {
@@ -790,6 +1006,38 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
+    func backupBudgetsNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.budgets.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            try await backupPendingBudgetOps(configuration: configuration, secrets: secrets)
+            messageKey = "bookkeeping.budgets.sync.backupSucceeded"
+            return true
+        } catch {
+            messageKey = "bookkeeping.budgets.sync.error.backupFailed"
+            return false
+        }
+    }
+
+    func importBudgetsNow(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else {
+            messageKey = "bookkeeping.budgets.sync.error.backupDisabled"
+            return false
+        }
+
+        do {
+            let didImport = try await importBudgetOps(configuration: configuration, secrets: secrets)
+            messageKey = didImport ? "bookkeeping.budgets.sync.importSucceeded" : "bookkeeping.budgets.sync.importNoRemoteBudgets"
+            return true
+        } catch {
+            messageKey = "bookkeeping.budgets.sync.error.importFailed"
+            return false
+        }
+    }
+
     func importIfRemoteTransactionsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
         guard configuration.backupEnabled else { return }
 
@@ -810,6 +1058,19 @@ final class DraftBookkeepingStore: ObservableObject {
             let didImport = try await importTemplateOps(configuration: configuration, secrets: secrets)
             if didImport {
                 messageKey = "bookkeeping.templates.sync.importSucceeded"
+            }
+        } catch {
+            return
+        }
+    }
+
+    func importIfRemoteBudgetsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
+        guard configuration.backupEnabled else { return }
+
+        do {
+            let didImport = try await importBudgetOps(configuration: configuration, secrets: secrets)
+            if didImport {
+                messageKey = "bookkeeping.budgets.sync.importSucceeded"
             }
         } catch {
             return
@@ -938,6 +1199,8 @@ final class DraftBookkeepingStore: ObservableObject {
         } else if let opAccount {
             appendLocalMetadataOp(entity: .account, action: .archive, account: opAccount, category: nil)
         }
+        normalizeBudgets()
+        persistBudgets()
         persistWidgetSnapshot()
         return true
     }
@@ -1093,6 +1356,8 @@ final class DraftBookkeepingStore: ObservableObject {
                 appendLocalMetadataOp(entity: .category, action: .archive, account: nil, category: opCategory)
             }
         }
+        normalizeBudgets()
+        persistBudgets()
         persistWidgetSnapshot()
         return true
     }
@@ -1194,10 +1459,12 @@ final class DraftBookkeepingStore: ObservableObject {
         normalizeDefaultNames()
         normalizeCategoryHierarchy()
         normalizeDefaultSelections()
+        normalizeBudgets()
         initializeMissingBaseBalances()
         recomputeAccountBalancesFromBase()
         persistAccounts()
         persistCategories()
+        persistBudgets()
         persistMetadata()
         persistMetadataSyncState()
         persistTransactionSyncState()
@@ -1450,6 +1717,22 @@ final class DraftBookkeepingStore: ObservableObject {
         persistTemplateSyncState()
     }
 
+    private func backupPendingBudgetOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        forceFullUpload: Bool = false
+    ) async throws {
+        initializeBudgetSyncStateIfNeeded()
+        let uploadCandidates = forceFullUpload ? localBudgetOps : localBudgetOps.filter { !uploadedBudgetOpIds.contains($0.opId) }
+        guard !uploadCandidates.isEmpty else { return }
+
+        let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
+        let opsToWrite = localBudgetOps.filter { pendingFileIndexes.contains($0.fileIndex) }
+        try await budgetsSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        uploadedBudgetOpIds.formUnion(opsToWrite.map(\.opId))
+        persistBudgetSyncState()
+    }
+
     @discardableResult
     private func importTransactionOps(
         configuration: SyncConfiguration,
@@ -1535,6 +1818,31 @@ final class DraftBookkeepingStore: ObservableObject {
         return true
     }
 
+    @discardableResult
+    private func importBudgetOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets
+    ) async throws -> Bool {
+        initializeBudgetSyncStateIfNeeded()
+        let remoteOps = try await budgetsSyncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let unappliedOps = remoteOps
+            .filter { !processedBudgetOpIds.contains($0.opId) }
+            .sorted(by: Self.budgetOpReplaySort)
+
+        guard !unappliedOps.isEmpty else {
+            return false
+        }
+
+        for op in unappliedOps {
+            applyRemoteBudgetOp(op)
+        }
+
+        normalizeBudgets()
+        persistBudgets()
+        persistBudgetSyncState()
+        return true
+    }
+
     private func appendLocalTransactionOp(action: BookkeepingTransactionOpAction, transaction: DraftTransaction, occurredAt: Date = Date()) {
         let op = BookkeepingTransactionOp(
             deviceId: DeviceIdentity.currentDeviceId,
@@ -1569,6 +1877,24 @@ final class DraftBookkeepingStore: ObservableObject {
         applyTemplateOpState(op)
         markTemplatesChanged()
         persistTemplateSyncState()
+    }
+
+    private func appendLocalBudgetOp(action: BookkeepingBudgetOpAction, budget: DraftBudget, occurredAt: Date = Date()) {
+        let op = BookkeepingBudgetOp(
+            deviceId: DeviceIdentity.currentDeviceId,
+            seq: nextBudgetOpSeq,
+            entityId: budget.id,
+            action: action,
+            occurredAt: occurredAt,
+            payload: action == .delete ? nil : normalizedBudget(budget)
+        )
+        nextBudgetOpSeq += 1
+        localBudgetOps.append(op)
+        processedBudgetOpIds.insert(op.opId)
+        importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyBudgetOpState(op)
+        markBudgetsChanged()
+        persistBudgetSyncState()
     }
 
     private func applyRemoteTransactionOp(_ op: BookkeepingTransactionOp) {
@@ -1689,6 +2015,67 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
+    private func applyRemoteBudgetOp(_ op: BookkeepingBudgetOp) {
+        guard op.schemaVersion == 1, op.entity == "budget" else { return }
+        guard op.ledgerId == "default", !op.deviceId.isEmpty, op.seq > 0, !op.entityId.isEmpty else { return }
+        guard op.action == .delete || op.payload != nil else { return }
+        guard !processedBudgetOpIds.contains(op.opId) else { return }
+        guard shouldApplyBudgetOp(op) else {
+            processedBudgetOpIds.insert(op.opId)
+            importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            return
+        }
+
+        switch op.action {
+        case .create, .update:
+            guard let payload = op.payload else { break }
+            var normalized = normalizedBudget(payload)
+            normalized.id = op.entityId
+            guard hasValidBudgetTarget(normalized), Self.normalizedPositiveAmountText(normalized.amountText) != nil else {
+                processedBudgetOpIds.insert(op.opId)
+                importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+                return
+            }
+            if let index = budgets.firstIndex(where: { $0.id == op.entityId }) {
+                budgets[index] = normalized
+            } else {
+                budgets.append(normalized)
+            }
+        case .delete:
+            budgets.removeAll { $0.id == op.entityId }
+            deletedBudgetOpSortKeysById[op.entityId] = op.sortKey
+        }
+
+        processedBudgetOpIds.insert(op.opId)
+        importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+        applyBudgetOpState(op)
+    }
+
+    private func shouldApplyBudgetOp(_ op: BookkeepingBudgetOp) -> Bool {
+        let incomingKey = op.sortKey
+        let currentKey = budgetOpSortKeysById[op.entityId] ?? .zero
+        let deletedKey = deletedBudgetOpSortKeysById[op.entityId] ?? .zero
+
+        switch op.action {
+        case .create, .update:
+            guard incomingKey >= currentKey else { return false }
+            guard incomingKey > deletedKey else { return false }
+            return true
+        case .delete:
+            return incomingKey >= currentKey && incomingKey >= deletedKey
+        }
+    }
+
+    private func applyBudgetOpState(_ op: BookkeepingBudgetOp) {
+        switch op.action {
+        case .create, .update:
+            budgetOpSortKeysById[op.entityId] = op.sortKey
+            deletedBudgetOpSortKeysById.removeValue(forKey: op.entityId)
+        case .delete:
+            deletedBudgetOpSortKeysById[op.entityId] = op.sortKey
+        }
+    }
+
     private func initializeTransactionSyncStateIfNeeded() {
         if !accountBaseBalanceTextById.isEmpty {
             initializeMissingBaseBalances()
@@ -1745,6 +2132,31 @@ final class DraftBookkeepingStore: ObservableObject {
             templateOpSortKeysById[template.id] = op.sortKey
         }
         persistTemplateSyncState()
+    }
+
+    private func initializeBudgetSyncStateIfNeeded() {
+        guard localBudgetOps.isEmpty, processedBudgetOpIds.isEmpty, !budgets.isEmpty else {
+            return
+        }
+
+        for budget in budgets.sorted(by: { $0.createdAt < $1.createdAt }) {
+            let normalized = normalizedBudget(budget)
+            let op = BookkeepingBudgetOp(
+                deviceId: DeviceIdentity.currentDeviceId,
+                seq: nextBudgetOpSeq,
+                entityId: budget.id,
+                action: .create,
+                occurredAt: budget.createdAt,
+                createdAt: budget.createdAt,
+                payload: normalized
+            )
+            nextBudgetOpSeq += 1
+            localBudgetOps.append(op)
+            processedBudgetOpIds.insert(op.opId)
+            importedBudgetSeqByDeviceId[op.deviceId] = max(importedBudgetSeqByDeviceId[op.deviceId] ?? 0, op.seq)
+            budgetOpSortKeysById[budget.id] = op.sortKey
+        }
+        persistBudgetSyncState()
     }
 
     private func initializeMissingBaseBalances() {
@@ -1811,6 +2223,10 @@ final class DraftBookkeepingStore: ObservableObject {
         localTemplatesChangeToken += 1
     }
 
+    private func markBudgetsChanged() {
+        localBudgetsChangeToken += 1
+    }
+
     private func updateTransactionsSyncMetadata(at date: Date, deviceId: String) {
         transactionsRevision += 1
         transactionsUpdatedAt = date
@@ -1863,6 +2279,16 @@ final class DraftBookkeepingStore: ObservableObject {
         Self.save(deletedTemplateOpSortKeysById, forKey: DefaultsKey.deletedTemplateOpSortKeysById, to: defaults)
     }
 
+    private func persistBudgetSyncState() {
+        defaults.set(nextBudgetOpSeq, forKey: DefaultsKey.budgetNextSeq)
+        Self.save(localBudgetOps, forKey: DefaultsKey.budgetLocalOps, to: defaults)
+        Self.save(Array(uploadedBudgetOpIds), forKey: DefaultsKey.budgetUploadedOpIds, to: defaults)
+        Self.save(Array(processedBudgetOpIds), forKey: DefaultsKey.budgetProcessedOpIds, to: defaults)
+        Self.save(importedBudgetSeqByDeviceId, forKey: DefaultsKey.budgetImportedSeqByDeviceId, to: defaults)
+        Self.save(budgetOpSortKeysById, forKey: DefaultsKey.budgetOpSortKeysById, to: defaults)
+        Self.save(deletedBudgetOpSortKeysById, forKey: DefaultsKey.deletedBudgetOpSortKeysById, to: defaults)
+    }
+
     private func normalizeTransactionsAfterMetadataChange() {
         lastDraft = transactions.first
     }
@@ -1881,6 +2307,110 @@ final class DraftBookkeepingStore: ObservableObject {
         normalized.note = normalized.note.trimmingCharacters(in: .whitespacesAndNewlines)
         normalized.amountText = DraftAmountFormatter.normalizedAmountText(template.amountText, allowNegative: false) ?? "0"
         return normalized
+    }
+
+    private func normalizeBudgets() {
+        budgets = budgets
+            .map(normalizedBudget)
+            .filter { budget in
+                hasValidBudgetTarget(budget) && Self.normalizedPositiveAmountText(budget.amountText) != nil
+            }
+            .sorted(by: Self.budgetSort)
+    }
+
+    private func normalizedBudget(_ budget: DraftBudget) -> DraftBudget {
+        var normalized = budget
+        normalized.name = normalized.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        normalized.amountText = DraftAmountFormatter.normalizedAmountText(budget.amountText, allowNegative: false) ?? "0"
+        if normalized.scope == .overall {
+            normalized.targetId = nil
+        }
+        return normalized
+    }
+
+    private func makeBudget(
+        id: String,
+        existingCreatedAt: Date?,
+        name: String,
+        scope: DraftBudgetScope,
+        targetId: String?,
+        amountText: String,
+        isEnabled: Bool
+    ) -> DraftBudget? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalizedAmountText = Self.normalizedPositiveAmountText(amountText) else {
+            messageKey = "budgets.error.invalidAmount"
+            return nil
+        }
+
+        let resolvedTargetId: String?
+        switch scope {
+        case .overall:
+            resolvedTargetId = nil
+        case .category:
+            guard let targetId, isActiveCategory(id: targetId, kind: .expense) else {
+                messageKey = "budgets.error.targetRequired"
+                return nil
+            }
+            resolvedTargetId = targetId
+        case .account:
+            guard let targetId, isActiveAccount(id: targetId) else {
+                messageKey = "budgets.error.targetRequired"
+                return nil
+            }
+            resolvedTargetId = targetId
+        }
+
+        let now = Date()
+        return DraftBudget(
+            id: id,
+            name: trimmedName,
+            scope: scope,
+            targetId: resolvedTargetId,
+            amountText: normalizedAmountText,
+            isEnabled: isEnabled,
+            createdAt: existingCreatedAt ?? now,
+            updatedAt: now
+        )
+    }
+
+    private func hasValidBudgetTarget(_ budget: DraftBudget) -> Bool {
+        switch budget.scope {
+        case .overall:
+            return true
+        case .category:
+            guard let targetId = budget.targetId else { return false }
+            return categories.contains { $0.id == targetId && $0.kind == .expense }
+        case .account:
+            guard let targetId = budget.targetId else { return false }
+            return accounts.contains { $0.id == targetId }
+        }
+    }
+
+    private func budgetIncludes(_ budget: DraftBudget, transaction: DraftTransaction) -> Bool {
+        guard transaction.kind == .expense else { return false }
+
+        switch budget.scope {
+        case .overall:
+            return true
+        case .category:
+            guard let targetId = budget.targetId, let categoryId = transaction.categoryId else { return false }
+            return categoryId == targetId || categoryDescendantIds(for: targetId).contains(categoryId)
+        case .account:
+            return transaction.accountId == budget.targetId
+        }
+    }
+
+    private func monthlyExpense(for budget: DraftBudget, now: Date, calendar: Calendar) -> Decimal {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: now) else { return 0 }
+
+        return transactions.reduce(Decimal(0)) { partialResult, transaction in
+            guard monthInterval.contains(transaction.date), budgetIncludes(budget, transaction: transaction) else {
+                return partialResult
+            }
+
+            return partialResult + decimalValue(from: transaction.amountText)
+        }
     }
 
     private func isActiveAccount(id: String) -> Bool {
@@ -2094,6 +2624,10 @@ final class DraftBookkeepingStore: ObservableObject {
         Self.save(transactionTemplates, forKey: DefaultsKey.transactionTemplates, to: defaults)
     }
 
+    private func persistBudgets() {
+        Self.save(budgets, forKey: DefaultsKey.budgets, to: defaults)
+    }
+
     private func persistLastDraft() {
         Self.save(lastDraft, forKey: DefaultsKey.lastDraft, to: defaults)
     }
@@ -2276,6 +2810,18 @@ final class DraftBookkeepingStore: ObservableObject {
         return lhs.updatedAt > rhs.updatedAt
     }
 
+    private static func budgetSort(_ lhs: DraftBudget, _ rhs: DraftBudget) -> Bool {
+        if lhs.isEnabled != rhs.isEnabled {
+            return lhs.isEnabled && !rhs.isEnabled
+        }
+
+        if lhs.updatedAt == rhs.updatedAt {
+            return lhs.createdAt > rhs.createdAt
+        }
+
+        return lhs.updatedAt > rhs.updatedAt
+    }
+
     private static func metadataOpReplaySort(_ lhs: BookkeepingMetadataOp, _ rhs: BookkeepingMetadataOp) -> Bool {
         if lhs.createdAt != rhs.createdAt {
             return lhs.createdAt < rhs.createdAt
@@ -2301,6 +2847,18 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private static func templateOpReplaySort(_ lhs: BookkeepingTemplateOp, _ rhs: BookkeepingTemplateOp) -> Bool {
+        if lhs.createdAt != rhs.createdAt {
+            return lhs.createdAt < rhs.createdAt
+        }
+
+        if lhs.deviceId != rhs.deviceId {
+            return lhs.deviceId < rhs.deviceId
+        }
+
+        return lhs.seq < rhs.seq
+    }
+
+    private static func budgetOpReplaySort(_ lhs: BookkeepingBudgetOp, _ rhs: BookkeepingBudgetOp) -> Bool {
         if lhs.createdAt != rhs.createdAt {
             return lhs.createdAt < rhs.createdAt
         }

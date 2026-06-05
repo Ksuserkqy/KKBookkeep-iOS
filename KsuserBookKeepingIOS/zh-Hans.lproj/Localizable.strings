@@ -19,7 +19,7 @@
 "initialSync.legal.accept" = "同意并继续";
 "initialSync.navigationTitle" = "开始使用";
 "initialSync.title" = "选择本设备的数据方式";
-"initialSync.subtitle" = "可以从已有同步空间导入个人信息、账户、分类、模板和流水，也可以让这台设备先独立运行。";
+"initialSync.subtitle" = "可以从已有同步空间导入个人信息、账户、分类、模板、预算和流水，也可以让这台设备先独立运行。";
 "initialSync.choice.section" = "是否需要同步";
 "initialSync.choice.iCloud.title" = "从 iCloud 同步";
 "initialSync.choice.iCloud.subtitle" = "暂不可用，后续版本开放。";
@@ -67,6 +67,9 @@
 "dashboard.monthTransactions.valueFormat" = "%d 笔";
 "dashboard.topExpenseCategory" = "最大支出分类";
 "dashboard.topExpenseCategory.valueFormat" = "%@ · %@";
+"dashboard.budgets" = "预算进度";
+"dashboard.budget.percentFormat" = "%.0f%%";
+"dashboard.budget.spentFormat" = "已用 %@ / %@";
 "dashboard.quickActions" = "快捷记账";
 "dashboard.quickExpense" = "支出";
 "dashboard.quickIncome" = "收入";
@@ -456,6 +459,38 @@
 "templates.message.saved" = "模板已保存。";
 "templates.message.deleted" = "模板已删除。";
 
+"budgets.title" = "预算管理";
+"budgets.add" = "新增预算";
+"budgets.add.title" = "新增预算";
+"budgets.edit.title" = "编辑预算";
+"budgets.section" = "月度预算";
+"budgets.section.basic" = "预算信息";
+"budgets.scope" = "预算范围";
+"budgets.scope.overall" = "总预算";
+"budgets.scope.category" = "分类预算";
+"budgets.scope.account" = "账户预算";
+"budgets.target.category" = "支出分类";
+"budgets.target.account" = "账户";
+"budgets.name.placeholder" = "预算名称";
+"budgets.amount.placeholder" = "月度预算";
+"budgets.enabled" = "启用预算";
+"budgets.disabled.badge" = "停用";
+"budgets.defaultName.overall" = "本月支出";
+"budgets.empty.title" = "暂无预算";
+"budgets.empty.subtitle" = "可以为本月总支出、某个分类或某个账户设置上限。";
+"budgets.footer" = "预算按月统计支出用量。分类预算会包含下级分类，账户预算会统计从该账户支付的支出。";
+"budgets.editor.footer" = "预算会以 WebDAV 增量日志备份，并在其他设备重放同步。";
+"budgets.delete.confirm.title" = "删除预算？";
+"budgets.delete.confirm.message" = "这里只会删除预算设置，不会影响已经保存的流水。";
+"budgets.message.saved" = "预算已保存。";
+"budgets.message.deleted" = "预算已删除。";
+"budgets.error.invalidAmount" = "请输入有效的预算金额。";
+"budgets.error.targetRequired" = "请选择有效的预算对象。";
+"budgets.progress.percentFormat" = "%.0f%%";
+"budgets.progress.spentFormat" = "已用 %@ / %@";
+"budgets.progress.remainingFormat" = "剩余 %@";
+"budgets.progress.overFormat" = "超出 %@";
+
 "profile.title" = "个人中心";
 "profile.displayName.placeholder" = "未设置昵称";
 "profile.section.account" = "账号与同步";
@@ -530,7 +565,7 @@
 "sync.backupInterval.oneMinute" = "1 分钟";
 "sync.backupInterval.fiveMinutes" = "5 分钟";
 "sync.backupInterval.tenMinutes" = "10 分钟";
-"sync.behavior.footer" = "有修改时会尽快备份；后台定期检查受系统调度影响。手动导入会在远端文件存在时覆盖本机个人信息，并重放账户、分类、模板和流水增量日志。";
+"sync.behavior.footer" = "有修改时会尽快备份；后台定期检查受系统调度影响。手动导入会在远端文件存在时覆盖本机个人信息，并重放账户、分类、模板、预算和流水增量日志。";
 "sync.encryption.enabled" = "加密备份文件";
 "sync.encryption.password.placeholder" = "同步密码";
 "sync.encryption.confirm.placeholder" = "确认同步密码";
@@ -576,6 +611,13 @@
 "bookkeeping.templates.sync.error.backupFailed" = "模板备份失败，请检查 WebDAV 地址、同步密码和凭据。";
 "bookkeeping.templates.sync.error.importFailed" = "模板导入失败，请检查 WebDAV 地址、同步密码和凭据。";
 
+"bookkeeping.budgets.sync.backupSucceeded" = "预算备份完成。";
+"bookkeeping.budgets.sync.importSucceeded" = "预算已导入。";
+"bookkeeping.budgets.sync.importNoRemoteBudgets" = "没有找到远端预算文件。";
+"bookkeeping.budgets.sync.error.backupDisabled" = "请先启用文件备份，再同步预算。";
+"bookkeeping.budgets.sync.error.backupFailed" = "预算备份失败，请检查 WebDAV 地址、同步密码和凭据。";
+"bookkeeping.budgets.sync.error.importFailed" = "预算导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+
 "bookkeeping.ledger.sync.backupSucceeded" = "账本数据备份完成。";
 "bookkeeping.ledger.sync.error.backupDisabled" = "请先启用文件备份，再同步账本数据。";
 "bookkeeping.ledger.sync.error.backupFailed" = "账本数据备份失败，请检查 WebDAV 地址、同步密码和凭据。";
@@ -593,12 +635,14 @@
 "settings.theme.footer" = "选择羊羊记账在此设备上的显示风格。";
 "settings.liveActivities.section" = "实时活动";
 "settings.liveActivities.enabled" = "在灵动岛显示最近一笔流水";
+"settings.liveActivities.budget.enabled" = "记支出后显示预算消耗";
+"settings.liveActivities.budget.selection" = "显示的预算";
 "settings.liveActivities.duration" = "灵动岛停留时间";
 "settings.liveActivities.duration.30s" = "30 秒";
 "settings.liveActivities.duration.1m" = "1 分钟";
 "settings.liveActivities.duration.3m" = "3 分钟";
 "settings.liveActivities.duration.5m" = "5 分钟";
-"settings.liveActivities.footer" = "保存流水后，若设备支持，羊羊记账会在灵动岛显示账户图标、金额和详情。停留时间只保存在本机，不参与备份或同步。";
+"settings.liveActivities.footer" = "最近流水和预算消耗两种灵动岛展示互斥，只能开启一种。预算消耗仅在保存支出后显示，并使用选中的已启用预算。这些设置只保存在本机，不参与备份或同步。";
 "settings.security.section" = "安全";
 "settings.security.appLock" = "进入应用时需要密码";
 "settings.security.changePassword" = "修改解锁密码";

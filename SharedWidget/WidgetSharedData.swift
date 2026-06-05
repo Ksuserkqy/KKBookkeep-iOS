@@ -5,9 +5,11 @@ import ActivityKit
 #endif
 
 enum WidgetSharedConfiguration {
-    static let appGroupIdentifier = "group.cn.ksuser.bookkeeping.KsuserBookKeepingIOS"
+    static let appGroupIdentifier = "group.cn.ksuser.bookkeeping.kkbookkeep"
     static let snapshotFileName = "widget-ledger-snapshot.json"
     static let liveActivitiesEnabledKey = "app.liveActivities.enabled"
+    static let budgetLiveActivitiesEnabledKey = "app.liveActivities.budget.enabled"
+    static let selectedBudgetLiveActivityIdKey = "app.liveActivities.budget.selectedBudgetId"
     static let liveActivityDisplayDurationKey = "app.liveActivities.displayDurationSeconds"
 
     static func snapshotURL(fileManager: FileManager = .default) -> URL? {
@@ -52,6 +54,24 @@ struct RecentTransactionActivityAttributes: ActivityAttributes, Sendable {
         var counterpartyAccountName: String?
         var note: String
         var locationName: String?
+        var dateText: String
+    }
+
+    var ledgerId: String
+}
+
+struct BudgetActivityAttributes: ActivityAttributes, Sendable {
+    struct ContentState: Codable, Hashable, Sendable {
+        var budgetId: String
+        var title: String
+        var targetName: String
+        var spentText: String
+        var limitText: String
+        var remainingText: String
+        var percentUsed: Double
+        var isOverLimit: Bool
+        var transactionAmountText: String
+        var transactionTitle: String
         var dateText: String
     }
 

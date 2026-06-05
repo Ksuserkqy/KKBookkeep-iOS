@@ -116,6 +116,9 @@ struct ContentView: View {
         .onReceive(draftBookkeepingStore.$localTemplatesChangeToken.dropFirst()) { _ in
             scheduleLedgerDataBackup()
         }
+        .onReceive(draftBookkeepingStore.$localBudgetsChangeToken.dropFirst()) { _ in
+            scheduleLedgerDataBackup()
+        }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
@@ -182,6 +185,10 @@ struct ContentView: View {
             secrets: secrets
         )
         await draftBookkeepingStore.importIfRemoteTemplatesAreNewer(
+            configuration: configuration,
+            secrets: secrets
+        )
+        await draftBookkeepingStore.importIfRemoteBudgetsAreNewer(
             configuration: configuration,
             secrets: secrets
         )

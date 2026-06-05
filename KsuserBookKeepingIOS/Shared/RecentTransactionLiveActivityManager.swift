@@ -10,6 +10,14 @@ enum RecentTransactionLiveActivityManager {
         UserDefaults.standard.object(forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey) as? Bool ?? true
     }
 
+    static var isBudgetFeatureEnabled: Bool {
+        UserDefaults.standard.object(forKey: WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey) as? Bool ?? false
+    }
+
+    static var selectedBudgetId: String {
+        UserDefaults.standard.string(forKey: WidgetSharedConfiguration.selectedBudgetLiveActivityIdKey) ?? ""
+    }
+
     static var displayDurationSeconds: TimeInterval {
         let storedValue = UserDefaults.standard.integer(forKey: WidgetSharedConfiguration.liveActivityDisplayDurationKey)
         let allowedValues = [30, 60, 180, 300]
@@ -21,11 +29,33 @@ enum RecentTransactionLiveActivityManager {
     static func setFeatureEnabled(_ isEnabled: Bool) {
         UserDefaults.standard.set(isEnabled, forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey)
 
+        if isEnabled {
+            UserDefaults.standard.set(false, forKey: WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey)
+        }
+
         guard !isEnabled else { return }
 
         Task {
-            await endAll()
+            await endRecentTransactionActivities()
         }
+    }
+
+    static func setBudgetFeatureEnabled(_ isEnabled: Bool) {
+        UserDefaults.standard.set(isEnabled, forKey: WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey)
+
+        if isEnabled {
+            UserDefaults.standard.set(false, forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey)
+        }
+
+        guard !isEnabled else { return }
+
+        Task {
+            await endBudgetActivities()
+        }
+    }
+
+    static func setSelectedBudgetId(_ budgetId: String) {
+        UserDefaults.standard.set(budgetId, forKey: WidgetSharedConfiguration.selectedBudgetLiveActivityIdKey)
     }
 
     static func showRecentTransaction(
@@ -69,7 +99,53 @@ enum RecentTransactionLiveActivityManager {
         #endif
     }
 
+    static func showBudgetUsage(
+        usage: DraftBudgetUsage,
+        transaction: DraftTransaction,
+        transactionTitle: String
+    ) {
+        guard isBudgetFeatureEnabled else { return }
+
+        #if canImport(ActivityKit)
+        guard #available(iOS 16.2, *) else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        let state = makeBudgetState(
+            usage: usage,
+            transaction: transaction,
+            transactionTitle: transactionTitle
+        )
+        let attributes = BudgetActivityAttributes(ledgerId: "default")
+        let content = ActivityContent(
+            state: state,
+            staleDate: Date().addingTimeInterval(displayDurationSeconds),
+            relevanceScore: 100
+        )
+        let displayDuration = displayDurationSeconds
+
+        Task {
+            await endAll()
+
+            do {
+                let activity = try Activity<BudgetActivityAttributes>.request(
+                    attributes: attributes,
+                    content: content,
+                    pushType: nil
+                )
+                scheduleEnd(activity, after: displayDuration)
+            } catch {
+                // Live Activities can be unavailable because of system settings, device support, or quota limits.
+            }
+        }
+        #endif
+    }
+
     static func endAll() async {
+        await endRecentTransactionActivities()
+        await endBudgetActivities()
+    }
+
+    static func endRecentTransactionActivities() async {
         #if canImport(ActivityKit)
         guard #available(iOS 16.2, *) else { return }
 
@@ -79,10 +155,20 @@ enum RecentTransactionLiveActivityManager {
         #endif
     }
 
+    static func endBudgetActivities() async {
+        #if canImport(ActivityKit)
+        guard #available(iOS 16.2, *) else { return }
+
+        for activity in Activity<BudgetActivityAttributes>.activities {
+            await activity.end(activity.content, dismissalPolicy: .immediate)
+        }
+        #endif
+    }
+
     #if canImport(ActivityKit)
     @available(iOS 16.2, *)
-    private static func scheduleEnd(
-        _ activity: Activity<RecentTransactionActivityAttributes>,
+    private static func scheduleEnd<Attributes: ActivityAttributes>(
+        _ activity: Activity<Attributes>,
         after displayDuration: TimeInterval
     ) {
         Task {
@@ -171,6 +257,27 @@ enum RecentTransactionLiveActivityManager {
         case .transfer:
             return amountText
         }
+    }
+
+    @available(iOS 16.2, *)
+    private static func makeBudgetState(
+        usage: DraftBudgetUsage,
+        transaction: DraftTransaction,
+        transactionTitle: String
+    ) -> BudgetActivityAttributes.ContentState {
+        BudgetActivityAttributes.ContentState(
+            budgetId: usage.budget.id,
+            title: usage.budget.name.isEmpty ? usage.targetName : usage.budget.name,
+            targetName: usage.targetName,
+            spentText: DraftAmountFormatter.currencyText(from: usage.spentText),
+            limitText: DraftAmountFormatter.currencyText(from: usage.limitText),
+            remainingText: DraftAmountFormatter.currencyText(from: usage.remainingText),
+            percentUsed: usage.percentUsed,
+            isOverLimit: usage.isOverLimit,
+            transactionAmountText: "-\(DraftAmountFormatter.currencyText(from: transaction.amountText))",
+            transactionTitle: transactionTitle,
+            dateText: dateFormatter.string(from: transaction.date)
+        )
     }
 
     private static let dateFormatter: DateFormatter = {

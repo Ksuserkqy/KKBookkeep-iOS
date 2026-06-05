@@ -488,14 +488,36 @@ struct RecordPage: View {
         )
 
         draftStore.saveTransaction(transaction)
-        RecentTransactionLiveActivityManager.showRecentTransaction(
-            transaction,
-            accounts: draftStore.accounts,
-            categoryName: draftStore.categoryDisplayName(for: transaction.categoryId)
-        )
+        showLiveActivityIfNeeded(for: transaction)
         resetFormForNextTransaction()
         draftStore.clearMessage()
         selectedTab = .transactions
+    }
+
+    private func showLiveActivityIfNeeded(for transaction: DraftTransaction) {
+        let categoryName = draftStore.categoryDisplayName(for: transaction.categoryId)
+
+        if
+            RecentTransactionLiveActivityManager.isBudgetFeatureEnabled,
+            transaction.kind == .expense,
+            let usage = draftStore.budgetUsageForRecentExpense(
+                transaction,
+                preferredBudgetId: RecentTransactionLiveActivityManager.selectedBudgetId
+            )
+        {
+            RecentTransactionLiveActivityManager.showBudgetUsage(
+                usage: usage,
+                transaction: transaction,
+                transactionTitle: categoryName
+            )
+            return
+        }
+
+        RecentTransactionLiveActivityManager.showRecentTransaction(
+            transaction,
+            accounts: draftStore.accounts,
+            categoryName: categoryName
+        )
     }
 
     private func resetFormForNextTransaction() {

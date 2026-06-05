@@ -21,6 +21,10 @@ struct DashboardPage: View {
         Array(draftStore.transactions.prefix(3))
     }
 
+    private var displayedBudgetUsages: [DraftBudgetUsage] {
+        Array(draftStore.budgetUsages().prefix(2))
+    }
+
     private var monthSummary: DashboardMonthSummary {
         let calendar = Calendar.current
         let now = Date()
@@ -86,6 +90,7 @@ struct DashboardPage: View {
                     dashboardHeader
                     balanceCard
                     monthOverviewSection
+                    budgetSection
                     quickActionsSection
                     accountsSection
                     recentDraftSection
@@ -208,6 +213,28 @@ struct DashboardPage: View {
                             systemImage: "chart.bar.xaxis",
                             tint: .purple
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var budgetSection: some View {
+        if !displayedBudgetUsages.isEmpty {
+            DashboardSection(titleKey: "dashboard.budgets") {
+                DashboardCard {
+                    VStack(spacing: 14) {
+                        ForEach(displayedBudgetUsages) { usage in
+                            DashboardBudgetRow(
+                                title: draftStore.budgetDisplayName(usage.budget),
+                                usage: usage
+                            )
+
+                            if usage.id != displayedBudgetUsages.last?.id {
+                                Divider()
+                            }
+                        }
                     }
                 }
             }
@@ -490,6 +517,59 @@ private struct DashboardMetricTile: View {
         .frame(height: 104)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct DashboardBudgetRow: View {
+    let title: String
+    let usage: DraftBudgetUsage
+
+    private var tint: Color {
+        usage.isOverLimit ? .red : .accentColor
+    }
+
+    private var percentText: String {
+        String(format: NSLocalizedString("dashboard.budget.percentFormat", comment: ""), usage.percentUsed * 100)
+    }
+
+    private var spentText: String {
+        DraftAmountFormatter.currencyText(from: usage.spentText)
+    }
+
+    private var limitText: String {
+        DraftAmountFormatter.currencyText(from: usage.limitText)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+
+                    Text(usage.targetName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 12)
+
+                Text(percentText)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(tint)
+                    .lineLimit(1)
+            }
+
+            ProgressView(value: min(max(usage.percentUsed, 0), 1))
+                .tint(tint)
+
+            Text(String(format: NSLocalizedString("dashboard.budget.spentFormat", comment: ""), spentText, limitText))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 }
 

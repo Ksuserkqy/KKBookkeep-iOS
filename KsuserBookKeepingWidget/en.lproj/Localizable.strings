@@ -13,6 +13,10 @@
 "liveActivity.kind.expense" = "Expense";
 "liveActivity.kind.income" = "Income";
 "liveActivity.kind.transfer" = "Transfer";
+"liveActivity.budget.title" = "Budget Usage";
+"liveActivity.budget.remaining" = "Remaining";
+"liveActivity.budget.over" = "Over Budget";
+"liveActivity.budget.spentFormat" = "%@ / %@";
 
 "dashboard.totalBalance" = "Total Balance";
 "dashboard.monthIncome" = "Income";

@@ -2,12 +2,19 @@ import SwiftUI
 
 struct AppSettingsPage: View {
     @EnvironmentObject private var appLock: AppLockManager
+    @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
     @AppStorage(WidgetSharedConfiguration.liveActivitiesEnabledKey) private var liveActivitiesEnabled = true
+    @AppStorage(WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey) private var budgetLiveActivitiesEnabled = false
+    @AppStorage(WidgetSharedConfiguration.selectedBudgetLiveActivityIdKey) private var selectedBudgetLiveActivityId = ""
     @AppStorage(WidgetSharedConfiguration.liveActivityDisplayDurationKey) private var liveActivityDisplayDuration = LiveActivityDisplayDuration.oneMinute.rawValue
     @State private var passwordSheetMode = PasswordSheetMode.setup
     @State private var isPasswordSheetPresented = false
+
+    private var selectableBudgetUsages: [DraftBudgetUsage] {
+        draftStore.budgetUsages()
+    }
 
     var body: some View {
         Form {
@@ -37,15 +44,44 @@ struct AppSettingsPage: View {
                     set: { enabled in
                         liveActivitiesEnabled = enabled
                         RecentTransactionLiveActivityManager.setFeatureEnabled(enabled)
+                        if enabled {
+                            budgetLiveActivitiesEnabled = false
+                        }
                     }
                 ))
+
+                Toggle("settings.liveActivities.budget.enabled", isOn: Binding(
+                    get: { budgetLiveActivitiesEnabled },
+                    set: { enabled in
+                        let resolvedEnabled = enabled && !selectableBudgetUsages.isEmpty
+                        budgetLiveActivitiesEnabled = resolvedEnabled
+                        RecentTransactionLiveActivityManager.setBudgetFeatureEnabled(resolvedEnabled)
+                        if resolvedEnabled {
+                            liveActivitiesEnabled = false
+                            ensureSelectedBudget()
+                        }
+                    }
+                ))
+                .disabled(selectableBudgetUsages.isEmpty)
+
+                if !selectableBudgetUsages.isEmpty {
+                    Picker("settings.liveActivities.budget.selection", selection: $selectedBudgetLiveActivityId) {
+                        ForEach(selectableBudgetUsages) { usage in
+                            Text(draftStore.budgetDisplayName(usage.budget)).tag(usage.budget.id)
+                        }
+                    }
+                    .disabled(!budgetLiveActivitiesEnabled)
+                    .onChange(of: selectedBudgetLiveActivityId) { _, newValue in
+                        RecentTransactionLiveActivityManager.setSelectedBudgetId(newValue)
+                    }
+                }
 
                 Picker("settings.liveActivities.duration", selection: $liveActivityDisplayDuration) {
                     ForEach(LiveActivityDisplayDuration.allCases) { option in
                         Text(option.titleKey).tag(option.rawValue)
                     }
                 }
-                .disabled(!liveActivitiesEnabled)
+                .disabled(!liveActivitiesEnabled && !budgetLiveActivitiesEnabled)
             } header: {
                 Text("settings.liveActivities.section")
             } footer: {
@@ -109,10 +145,29 @@ struct AppSettingsPage: View {
         .sheet(isPresented: $isPasswordSheetPresented) {
             PasswordSetupSheet(mode: passwordSheetMode, appLock: appLock)
         }
+        .onAppear {
+            ensureSelectedBudget()
+        }
+        .onChange(of: draftStore.budgets) { _, _ in
+            ensureSelectedBudget()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 AppBackButton()
             }
+        }
+    }
+
+    private func ensureSelectedBudget() {
+        let budgetIds = selectableBudgetUsages.map(\.budget.id)
+        if selectedBudgetLiveActivityId.isEmpty || !budgetIds.contains(selectedBudgetLiveActivityId) {
+            selectedBudgetLiveActivityId = budgetIds.first ?? ""
+            RecentTransactionLiveActivityManager.setSelectedBudgetId(selectedBudgetLiveActivityId)
+        }
+
+        if budgetLiveActivitiesEnabled, selectedBudgetLiveActivityId.isEmpty {
+            budgetLiveActivitiesEnabled = false
+            RecentTransactionLiveActivityManager.setBudgetFeatureEnabled(false)
         }
     }
 }

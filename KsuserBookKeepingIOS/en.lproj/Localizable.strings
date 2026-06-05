@@ -19,7 +19,7 @@
 "initialSync.legal.accept" = "Agree and Continue";
 "initialSync.navigationTitle" = "Get Started";
 "initialSync.title" = "Choose how this device uses data";
-"initialSync.subtitle" = "Import profile, account, category, template, and transaction data from an existing sync space, or keep this device independent for now.";
+"initialSync.subtitle" = "Import profile, account, category, template, budget, and transaction data from an existing sync space, or keep this device independent for now.";
 "initialSync.choice.section" = "Do You Need Sync?";
 "initialSync.choice.iCloud.title" = "Sync from iCloud";
 "initialSync.choice.iCloud.subtitle" = "Temporarily unavailable. Coming in a later version.";
@@ -67,6 +67,9 @@
 "dashboard.monthTransactions.valueFormat" = "%d entries";
 "dashboard.topExpenseCategory" = "Top Expense Category";
 "dashboard.topExpenseCategory.valueFormat" = "%@ · %@";
+"dashboard.budgets" = "Budgets";
+"dashboard.budget.percentFormat" = "%.0f%%";
+"dashboard.budget.spentFormat" = "%@ / %@ used";
 "dashboard.quickActions" = "Quick Entry";
 "dashboard.quickExpense" = "Expense";
 "dashboard.quickIncome" = "Income";
@@ -456,6 +459,38 @@
 "templates.message.saved" = "Template saved.";
 "templates.message.deleted" = "Template deleted.";
 
+"budgets.title" = "Budgets";
+"budgets.add" = "Add Budget";
+"budgets.add.title" = "Add Budget";
+"budgets.edit.title" = "Edit Budget";
+"budgets.section" = "Monthly Budgets";
+"budgets.section.basic" = "Budget Info";
+"budgets.scope" = "Budget Scope";
+"budgets.scope.overall" = "Overall";
+"budgets.scope.category" = "Category";
+"budgets.scope.account" = "Account";
+"budgets.target.category" = "Expense Category";
+"budgets.target.account" = "Account";
+"budgets.name.placeholder" = "Budget name";
+"budgets.amount.placeholder" = "Monthly budget";
+"budgets.enabled" = "Enable Budget";
+"budgets.disabled.badge" = "Off";
+"budgets.defaultName.overall" = "Monthly Spending";
+"budgets.empty.title" = "No budgets yet";
+"budgets.empty.subtitle" = "Set monthly limits for total spending, a category, or an account.";
+"budgets.footer" = "Budgets track monthly expense usage. Category budgets include child categories, and account budgets include expenses paid from that account.";
+"budgets.editor.footer" = "Budgets are backed up as incremental WebDAV logs and replayed on other devices.";
+"budgets.delete.confirm.title" = "Delete Budget?";
+"budgets.delete.confirm.message" = "This removes the budget setting only. Existing transactions will not be changed.";
+"budgets.message.saved" = "Budget saved.";
+"budgets.message.deleted" = "Budget deleted.";
+"budgets.error.invalidAmount" = "Enter a valid budget amount.";
+"budgets.error.targetRequired" = "Choose a valid budget target.";
+"budgets.progress.percentFormat" = "%.0f%%";
+"budgets.progress.spentFormat" = "%@ / %@ used";
+"budgets.progress.remainingFormat" = "%@ left";
+"budgets.progress.overFormat" = "%@ over";
+
 "profile.title" = "Personal Center";
 "profile.displayName.placeholder" = "No nickname set";
 "profile.section.account" = "Account & Sync";
@@ -530,7 +565,7 @@
 "sync.backupInterval.oneMinute" = "1 minute";
 "sync.backupInterval.fiveMinutes" = "5 minutes";
 "sync.backupInterval.tenMinutes" = "10 minutes";
-"sync.behavior.footer" = "Changes are backed up as soon as possible; background checks depend on system scheduling. Manual import overwrites local profile and replays account, category, template, and transaction logs when remote files exist.";
+"sync.behavior.footer" = "Changes are backed up as soon as possible; background checks depend on system scheduling. Manual import overwrites local profile and replays account, category, template, budget, and transaction logs when remote files exist.";
 "sync.encryption.enabled" = "Encrypt Backup Files";
 "sync.encryption.password.placeholder" = "Sync password";
 "sync.encryption.confirm.placeholder" = "Confirm sync password";
@@ -576,6 +611,13 @@
 "bookkeeping.templates.sync.error.backupFailed" = "Could not back up templates. Check the WebDAV address, sync password, and credentials.";
 "bookkeeping.templates.sync.error.importFailed" = "Could not import templates. Check the WebDAV address, sync password, and credentials.";
 
+"bookkeeping.budgets.sync.backupSucceeded" = "Budget backup completed.";
+"bookkeeping.budgets.sync.importSucceeded" = "Budgets imported.";
+"bookkeeping.budgets.sync.importNoRemoteBudgets" = "No remote budget file was found.";
+"bookkeeping.budgets.sync.error.backupDisabled" = "Enable file backup before syncing budgets.";
+"bookkeeping.budgets.sync.error.backupFailed" = "Could not back up budgets. Check the WebDAV address, sync password, and credentials.";
+"bookkeeping.budgets.sync.error.importFailed" = "Could not import budgets. Check the WebDAV address, sync password, and credentials.";
+
 "bookkeeping.ledger.sync.backupSucceeded" = "Ledger data backup completed.";
 "bookkeeping.ledger.sync.error.backupDisabled" = "Enable file backup before syncing ledger data.";
 "bookkeeping.ledger.sync.error.backupFailed" = "Could not back up ledger data. Check the WebDAV address, sync password, and credentials.";
@@ -593,12 +635,14 @@
 "settings.theme.footer" = "Choose how KKBookkeep looks on this device.";
 "settings.liveActivities.section" = "Live Activities";
 "settings.liveActivities.enabled" = "Show Recent Transaction in Dynamic Island";
+"settings.liveActivities.budget.enabled" = "Show Budget Usage After Expense";
+"settings.liveActivities.budget.selection" = "Budget to Show";
 "settings.liveActivities.duration" = "Dynamic Island Display Time";
 "settings.liveActivities.duration.30s" = "30 seconds";
 "settings.liveActivities.duration.1m" = "1 minute";
 "settings.liveActivities.duration.3m" = "3 minutes";
 "settings.liveActivities.duration.5m" = "5 minutes";
-"settings.liveActivities.footer" = "After saving a transaction, KKBookkeep shows the account icon, amount, and details in Dynamic Island when the device supports it. The display time stays on this device and is not backed up or synced.";
+"settings.liveActivities.footer" = "Recent transaction and budget usage displays are mutually exclusive. Budget usage appears only after saving an expense and uses the selected enabled budget. These settings stay on this device and are not backed up or synced.";
 "settings.security.section" = "Security";
 "settings.security.appLock" = "Require Password on Launch";
 "settings.security.changePassword" = "Change Unlock Password";

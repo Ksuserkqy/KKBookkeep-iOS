@@ -33,6 +33,7 @@ struct KsuserBookKeepingWidgetBundle: WidgetBundle {
         LedgerOverviewWidget()
         LedgerReportWidget()
         RecentTransactionLiveActivityWidget()
+        BudgetLiveActivityWidget()
     }
 }
 
@@ -99,6 +100,42 @@ struct RecentTransactionLiveActivityWidget: Widget {
             }
             .widgetURL(WidgetDeepLink.transactions)
             .keylineTint(Color(hex: context.state.accountColorHex))
+        }
+    }
+}
+
+struct BudgetLiveActivityWidget: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: BudgetActivityAttributes.self) { context in
+            BudgetLockScreenView(state: context.state)
+                .activityBackgroundTint(Color(.systemBackground))
+                .activitySystemActionForegroundColor(context.state.tintColor)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.center) {
+                    BudgetExpandedHeader(state: context.state)
+                }
+
+                DynamicIslandExpandedRegion(.bottom) {
+                    BudgetExpandedDetails(state: context.state)
+                }
+            } compactLeading: {
+                Image(systemName: "chart.pie.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(context.state.tintColor)
+            } compactTrailing: {
+                Text(context.state.percentText)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(context.state.tintColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            } minimal: {
+                Image(systemName: "chart.pie.fill")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(context.state.tintColor)
+            }
+            .widgetURL(WidgetDeepLink.reports)
+            .keylineTint(context.state.tintColor)
         }
     }
 }
@@ -814,6 +851,149 @@ private struct LiveActivityAmountBlock: View {
     }
 }
 
+private struct BudgetLockScreenView: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 12) {
+            BudgetRing(state: state, size: 46)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("liveActivity.budget.title")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(state.title)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Text(state.targetName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            BudgetAmountBlock(state: state, alignment: .trailing)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+}
+
+private struct BudgetExpandedHeader: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            BudgetRing(state: state, size: 44)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    LiveActivityAppIcon(size: 15)
+
+                    Text("liveActivity.budget.title")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                Text(state.title)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
+
+            BudgetAmountBlock(state: state, alignment: .trailing)
+                .frame(minWidth: 88, alignment: .trailing)
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+private struct BudgetExpandedDetails: View {
+    let state: BudgetActivityAttributes.ContentState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+                .overlay(Color.white.opacity(0.2))
+
+            ProgressView(value: min(max(state.percentUsed, 0), 1))
+                .tint(state.tintColor)
+
+            HStack(spacing: 8) {
+                LiveActivityDetailPill(
+                    systemImage: "minus.circle.fill",
+                    text: state.transactionAmountText
+                )
+
+                LiveActivityDetailPill(
+                    systemImage: "chart.pie.fill",
+                    text: String(format: NSLocalizedString("liveActivity.budget.spentFormat", comment: ""), state.spentText, state.limitText)
+                )
+            }
+
+            Text(state.transactionTitle)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 2)
+    }
+}
+
+private struct BudgetRing: View {
+    let state: BudgetActivityAttributes.ContentState
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(state.tintColor.opacity(0.18), lineWidth: 5)
+
+            Circle()
+                .trim(from: 0, to: min(max(state.percentUsed, 0), 1))
+                .stroke(state.tintColor, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+
+            Text(state.percentText)
+                .font(.system(size: max(size * 0.24, 10), weight: .bold, design: .rounded))
+                .foregroundStyle(state.tintColor)
+                .minimumScaleFactor(0.65)
+                .lineLimit(1)
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel(Text(state.percentText))
+    }
+}
+
+private struct BudgetAmountBlock: View {
+    let state: BudgetActivityAttributes.ContentState
+    let alignment: HorizontalAlignment
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: 3) {
+            Text(LocalizedStringKey(state.isOverLimit ? "liveActivity.budget.over" : "liveActivity.budget.remaining"))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            Text(state.isOverLimit ? state.overLimitText : state.remainingText)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(state.tintColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
 private struct LiveActivityAppIcon: View {
     var size: CGFloat
 
@@ -952,6 +1132,20 @@ private extension RecentTransactionActivityAttributes.ContentState {
         case .transfer:
             return .blue
         }
+    }
+}
+
+private extension BudgetActivityAttributes.ContentState {
+    var tintColor: Color {
+        isOverLimit ? .red : .accentColor
+    }
+
+    var percentText: String {
+        String(format: "%.0f%%", min(max(percentUsed, 0), 9.99) * 100)
+    }
+
+    var overLimitText: String {
+        remainingText.replacingOccurrences(of: "-", with: "")
     }
 }
 #endif

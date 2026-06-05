@@ -83,6 +83,12 @@ struct ProfilePage: View {
                     }
 
                     NavigationLink {
+                        BudgetManagementPage()
+                    } label: {
+                        Label("budgets.title", systemImage: "chart.pie.fill")
+                    }
+
+                    NavigationLink {
                         AppSettingsPage()
                     } label: {
                         Label("profile.settings", systemImage: "gearshape.fill")
