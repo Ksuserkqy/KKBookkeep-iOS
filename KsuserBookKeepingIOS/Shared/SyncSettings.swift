@@ -21,7 +21,7 @@ enum SyncProvider: String, CaseIterable, Codable, Identifiable {
     var isAvailable: Bool {
         switch self {
         case .iCloudDrive:
-            return false
+            return true
         case .webDAV:
             return true
         }
@@ -142,11 +142,7 @@ final class SyncSettingsStore: ObservableObject {
             let data = defaults.data(forKey: DefaultsKey.configuration),
             let stored = try? Self.decoder.decode(SyncConfiguration.self, from: data)
         {
-            var normalized = stored
-            if !normalized.provider.isAvailable {
-                normalized.provider = .webDAV
-            }
-            loadedConfiguration = normalized
+            loadedConfiguration = stored
             hasStoredConfiguration = true
         } else {
             loadedConfiguration = .defaultValue

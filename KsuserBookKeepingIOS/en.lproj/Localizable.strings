@@ -22,15 +22,16 @@
 "initialSync.subtitle" = "Import profile, account, category, template, budget, and transaction data from an existing sync space, or keep this device independent for now.";
 "initialSync.choice.section" = "Do You Need Sync?";
 "initialSync.choice.iCloud.title" = "Sync from iCloud";
-"initialSync.choice.iCloud.subtitle" = "Temporarily unavailable. Coming in a later version.";
+"initialSync.choice.iCloud.subtitle" = "Import existing data from this app's iCloud Drive sync folder.";
 "initialSync.choice.webDAV.title" = "Sync from WebDAV";
 "initialSync.choice.webDAV.subtitle" = "Connect your WebDAV space and import existing data.";
 "initialSync.choice.localOnly.title" = "Do Not Sync";
 "initialSync.choice.localOnly.subtitle" = "Keep the ledger on this device for now. You can enable sync later from Me.";
 "initialSync.choice.unavailable" = "Unavailable";
-"initialSync.choice.footer" = "Choose a sync method before configuring its server. Do Not Sync turns off auto-import and automatic backup.";
+"initialSync.choice.footer" = "Choose a sync method before configuring its file location. Do Not Sync turns off auto-import and automatic backup.";
 "initialSync.webDAV.navigationTitle" = "WebDAV Setup";
-"initialSync.provider.footer" = "WebDAV sync space is supported first. iCloud Drive is kept for a later version.";
+"initialSync.syncSpace.navigationTitle" = "Sync Space Setup";
+"initialSync.provider.footer" = "iCloud Drive and WebDAV use the same incremental file format.";
 "initialSync.behavior.footer" = "After import succeeds, this device can auto-import external changes and back up local changes.";
 "initialSync.actions.footer" = "Import reads remote incremental logs first and does not upload an empty ledger before import. Independent mode turns off auto-import and automatic backup.";
 "initialSync.action.import" = "Import from Sync Space";
@@ -222,7 +223,7 @@
 "record.action.saveDraft" = "Save Draft";
 "record.action.saveTransaction" = "Save Transaction";
 "record.footer.draftOnly" = "This only creates a local draft and does not write to the ledger yet.";
-"record.footer.localOnly" = "This transaction is saved locally and can be backed up through WebDAV file sync.";
+"record.footer.localOnly" = "This transaction is saved locally and can be backed up through file sync.";
 "record.draft.saved" = "Draft saved. It is not posted to the ledger yet.";
 "record.transaction.saved" = "Transaction saved.";
 "record.error.invalidAmount" = "Enter an amount greater than 0.";
@@ -246,7 +247,7 @@
 "transactions.draft.fromAccount" = "From Account";
 "transactions.draft.toAccount" = "To Account";
 "transactions.draft.note" = "Note";
-"transactions.footer.localOnly" = "Transactions are stored locally and can be backed up or imported through WebDAV file sync.";
+"transactions.footer.localOnly" = "Transactions are stored locally and can be backed up or imported through file sync.";
 "transactions.edit.title" = "Edit Transaction";
 "transactions.edit.kind" = "Type";
 "transactions.delete.title" = "Delete Transaction";
@@ -380,8 +381,8 @@
 "management.account.section" = "Local Accounts";
 "management.account.section.basic" = "Account Info";
 "management.account.section.note" = "Note";
-"management.account.footer" = "Accounts are stored on this device and can be backed up or imported through WebDAV file sync.";
-"management.account.footer.sort" = "Accounts are stored on this device and can sync through WebDAV file backup. Tap Edit to drag and reorder.";
+"management.account.footer" = "Accounts are stored on this device and can be backed up or imported through file sync.";
+"management.account.footer.sort" = "Accounts are stored on this device and can sync through file backup. Tap Edit to drag and reorder.";
 "management.account.add" = "Add Account";
 "management.account.add.title" = "Add Account";
 "management.account.edit.title" = "Edit Account";
@@ -411,8 +412,8 @@
 "management.category.kind" = "Category Type";
 "management.category.section" = "Local Categories";
 "management.category.section.basic" = "Category Info";
-"management.category.footer" = "Categories are stored on this device and can be backed up or imported through WebDAV file sync.";
-"management.category.footer.sort" = "Categories are stored on this device and can sync through WebDAV file backup. Tap Edit to drag and reorder.";
+"management.category.footer" = "Categories are stored on this device and can be backed up or imported through file sync.";
+"management.category.footer.sort" = "Categories are stored on this device and can sync through file backup. Tap Edit to drag and reorder.";
 "management.category.add" = "Add Category";
 "management.category.add.title" = "Add Category";
 "management.category.edit.title" = "Edit Category";
@@ -453,7 +454,7 @@
 "templates.name.placeholder" = "Template name";
 "templates.empty.title" = "No templates yet";
 "templates.empty.subtitle" = "Add fixed expenses or income templates for quick repeat entries.";
-"templates.footer" = "Templates are used to quickly fill the record form. After a template is added, edited, or deleted, the app automatically tries to back it up to the current WebDAV sync space.";
+"templates.footer" = "Templates are used to quickly fill the record form. After a template is added, edited, or deleted, the app automatically tries to back it up to the current sync space.";
 "templates.delete.confirm.title" = "Delete Template?";
 "templates.delete.confirm.message" = "This only removes the template. Existing transactions will not be changed.";
 "templates.message.saved" = "Template saved.";
@@ -479,7 +480,7 @@
 "budgets.empty.title" = "No budgets yet";
 "budgets.empty.subtitle" = "Set monthly limits for total spending, a category, or an account.";
 "budgets.footer" = "Budgets track monthly expense usage. Category budgets include child categories, and account budgets include expenses paid from that account.";
-"budgets.editor.footer" = "Budgets are backed up as incremental WebDAV logs and replayed on other devices.";
+"budgets.editor.footer" = "Budgets are backed up as incremental logs and replayed on other devices.";
 "budgets.delete.confirm.title" = "Delete Budget?";
 "budgets.delete.confirm.message" = "This removes the budget setting only. Existing transactions will not be changed.";
 "budgets.message.saved" = "Budget saved.";
@@ -526,9 +527,9 @@
 "profile.sync.testSucceeded" = "Backup location is reachable.";
 "profile.sync.error.saveFailed" = "Could not save the profile. Please try again.";
 "profile.sync.error.backupDisabled" = "Enable file backup before syncing profile data.";
-"profile.sync.error.backupFailed" = "Could not back up the profile. Check the WebDAV address, password, and credentials.";
-"profile.sync.error.importFailed" = "Could not import the profile. Check the WebDAV address, password, and credentials.";
-"profile.sync.error.testFailed" = "Could not reach the WebDAV backup location.";
+"profile.sync.error.backupFailed" = "Could not back up the profile. Check the selected file location, sync password, and credentials.";
+"profile.sync.error.importFailed" = "Could not import the profile. Check the selected file location, sync password, and credentials.";
+"profile.sync.error.testFailed" = "Could not reach the selected backup location.";
 
 "sync.title" = "Backup & Sync";
 "sync.section.status" = "Backup Status";
@@ -549,8 +550,9 @@
 "sync.backupEnabled" = "Enable File Backup";
 "sync.provider" = "File Location";
 "sync.provider.iCloudDrive" = "iCloud Drive";
-"sync.provider.iCloudDrive.unavailable" = "iCloud Drive is kept in the UI for a later version. File backup currently uses WebDAV only.";
+"sync.provider.iCloudDrive.unavailable" = "iCloud Drive is currently unavailable. Make sure this device is signed in to Apple ID and iCloud Drive is enabled.";
 "sync.provider.webDAV" = "WebDAV";
+"sync.iCloud.footer" = "iCloud Drive stores v1/ incremental files inside this app's folder. WebDAV still uses the KKBookKeep/v1/ relative directory.";
 "sync.webDAV.server.placeholder" = "Server URL";
 "sync.webDAV.authentication" = "Authentication";
 "sync.webDAV.authentication.password" = "Username & Password";
@@ -579,15 +581,15 @@
 "sync.settings.saved" = "Sync settings saved.";
 "sync.settings.localOnlySaved" = "This device now runs independently.";
 "sync.backup.succeeded" = "Data backup completed.";
-"sync.backup.error.failed" = "Could not back up all data. Check the WebDAV address, sync password, and credentials.";
+"sync.backup.error.failed" = "Could not back up all data. Check the selected file location, sync password, and credentials.";
 "sync.import.completed" = "Data import completed.";
-"sync.import.error.failed" = "Could not import all data. Check the WebDAV address, sync password, and credentials.";
+"sync.import.error.failed" = "Could not import all data. Check the selected file location, sync password, and credentials.";
 "sync.settings.savedAndBackedUp" = "Sync settings saved and data backup completed.";
-"sync.settings.savedButBackupFailed" = "Sync settings saved, but data backup failed. Check the WebDAV address, sync password, and credentials.";
-"sync.settings.savedButImportFailed" = "Sync settings saved, but remote data import failed. To avoid overwriting cloud data, check the WebDAV address, sync password, and credentials, then try again.";
+"sync.settings.savedButBackupFailed" = "Sync settings saved, but data backup failed. Check the selected file location, sync password, and credentials.";
+"sync.settings.savedButImportFailed" = "Sync settings saved, but remote data import failed. To avoid overwriting cloud data, check the selected file location, sync password, and credentials, then try again.";
 "sync.settings.message.title" = "Sync Settings";
 "sync.settings.error.saveFailed" = "Could not save sync settings. Please try again.";
-"sync.settings.error.providerUnavailable" = "iCloud Drive sync is not available yet. Use WebDAV for now.";
+"sync.settings.error.providerUnavailable" = "This device cannot access iCloud Drive. Make sure it is signed in to Apple ID and iCloud Drive is enabled.";
 "sync.settings.error.encryptionPasswordRequired" = "Enter a sync password before enabling encrypted backup.";
 "sync.settings.error.encryptionPasswordMismatch" = "The sync passwords do not match.";
 
@@ -595,33 +597,33 @@
 "bookkeeping.metadata.sync.importSucceeded" = "Accounts and categories imported.";
 "bookkeeping.metadata.sync.importNoRemoteMetadata" = "No remote account and category file was found.";
 "bookkeeping.metadata.sync.error.backupDisabled" = "Enable file backup before syncing account and category data.";
-"bookkeeping.metadata.sync.error.backupFailed" = "Could not back up accounts and categories. Check the WebDAV address, sync password, and credentials.";
-"bookkeeping.metadata.sync.error.importFailed" = "Could not import accounts and categories. Check the WebDAV address, sync password, and credentials.";
+"bookkeeping.metadata.sync.error.backupFailed" = "Could not back up accounts and categories. Check the selected file location, sync password, and credentials.";
+"bookkeeping.metadata.sync.error.importFailed" = "Could not import accounts and categories. Check the selected file location, sync password, and credentials.";
 
 "bookkeeping.transactions.sync.backupSucceeded" = "Transaction backup completed.";
 "bookkeeping.transactions.sync.importSucceeded" = "Transactions imported.";
 "bookkeeping.transactions.sync.importNoRemoteTransactions" = "No remote transaction file was found.";
 "bookkeeping.transactions.sync.error.backupDisabled" = "Enable file backup before syncing transactions.";
-"bookkeeping.transactions.sync.error.backupFailed" = "Could not back up transactions. Check the WebDAV address, sync password, and credentials.";
-"bookkeeping.transactions.sync.error.importFailed" = "Could not import transactions. Check the WebDAV address, sync password, and credentials.";
+"bookkeeping.transactions.sync.error.backupFailed" = "Could not back up transactions. Check the selected file location, sync password, and credentials.";
+"bookkeeping.transactions.sync.error.importFailed" = "Could not import transactions. Check the selected file location, sync password, and credentials.";
 
 "bookkeeping.templates.sync.backupSucceeded" = "Template backup completed.";
 "bookkeeping.templates.sync.importSucceeded" = "Templates imported.";
 "bookkeeping.templates.sync.importNoRemoteTemplates" = "No remote template file was found.";
 "bookkeeping.templates.sync.error.backupDisabled" = "Enable file backup before syncing templates.";
-"bookkeeping.templates.sync.error.backupFailed" = "Could not back up templates. Check the WebDAV address, sync password, and credentials.";
-"bookkeeping.templates.sync.error.importFailed" = "Could not import templates. Check the WebDAV address, sync password, and credentials.";
+"bookkeeping.templates.sync.error.backupFailed" = "Could not back up templates. Check the selected file location, sync password, and credentials.";
+"bookkeeping.templates.sync.error.importFailed" = "Could not import templates. Check the selected file location, sync password, and credentials.";
 
 "bookkeeping.budgets.sync.backupSucceeded" = "Budget backup completed.";
 "bookkeeping.budgets.sync.importSucceeded" = "Budgets imported.";
 "bookkeeping.budgets.sync.importNoRemoteBudgets" = "No remote budget file was found.";
 "bookkeeping.budgets.sync.error.backupDisabled" = "Enable file backup before syncing budgets.";
-"bookkeeping.budgets.sync.error.backupFailed" = "Could not back up budgets. Check the WebDAV address, sync password, and credentials.";
-"bookkeeping.budgets.sync.error.importFailed" = "Could not import budgets. Check the WebDAV address, sync password, and credentials.";
+"bookkeeping.budgets.sync.error.backupFailed" = "Could not back up budgets. Check the selected file location, sync password, and credentials.";
+"bookkeeping.budgets.sync.error.importFailed" = "Could not import budgets. Check the selected file location, sync password, and credentials.";
 
 "bookkeeping.ledger.sync.backupSucceeded" = "Ledger data backup completed.";
 "bookkeeping.ledger.sync.error.backupDisabled" = "Enable file backup before syncing ledger data.";
-"bookkeeping.ledger.sync.error.backupFailed" = "Could not back up ledger data. Check the WebDAV address, sync password, and credentials.";
+"bookkeeping.ledger.sync.error.backupFailed" = "Could not back up ledger data. Check the selected file location, sync password, and credentials.";
 
 "settings.title" = "App Settings";
 "settings.language" = "Language";

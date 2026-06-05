@@ -6,5 +6,19 @@
 	<array>
 		<string>group.cn.ksuser.bookkeeping.kkbookkeep</string>
 	</array>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.cn.ksuser.bookkeeping.kkbookkeep</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.cn.ksuser.bookkeeping.kkbookkeep</string>
+	</array>
+	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
+	<string>$(TeamIdentifierPrefix)cn.ksuser.bookkeeping.kkbookkeep</string>
 </dict>
 </plist>

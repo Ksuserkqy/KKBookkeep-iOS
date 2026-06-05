@@ -36,15 +36,15 @@ struct InitialSyncSetupPage: View {
                     legalConsentView
                 case .syncChoice:
                     syncChoiceView
-                case .webDAVConfiguration:
-                    webDAVConfigurationView
+                case .syncSpaceConfiguration:
+                    syncSpaceConfigurationView
                 }
             }
             .navigationTitle(Text(currentStep.navigationTitleKey))
             .navigationBarTitleDisplayMode(currentStep.titleDisplayMode)
             .tint(.accentColor)
             .toolbar {
-                if currentStep == .webDAVConfiguration {
+                if currentStep == .syncSpaceConfiguration {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("common.back") {
                             currentStep = .syncChoice
@@ -155,8 +155,10 @@ struct InitialSyncSetupPage: View {
                     titleKey: "initialSync.choice.iCloud.title",
                     subtitleKey: "initialSync.choice.iCloud.subtitle",
                     systemImage: "icloud.fill",
-                    isAvailable: false
-                ) {}
+                ) {
+                    provider = .iCloudDrive
+                    currentStep = .syncSpaceConfiguration
+                }
 
                 syncChoiceButton(
                     titleKey: "initialSync.choice.webDAV.title",
@@ -164,7 +166,7 @@ struct InitialSyncSetupPage: View {
                     systemImage: "server.rack"
                 ) {
                     provider = .webDAV
-                    currentStep = .webDAVConfiguration
+                    currentStep = .syncSpaceConfiguration
                 }
 
                 syncChoiceButton(
@@ -182,35 +184,43 @@ struct InitialSyncSetupPage: View {
         }
     }
 
-    private var webDAVConfigurationView: some View {
+    private var syncSpaceConfigurationView: some View {
         Form {
             messageSection
 
-            Section {
-                TextField("sync.webDAV.server.placeholder", text: $serverURL)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-
-                Picker("sync.webDAV.authentication", selection: $webDAVAuthentication) {
-                    ForEach(WebDAVAuthentication.allCases) { option in
-                        Text(option.titleKey).tag(option)
-                    }
+            if provider == .iCloudDrive {
+                Section {
+                    Label("sync.provider.iCloudDrive", systemImage: "icloud.fill")
+                } footer: {
+                    Text("sync.iCloud.footer")
                 }
-
-                if webDAVAuthentication == .password {
-                    TextField("sync.webDAV.username.placeholder", text: $username)
+            } else {
+                Section {
+                    TextField("sync.webDAV.server.placeholder", text: $serverURL)
+                        .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
-                    SecureField("sync.webDAV.password.placeholder", text: $password)
-                } else {
-                    SecureField("sync.webDAV.token.placeholder", text: $accessToken)
+                    Picker("sync.webDAV.authentication", selection: $webDAVAuthentication) {
+                        ForEach(WebDAVAuthentication.allCases) { option in
+                            Text(option.titleKey).tag(option)
+                        }
+                    }
+
+                    if webDAVAuthentication == .password {
+                        TextField("sync.webDAV.username.placeholder", text: $username)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+
+                        SecureField("sync.webDAV.password.placeholder", text: $password)
+                    } else {
+                        SecureField("sync.webDAV.token.placeholder", text: $accessToken)
+                    }
+                } header: {
+                    Text("sync.section.webDAV")
+                } footer: {
+                    Text("sync.webDAV.footer")
                 }
-            } header: {
-                Text("sync.section.webDAV")
-            } footer: {
-                Text("sync.webDAV.footer")
             }
 
             Section {
@@ -440,11 +450,6 @@ struct InitialSyncSetupPage: View {
     }
 
     private func validateSyncSpaceSettings() -> Bool {
-        if provider == .iCloudDrive {
-            showMessage("sync.settings.error.providerUnavailable")
-            return false
-        }
-
         if encryptionEnabled, encryptionPassword.isEmpty {
             showMessage("sync.settings.error.encryptionPasswordRequired")
             return false
@@ -502,7 +507,7 @@ struct InitialSyncSetupPage: View {
 private enum InitialSetupStep {
     case legal
     case syncChoice
-    case webDAVConfiguration
+    case syncSpaceConfiguration
 
     var navigationTitleKey: LocalizedStringKey {
         switch self {
@@ -510,8 +515,8 @@ private enum InitialSetupStep {
             return "initialSync.legal.navigationTitle"
         case .syncChoice:
             return "initialSync.navigationTitle"
-        case .webDAVConfiguration:
-            return "initialSync.webDAV.navigationTitle"
+        case .syncSpaceConfiguration:
+            return "initialSync.syncSpace.navigationTitle"
         }
     }
 
@@ -519,7 +524,7 @@ private enum InitialSetupStep {
         switch self {
         case .legal:
             return .large
-        case .syncChoice, .webDAVConfiguration:
+        case .syncChoice, .syncSpaceConfiguration:
             return .inline
         }
     }

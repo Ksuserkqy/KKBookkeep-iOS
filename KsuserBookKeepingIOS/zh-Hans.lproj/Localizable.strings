@@ -22,15 +22,16 @@
 "initialSync.subtitle" = "可以从已有同步空间导入个人信息、账户、分类、模板、预算和流水，也可以让这台设备先独立运行。";
 "initialSync.choice.section" = "是否需要同步";
 "initialSync.choice.iCloud.title" = "从 iCloud 同步";
-"initialSync.choice.iCloud.subtitle" = "暂不可用，后续版本开放。";
+"initialSync.choice.iCloud.subtitle" = "从本 App 的 iCloud 云盘同步目录导入已有数据。";
 "initialSync.choice.webDAV.title" = "从 WebDAV 同步";
 "initialSync.choice.webDAV.subtitle" = "连接你自己的 WebDAV 空间并导入已有数据。";
 "initialSync.choice.localOnly.title" = "不进行同步";
 "initialSync.choice.localOnly.subtitle" = "先只在本设备保存账本，之后可在“我的”里开启同步。";
 "initialSync.choice.unavailable" = "暂不可用";
-"initialSync.choice.footer" = "选择同步方式后再配置对应服务器；不进行同步会关闭自动导入和自动备份。";
+"initialSync.choice.footer" = "选择同步方式后再配置对应文件位置；不进行同步会关闭自动导入和自动备份。";
 "initialSync.webDAV.navigationTitle" = "WebDAV 配置";
-"initialSync.provider.footer" = "当前先支持 WebDAV 同步空间；iCloud 云盘入口保留给后续版本。";
+"initialSync.syncSpace.navigationTitle" = "同步空间配置";
+"initialSync.provider.footer" = "iCloud 云盘和 WebDAV 使用同一套增量文件格式。";
 "initialSync.behavior.footer" = "导入成功后，后续可自动导入外部增量，并在本机有修改时自动备份。";
 "initialSync.actions.footer" = "从同步空间导入会先读取远端增量日志，不会把空账本先覆盖到远端；独立运行会关闭本机自动导入和自动备份。";
 "initialSync.action.import" = "从同步空间导入";
@@ -222,7 +223,7 @@
 "record.action.saveDraft" = "保存草稿";
 "record.action.saveTransaction" = "保存流水";
 "record.footer.draftOnly" = "当前只生成本机草稿，尚未正式写入账本。";
-"record.footer.localOnly" = "流水会保存到本机账本，并可通过 WebDAV 文件同步备份。";
+"record.footer.localOnly" = "流水会保存到本机账本，并可通过文件同步备份。";
 "record.draft.saved" = "草稿已保存，尚未正式入账。";
 "record.transaction.saved" = "流水已保存。";
 "record.error.invalidAmount" = "请输入大于 0 的金额。";
@@ -246,7 +247,7 @@
 "transactions.draft.fromAccount" = "转出账户";
 "transactions.draft.toAccount" = "转入账户";
 "transactions.draft.note" = "备注";
-"transactions.footer.localOnly" = "流水保存在本机，可通过 WebDAV 文件同步备份和导入。";
+"transactions.footer.localOnly" = "流水保存在本机，可通过文件同步备份和导入。";
 "transactions.edit.title" = "编辑流水";
 "transactions.edit.kind" = "类型";
 "transactions.delete.title" = "删除流水";
@@ -380,8 +381,8 @@
 "management.account.section" = "本机账户";
 "management.account.section.basic" = "账户信息";
 "management.account.section.note" = "备注";
-"management.account.footer" = "账户保存在本机，可通过 WebDAV 文件同步备份和导入。";
-"management.account.footer.sort" = "账户保存在本机，可通过 WebDAV 文件备份同步；点“编辑”后可拖动排序。";
+"management.account.footer" = "账户保存在本机，可通过文件同步备份和导入。";
+"management.account.footer.sort" = "账户保存在本机，可通过文件备份同步；点“编辑”后可拖动排序。";
 "management.account.add" = "新增账户";
 "management.account.add.title" = "新增账户";
 "management.account.edit.title" = "编辑账户";
@@ -411,8 +412,8 @@
 "management.category.kind" = "分类类型";
 "management.category.section" = "本机分类";
 "management.category.section.basic" = "分类信息";
-"management.category.footer" = "分类保存在本机，可通过 WebDAV 文件同步备份和导入。";
-"management.category.footer.sort" = "分类保存在本机，可通过 WebDAV 文件备份同步；点“编辑”后可拖动排序。";
+"management.category.footer" = "分类保存在本机，可通过文件同步备份和导入。";
+"management.category.footer.sort" = "分类保存在本机，可通过文件备份同步；点“编辑”后可拖动排序。";
 "management.category.add" = "新增分类";
 "management.category.add.title" = "新增分类";
 "management.category.edit.title" = "编辑分类";
@@ -453,7 +454,7 @@
 "templates.name.placeholder" = "模板名称";
 "templates.empty.title" = "暂无模板";
 "templates.empty.subtitle" = "可以添加固定支出或收入模板，用于快速重复记账。";
-"templates.footer" = "模板仅用于在记账页快速填充表单；新增、编辑或删除模板后会自动尝试备份到当前 WebDAV 同步空间。";
+"templates.footer" = "模板仅用于在记账页快速填充表单；新增、编辑或删除模板后会自动尝试备份到当前同步空间。";
 "templates.delete.confirm.title" = "删除模板？";
 "templates.delete.confirm.message" = "这里只会删除模板，不会影响已经保存的流水。";
 "templates.message.saved" = "模板已保存。";
@@ -479,7 +480,7 @@
 "budgets.empty.title" = "暂无预算";
 "budgets.empty.subtitle" = "可以为本月总支出、某个分类或某个账户设置上限。";
 "budgets.footer" = "预算按月统计支出用量。分类预算会包含下级分类，账户预算会统计从该账户支付的支出。";
-"budgets.editor.footer" = "预算会以 WebDAV 增量日志备份，并在其他设备重放同步。";
+"budgets.editor.footer" = "预算会以增量日志备份，并在其他设备重放同步。";
 "budgets.delete.confirm.title" = "删除预算？";
 "budgets.delete.confirm.message" = "这里只会删除预算设置，不会影响已经保存的流水。";
 "budgets.message.saved" = "预算已保存。";
@@ -526,9 +527,9 @@
 "profile.sync.testSucceeded" = "备份位置可以访问。";
 "profile.sync.error.saveFailed" = "个人信息保存失败，请稍后重试。";
 "profile.sync.error.backupDisabled" = "请先启用文件备份，再同步个人信息。";
-"profile.sync.error.backupFailed" = "个人信息备份失败，请检查 WebDAV 地址、同步密码和凭据。";
-"profile.sync.error.importFailed" = "个人信息导入失败，请检查 WebDAV 地址、同步密码和凭据。";
-"profile.sync.error.testFailed" = "无法访问 WebDAV 备份位置。";
+"profile.sync.error.backupFailed" = "个人信息备份失败，请检查所选文件位置、同步密码和凭据。";
+"profile.sync.error.importFailed" = "个人信息导入失败，请检查所选文件位置、同步密码和凭据。";
+"profile.sync.error.testFailed" = "无法访问所选备份位置。";
 
 "sync.title" = "备份与同步";
 "sync.section.status" = "备份状态";
@@ -549,8 +550,9 @@
 "sync.backupEnabled" = "启用文件备份";
 "sync.provider" = "文件位置";
 "sync.provider.iCloudDrive" = "iCloud云盘";
-"sync.provider.iCloudDrive.unavailable" = "iCloud云盘入口先保留给后续版本；当前文件备份只使用 WebDAV。";
+"sync.provider.iCloudDrive.unavailable" = "iCloud云盘当前不可用，请确认系统已登录 Apple ID 并启用 iCloud 云盘。";
 "sync.provider.webDAV" = "WebDAV";
+"sync.iCloud.footer" = "iCloud 云盘会在本 App 文件夹内保存 v1/ 增量文件；WebDAV 仍使用 KKBookKeep/v1/ 相对目录。";
 "sync.webDAV.server.placeholder" = "服务器地址";
 "sync.webDAV.authentication" = "鉴权方式";
 "sync.webDAV.authentication.password" = "用户名和密码";
@@ -579,15 +581,15 @@
 "sync.settings.saved" = "同步设置已保存。";
 "sync.settings.localOnlySaved" = "本设备已切换为独立运行。";
 "sync.backup.succeeded" = "数据备份完成。";
-"sync.backup.error.failed" = "数据未能全部备份，请检查 WebDAV 地址、同步密码和凭据。";
+"sync.backup.error.failed" = "数据未能全部备份，请检查所选文件位置、同步密码和凭据。";
 "sync.import.completed" = "数据导入完成。";
-"sync.import.error.failed" = "数据未能全部导入，请检查 WebDAV 地址、同步密码和凭据。";
+"sync.import.error.failed" = "数据未能全部导入，请检查所选文件位置、同步密码和凭据。";
 "sync.settings.savedAndBackedUp" = "同步设置已保存，数据备份完成。";
-"sync.settings.savedButBackupFailed" = "同步设置已保存，但数据备份失败。请检查 WebDAV 地址、同步密码和凭据。";
-"sync.settings.savedButImportFailed" = "同步设置已保存，但导入远端数据失败。为避免覆盖云端，请检查 WebDAV 地址、同步密码和凭据后重试。";
+"sync.settings.savedButBackupFailed" = "同步设置已保存，但数据备份失败。请检查所选文件位置、同步密码和凭据。";
+"sync.settings.savedButImportFailed" = "同步设置已保存，但导入远端数据失败。为避免覆盖云端，请检查所选文件位置、同步密码和凭据后重试。";
 "sync.settings.message.title" = "同步设置";
 "sync.settings.error.saveFailed" = "同步设置保存失败，请稍后重试。";
-"sync.settings.error.providerUnavailable" = "iCloud云盘同步暂不可用，请先使用 WebDAV。";
+"sync.settings.error.providerUnavailable" = "当前设备无法访问 iCloud 云盘，请确认系统已登录 Apple ID 并启用 iCloud 云盘。";
 "sync.settings.error.encryptionPasswordRequired" = "启用加密备份前，请先填写同步密码。";
 "sync.settings.error.encryptionPasswordMismatch" = "两次同步密码不一致。";
 
@@ -595,33 +597,33 @@
 "bookkeeping.metadata.sync.importSucceeded" = "账户和分类已导入。";
 "bookkeeping.metadata.sync.importNoRemoteMetadata" = "没有找到远端账户和分类文件。";
 "bookkeeping.metadata.sync.error.backupDisabled" = "请先启用文件备份，再同步账户和分类。";
-"bookkeeping.metadata.sync.error.backupFailed" = "账户和分类备份失败，请检查 WebDAV 地址、同步密码和凭据。";
-"bookkeeping.metadata.sync.error.importFailed" = "账户和分类导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+"bookkeeping.metadata.sync.error.backupFailed" = "账户和分类备份失败，请检查所选文件位置、同步密码和凭据。";
+"bookkeeping.metadata.sync.error.importFailed" = "账户和分类导入失败，请检查所选文件位置、同步密码和凭据。";
 
 "bookkeeping.transactions.sync.backupSucceeded" = "流水备份完成。";
 "bookkeeping.transactions.sync.importSucceeded" = "流水已导入。";
 "bookkeeping.transactions.sync.importNoRemoteTransactions" = "没有找到远端流水文件。";
 "bookkeeping.transactions.sync.error.backupDisabled" = "请先启用文件备份，再同步流水。";
-"bookkeeping.transactions.sync.error.backupFailed" = "流水备份失败，请检查 WebDAV 地址、同步密码和凭据。";
-"bookkeeping.transactions.sync.error.importFailed" = "流水导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+"bookkeeping.transactions.sync.error.backupFailed" = "流水备份失败，请检查所选文件位置、同步密码和凭据。";
+"bookkeeping.transactions.sync.error.importFailed" = "流水导入失败，请检查所选文件位置、同步密码和凭据。";
 
 "bookkeeping.templates.sync.backupSucceeded" = "模板备份完成。";
 "bookkeeping.templates.sync.importSucceeded" = "模板已导入。";
 "bookkeeping.templates.sync.importNoRemoteTemplates" = "没有找到远端模板文件。";
 "bookkeeping.templates.sync.error.backupDisabled" = "请先启用文件备份，再同步模板。";
-"bookkeeping.templates.sync.error.backupFailed" = "模板备份失败，请检查 WebDAV 地址、同步密码和凭据。";
-"bookkeeping.templates.sync.error.importFailed" = "模板导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+"bookkeeping.templates.sync.error.backupFailed" = "模板备份失败，请检查所选文件位置、同步密码和凭据。";
+"bookkeeping.templates.sync.error.importFailed" = "模板导入失败，请检查所选文件位置、同步密码和凭据。";
 
 "bookkeeping.budgets.sync.backupSucceeded" = "预算备份完成。";
 "bookkeeping.budgets.sync.importSucceeded" = "预算已导入。";
 "bookkeeping.budgets.sync.importNoRemoteBudgets" = "没有找到远端预算文件。";
 "bookkeeping.budgets.sync.error.backupDisabled" = "请先启用文件备份，再同步预算。";
-"bookkeeping.budgets.sync.error.backupFailed" = "预算备份失败，请检查 WebDAV 地址、同步密码和凭据。";
-"bookkeeping.budgets.sync.error.importFailed" = "预算导入失败，请检查 WebDAV 地址、同步密码和凭据。";
+"bookkeeping.budgets.sync.error.backupFailed" = "预算备份失败，请检查所选文件位置、同步密码和凭据。";
+"bookkeeping.budgets.sync.error.importFailed" = "预算导入失败，请检查所选文件位置、同步密码和凭据。";
 
 "bookkeeping.ledger.sync.backupSucceeded" = "账本数据备份完成。";
 "bookkeeping.ledger.sync.error.backupDisabled" = "请先启用文件备份，再同步账本数据。";
-"bookkeeping.ledger.sync.error.backupFailed" = "账本数据备份失败，请检查 WebDAV 地址、同步密码和凭据。";
+"bookkeeping.ledger.sync.error.backupFailed" = "账本数据备份失败，请检查所选文件位置、同步密码和凭据。";
 
 "settings.title" = "应用设置";
 "settings.language" = "语言";

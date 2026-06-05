@@ -46,6 +46,7 @@
 		69E804002FC9CBCC002A4EC1 /* KsuserBookKeepingIOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KsuserBookKeepingIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A1000012FD0000000010001 /* KsuserBookKeepingWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KsuserBookKeepingWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "KsuserBookKeepingWidget-Info.plist"; sourceTree = "<group>"; };
+		7A1000112FD5000000010001 /* KsuserBookKeepingIOS-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "KsuserBookKeepingIOS-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -121,6 +122,7 @@
 		7A1000102FD0000000010001 /* Config */ = {
 			isa = PBXGroup;
 			children = (
+				7A1000112FD5000000010001 /* KsuserBookKeepingIOS-Info.plist */,
 				7A10000F2FD0000000010001 /* KsuserBookKeepingWidget-Info.plist */,
 			);
 			path = Config;
@@ -210,21 +212,24 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
-				69E8033B2FC9CBCC002A4EC1 = {
-					CreatedOnToolsVersion = 26.5;
-					SystemCapabilities = {
-						com.apple.ApplicationGroups.iOS = {
+					69E8033B2FC9CBCC002A4EC1 = {
+						CreatedOnToolsVersion = 26.5;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
 								enabled = 1;
+							};
+							com.apple.iCloud = {
+								enabled = 1;
+							};
 						};
 					};
-				};
-				69E804022FC9CBCC002A4EC1 = {
-					CreatedOnToolsVersion = 26.5;
-					TestTargetID = 69E8033B2FC9CBCC002A4EC1;
-				};
-				7A1000072FD0000000010001 = {
-					CreatedOnToolsVersion = 26.5;
-					SystemCapabilities = {
+					69E804022FC9CBCC002A4EC1 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = 69E8033B2FC9CBCC002A4EC1;
+					};
+					7A1000072FD0000000010001 = {
+						CreatedOnToolsVersion = 26.5;
+						SystemCapabilities = {
 							com.apple.ApplicationGroups.iOS = {
 								enabled = 1;
 							};
@@ -444,30 +449,17 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingIOS/KsuserBookKeepingIOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "羊阳记账";
-				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"cn.ksuser.bookkeeping.KsuserBookKeepingIOS\";\n    CFBundleURLSchemes =     (\n        kkbookkeep\n    );\n}";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
-				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "用于解锁羊羊记账。";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于在用户主动记账时录入当前位置。";
-				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
-				INFOPLIST_KEY_UIAppFonts = "FontAwesome7Free-Solid-900.otf FontAwesome7Brands-Regular-400.otf";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = "";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/KsuserBookKeepingIOS-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.ksuser.bookkeeping.kkbookkeep;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -487,30 +479,17 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = KsuserBookKeepingIOS/KsuserBookKeepingIOSRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 8LDARH2S3X;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "羊阳记账";
-				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleURLName = \"cn.ksuser.bookkeeping.KsuserBookKeepingIOS\";\n    CFBundleURLSchemes =     (\n        kkbookkeep\n    );\n}";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
-				INFOPLIST_KEY_LSApplicationQueriesSchemes = iosamap;
-				INFOPLIST_KEY_NSFaceIDUsageDescription = "用于解锁羊羊记账。";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "用于在用户主动记账时录入当前位置。";
-				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
-				INFOPLIST_KEY_UIAppFonts = "FontAwesome7Free-Solid-900.otf FontAwesome7Brands-Regular-400.otf";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = "";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/KsuserBookKeepingIOS-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.ksuser.bookkeeping.kkbookkeep;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

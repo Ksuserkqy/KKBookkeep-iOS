@@ -72,14 +72,13 @@ struct SyncSettingsPage: View {
                 Picker("sync.provider", selection: $provider) {
                     ForEach(SyncProvider.allCases) { option in
                         Text(option.titleKey).tag(option)
-                            .disabled(!option.isAvailable)
                     }
                 }
             } header: {
                 Text("sync.section.provider")
             } footer: {
                 if provider == .iCloudDrive {
-                    Text("sync.provider.iCloudDrive.unavailable")
+                    Text("sync.iCloud.footer")
                 }
             }
 
@@ -232,11 +231,6 @@ struct SyncSettingsPage: View {
     }
 
     private func saveSettings() async {
-        if backupEnabled, provider == .iCloudDrive {
-            showSettingsMessage("sync.settings.error.providerUnavailable")
-            return
-        }
-
         if backupEnabled, encryptionEnabled, encryptionPassword.isEmpty {
             showSettingsMessage("sync.settings.error.encryptionPasswordRequired")
             return
