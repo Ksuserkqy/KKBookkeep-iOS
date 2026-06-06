@@ -742,7 +742,7 @@
 "about.openSource.title" = "开源项目";
 "about.openSource.description" = "羊阳记账是一个开源项目，遵循 Apache-2.0 协议。";
 "about.openSource.repository" = "开源地址";
-"about.icp" = "沪ICP备XXXXX";
+"about.icp" = "沪ICP备2025144703号";
 "about.copyright" = "版权所有 Ksuser KsuserKqy";
 
 "legal.title" = "法律信息";

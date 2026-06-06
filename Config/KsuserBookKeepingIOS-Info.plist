@@ -37,6 +37,8 @@
 	<array>
 		<string>iosamap</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Used to unlock KKBookkeep.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
