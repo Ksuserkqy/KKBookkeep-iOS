@@ -142,6 +142,32 @@ struct DraftCategoryHierarchyItem: Identifiable, Equatable {
     }
 }
 
+private struct InitialBookkeepingTemplate: Decodable {
+    var accounts: [Account]
+    var categories: [Category]
+
+    struct Account: Decodable {
+        var id: String
+        var name: String
+        var isDefault: Bool?
+        var type: DraftAccountType?
+        var iconName: String?
+        var colorHex: String?
+        var balanceText: String?
+        var note: String?
+    }
+
+    struct Category: Decodable {
+        var id: String
+        var name: String
+        var isDefault: Bool?
+        var kind: DraftEntryKind
+        var parentId: String?
+        var iconName: String?
+        var colorHex: String?
+    }
+}
+
 enum DraftAccountType: String, CaseIterable, Codable, Identifiable {
     case cash
     case savingsCard
@@ -2950,22 +2976,133 @@ final class DraftBookkeepingStore: ObservableObject {
 
     private static let defaultAccountMetadataById: [String: (type: DraftAccountType, iconName: String, colorHex: String)] = [
         "account.cash": (.cash, "money-bill", "#F6C343"),
-        "account.bankCard": (.savingsCard, "credit-card", "#4F8EF7")
+        "account.bankCard": (.savingsCard, "credit-card", "#4F8EF7"),
+        "account.wechatBalance": (.digitalWallet, "weixin", "#07C160"),
+        "account.alipayBalance": (.digitalWallet, "alipay", "#1677FF"),
+        "account.qqWallet": (.digitalWallet, "qq", "#12B7F5"),
+        "account.paypalBalance": (.digitalWallet, "paypal", "#003087"),
+        "account.appleCash": (.digitalWallet, "apple-pay", "#111111"),
+        "account.venmoBalance": (.digitalWallet, "venmo", "#3D95CE")
     ]
 
     private static let defaultCategoryMetadataById: [String: (iconName: String, colorHex: String)] = [
         "category.expense.food": ("utensils", "#F97316"),
+        "category.expense.groceries": ("basket-shopping", "#22C55E"),
+        "category.expense.dining": ("utensils", "#F97316"),
         "category.expense.transport": ("bus", "#3B82F6"),
+        "category.expense.transportation": ("bus", "#3B82F6"),
         "category.expense.shopping": ("bag-shopping", "#EC4899"),
         "category.expense.daily": ("cart-shopping", "#10B981"),
         "category.expense.housing": ("house", "#8B5CF6"),
+        "category.expense.utilities": ("bolt", "#F59E0B"),
         "category.income.salary": ("briefcase", "#22C55E"),
         "category.income.bonus": ("gift", "#F59E0B"),
+        "category.income.freelance": ("laptop-code", "#6366F1"),
         "category.income.reimbursement": ("receipt", "#06B6D4"),
         "category.income.other": ("ellipsis", "#64748B")
     ]
 
-    private static let defaultAccounts = [
+    private static var defaultAccounts: [DraftAccount] {
+        defaultBookkeepingTemplate.accounts.map { account in
+            DraftAccount(
+                id: account.id,
+                name: account.name,
+                isDefault: account.isDefault ?? false,
+                type: account.type ?? .cash,
+                iconName: account.iconName ?? "",
+                colorHex: account.colorHex ?? "",
+                balanceText: account.balanceText ?? "0",
+                note: account.note ?? ""
+            )
+        }
+    }
+
+    private static var defaultCategories: [DraftCategory] {
+        defaultBookkeepingTemplate.categories.map { category in
+            DraftCategory(
+                id: category.id,
+                name: category.name,
+                isDefault: category.isDefault ?? false,
+                kind: category.kind,
+                parentId: category.parentId,
+                iconName: category.iconName ?? "",
+                colorHex: category.colorHex ?? ""
+            )
+        }
+    }
+
+    private static var defaultBookkeepingTemplate: InitialBookkeepingTemplate {
+        loadDefaultBookkeepingTemplate() ?? fallbackDefaultBookkeepingTemplate
+    }
+
+    private static func loadDefaultBookkeepingTemplate() -> InitialBookkeepingTemplate? {
+        let candidates = preferredBookkeepingTemplateResourceNames()
+        let decoder = JSONDecoder()
+
+        for name in candidates {
+            let url = Bundle.main.url(
+                forResource: name,
+                withExtension: "json",
+                subdirectory: "Resources/InitialBookkeepingTemplates"
+            ) ?? Bundle.main.url(forResource: name, withExtension: "json")
+
+            guard let url else {
+                continue
+            }
+
+            do {
+                let data = try Data(contentsOf: url)
+                return try decoder.decode(InitialBookkeepingTemplate.self, from: data)
+            } catch {
+                continue
+            }
+        }
+
+        return nil
+    }
+
+    private static func preferredBookkeepingTemplateResourceNames() -> [String] {
+        let usesChineseTemplate = Locale.preferredLanguages.contains { preferredLanguage in
+            preferredLanguage == "zh" || preferredLanguage.hasPrefix("zh-")
+        }
+
+        if usesChineseTemplate {
+            return [
+                "initial-bookkeeping-templates.zh-Hans",
+                "initial-bookkeeping-templates.en"
+            ]
+        }
+
+        return ["initial-bookkeeping-templates.en"]
+    }
+
+    private static let fallbackDefaultBookkeepingTemplate = InitialBookkeepingTemplate(
+        accounts: fallbackDefaultAccounts.map {
+            InitialBookkeepingTemplate.Account(
+                id: $0.id,
+                name: $0.name,
+                isDefault: $0.isDefault,
+                type: $0.type,
+                iconName: $0.iconName,
+                colorHex: $0.colorHex,
+                balanceText: $0.balanceText,
+                note: $0.note
+            )
+        },
+        categories: fallbackDefaultCategories.map {
+            InitialBookkeepingTemplate.Category(
+                id: $0.id,
+                name: $0.name,
+                isDefault: $0.isDefault,
+                kind: $0.kind,
+                parentId: $0.parentId,
+                iconName: $0.iconName,
+                colorHex: $0.colorHex
+            )
+        }
+    )
+
+    private static let fallbackDefaultAccounts = [
         DraftAccount(
             id: "account.cash",
             name: localized("management.account.default.cash"),
@@ -2986,7 +3123,7 @@ final class DraftBookkeepingStore: ObservableObject {
         )
     ]
 
-    private static let defaultCategories = [
+    private static let fallbackDefaultCategories = [
         DraftCategory(id: "category.expense.food", name: localized("management.category.default.food"), kind: .expense, iconName: "utensils", colorHex: "#F97316"),
         DraftCategory(id: "category.expense.transport", name: localized("management.category.default.transport"), kind: .expense, iconName: "bus", colorHex: "#3B82F6"),
         DraftCategory(id: "category.expense.shopping", name: localized("management.category.default.shopping"), kind: .expense, iconName: "bag-shopping", colorHex: "#EC4899"),

@@ -1,0 +1,116 @@
+{
+  "accounts": [
+    {
+      "id": "account.cash",
+      "name": "现金",
+      "isDefault": true,
+      "type": "cash",
+      "iconName": "money-bill",
+      "colorHex": "#F6C343",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.bankCard",
+      "name": "银行卡",
+      "isDefault": false,
+      "type": "savingsCard",
+      "iconName": "credit-card",
+      "colorHex": "#4F8EF7",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.wechatBalance",
+      "name": "微信余额",
+      "isDefault": false,
+      "type": "digitalWallet",
+      "iconName": "weixin",
+      "colorHex": "#07C160",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.alipayBalance",
+      "name": "支付宝余额",
+      "isDefault": false,
+      "type": "digitalWallet",
+      "iconName": "alipay",
+      "colorHex": "#1677FF",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.qqWallet",
+      "name": "QQ钱包",
+      "isDefault": false,
+      "type": "digitalWallet",
+      "iconName": "qq",
+      "colorHex": "#12B7F5",
+      "balanceText": "0"
+    }
+  ],
+  "categories": [
+    {
+      "id": "category.expense.food",
+      "name": "餐饮",
+      "isDefault": true,
+      "kind": "expense",
+      "iconName": "utensils",
+      "colorHex": "#F97316"
+    },
+    {
+      "id": "category.expense.transport",
+      "name": "交通",
+      "kind": "expense",
+      "iconName": "bus",
+      "colorHex": "#3B82F6"
+    },
+    {
+      "id": "category.expense.shopping",
+      "name": "购物",
+      "kind": "expense",
+      "iconName": "bag-shopping",
+      "colorHex": "#EC4899"
+    },
+    {
+      "id": "category.expense.daily",
+      "name": "日用",
+      "kind": "expense",
+      "iconName": "cart-shopping",
+      "colorHex": "#10B981"
+    },
+    {
+      "id": "category.expense.housing",
+      "name": "居住",
+      "kind": "expense",
+      "iconName": "house",
+      "colorHex": "#8B5CF6"
+    },
+    {
+      "id": "category.income.salary",
+      "name": "工资",
+      "isDefault": true,
+      "kind": "income",
+      "iconName": "briefcase",
+      "colorHex": "#22C55E"
+    },
+    {
+      "id": "category.income.bonus",
+      "name": "奖金",
+      "kind": "income",
+      "iconName": "gift",
+      "colorHex": "#F59E0B"
+    },
+    {
+      "id": "category.income.reimbursement",
+      "name": "报销",
+      "kind": "income",
+      "iconName": "receipt",
+      "colorHex": "#06B6D4"
+    },
+    {
+      "id": "category.income.other",
+      "name": "其他收入",
+      "kind": "income",
+      "iconName": "ellipsis",
+      "colorHex": "#64748B"
+    }
+  ]
+}

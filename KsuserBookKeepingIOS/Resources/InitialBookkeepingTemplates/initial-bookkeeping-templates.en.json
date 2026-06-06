@@ -1,0 +1,123 @@
+{
+  "accounts": [
+    {
+      "id": "account.cash",
+      "name": "Cash",
+      "isDefault": true,
+      "type": "cash",
+      "iconName": "money-bill",
+      "colorHex": "#F6C343",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.bankCard",
+      "name": "Bank Card",
+      "isDefault": false,
+      "type": "savingsCard",
+      "iconName": "credit-card",
+      "colorHex": "#4F8EF7",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.paypalBalance",
+      "name": "PayPal Balance",
+      "isDefault": false,
+      "type": "digitalWallet",
+      "iconName": "paypal",
+      "colorHex": "#003087",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.appleCash",
+      "name": "Apple Cash",
+      "isDefault": false,
+      "type": "digitalWallet",
+      "iconName": "apple-pay",
+      "colorHex": "#111111",
+      "balanceText": "0"
+    },
+    {
+      "id": "account.venmoBalance",
+      "name": "Venmo Balance",
+      "isDefault": false,
+      "type": "digitalWallet",
+      "iconName": "venmo",
+      "colorHex": "#3D95CE",
+      "balanceText": "0"
+    }
+  ],
+  "categories": [
+    {
+      "id": "category.expense.groceries",
+      "name": "Groceries",
+      "isDefault": true,
+      "kind": "expense",
+      "iconName": "basket-shopping",
+      "colorHex": "#22C55E"
+    },
+    {
+      "id": "category.expense.dining",
+      "name": "Dining",
+      "kind": "expense",
+      "iconName": "utensils",
+      "colorHex": "#F97316"
+    },
+    {
+      "id": "category.expense.transportation",
+      "name": "Transportation",
+      "kind": "expense",
+      "iconName": "bus",
+      "colorHex": "#3B82F6"
+    },
+    {
+      "id": "category.expense.shopping",
+      "name": "Shopping",
+      "kind": "expense",
+      "iconName": "bag-shopping",
+      "colorHex": "#EC4899"
+    },
+    {
+      "id": "category.expense.housing",
+      "name": "Housing",
+      "kind": "expense",
+      "iconName": "house",
+      "colorHex": "#8B5CF6"
+    },
+    {
+      "id": "category.expense.utilities",
+      "name": "Utilities",
+      "kind": "expense",
+      "iconName": "bolt",
+      "colorHex": "#F59E0B"
+    },
+    {
+      "id": "category.income.salary",
+      "name": "Salary",
+      "isDefault": true,
+      "kind": "income",
+      "iconName": "briefcase",
+      "colorHex": "#22C55E"
+    },
+    {
+      "id": "category.income.freelance",
+      "name": "Freelance",
+      "kind": "income",
+      "iconName": "laptop-code",
+      "colorHex": "#6366F1"
+    },
+    {
+      "id": "category.income.reimbursement",
+      "name": "Reimbursement",
+      "kind": "income",
+      "iconName": "receipt",
+      "colorHex": "#06B6D4"
+    },
+    {
+      "id": "category.income.other",
+      "name": "Other Income",
+      "kind": "income",
+      "iconName": "ellipsis",
+      "colorHex": "#64748B"
+    }
+  ]
+}
