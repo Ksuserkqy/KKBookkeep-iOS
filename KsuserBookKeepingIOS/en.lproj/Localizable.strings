@@ -440,10 +440,10 @@
 "management.account.note.placeholder" = "Account note";
 "management.account.type" = "Account Type";
 "management.account.type.cash" = "Cash";
-"management.account.type.debitCard" = "Debit Card";
+"management.account.type.savingsCard" = "Savings Card";
 "management.account.type.creditCard" = "Credit Card";
-"management.account.type.savings" = "Savings";
 "management.account.type.digitalWallet" = "Digital Wallet";
+"management.account.type.virtualWallet" = "Virtual Wallet";
 "management.account.type.other" = "Other Account";
 "management.account.saved" = "Account saved.";
 "management.account.deleted" = "Account deleted.";

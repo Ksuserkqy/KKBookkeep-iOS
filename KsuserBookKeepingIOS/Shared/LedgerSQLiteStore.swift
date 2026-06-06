@@ -1058,7 +1058,7 @@ final class LedgerSQLiteStore {
                     id: columnText(statement, 0),
                     name: columnText(statement, 1),
                     isDefault: sqlite3_column_int(statement, 2) != 0,
-                    type: DraftAccountType(rawValue: columnText(statement, 3)) ?? .cash,
+                    type: DraftAccountType(persistedValue: columnText(statement, 3)),
                     iconName: columnText(statement, 4),
                     colorHex: columnText(statement, 5),
                     balanceText: columnText(statement, 6),

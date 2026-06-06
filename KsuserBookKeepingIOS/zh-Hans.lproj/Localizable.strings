@@ -440,10 +440,10 @@
 "management.account.note.placeholder" = "账户备注";
 "management.account.type" = "账户类型";
 "management.account.type.cash" = "现金";
-"management.account.type.debitCard" = "借记卡";
+"management.account.type.savingsCard" = "储蓄卡";
 "management.account.type.creditCard" = "信用卡";
-"management.account.type.savings" = "储蓄账户";
 "management.account.type.digitalWallet" = "电子钱包";
+"management.account.type.virtualWallet" = "虚拟钱包";
 "management.account.type.other" = "其他账户";
 "management.account.saved" = "账户已保存。";
 "management.account.deleted" = "账户已删除。";

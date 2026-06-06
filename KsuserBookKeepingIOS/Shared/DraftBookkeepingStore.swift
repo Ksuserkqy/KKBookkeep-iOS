@@ -144,11 +144,40 @@ struct DraftCategoryHierarchyItem: Identifiable, Equatable {
 
 enum DraftAccountType: String, CaseIterable, Codable, Identifiable {
     case cash
-    case debitCard
+    case savingsCard
     case creditCard
-    case savings
     case digitalWallet
+    case virtualWallet
     case other
+
+    static let allCases: [DraftAccountType] = [
+        .cash,
+        .savingsCard,
+        .creditCard,
+        .digitalWallet,
+        .virtualWallet,
+        .other
+    ]
+
+    init(persistedValue: String) {
+        switch persistedValue {
+        case "debitCard", "savings":
+            self = .savingsCard
+        default:
+            self = Self(rawValue: persistedValue) ?? .cash
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let persistedValue = try container.decode(String.self)
+        self.init(persistedValue: persistedValue)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 
     var id: String { rawValue }
 
@@ -160,14 +189,14 @@ enum DraftAccountType: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .cash:
             return "management.account.type.cash"
-        case .debitCard:
-            return "management.account.type.debitCard"
+        case .savingsCard:
+            return "management.account.type.savingsCard"
         case .creditCard:
             return "management.account.type.creditCard"
-        case .savings:
-            return "management.account.type.savings"
         case .digitalWallet:
             return "management.account.type.digitalWallet"
+        case .virtualWallet:
+            return "management.account.type.virtualWallet"
         case .other:
             return "management.account.type.other"
         }
@@ -2921,7 +2950,7 @@ final class DraftBookkeepingStore: ObservableObject {
 
     private static let defaultAccountMetadataById: [String: (type: DraftAccountType, iconName: String, colorHex: String)] = [
         "account.cash": (.cash, "money-bill", "#F6C343"),
-        "account.bankCard": (.debitCard, "credit-card", "#4F8EF7")
+        "account.bankCard": (.savingsCard, "credit-card", "#4F8EF7")
     ]
 
     private static let defaultCategoryMetadataById: [String: (iconName: String, colorHex: String)] = [
@@ -2950,7 +2979,7 @@ final class DraftBookkeepingStore: ObservableObject {
             id: "account.bankCard",
             name: localized("management.account.default.bankCard"),
             isDefault: true,
-            type: .debitCard,
+            type: .savingsCard,
             iconName: "credit-card",
             colorHex: "#4F8EF7",
             balanceText: "0"
