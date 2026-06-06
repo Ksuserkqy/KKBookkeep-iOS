@@ -23,7 +23,7 @@ struct ContentView: View {
     @State private var requestedRecordKind: DraftEntryKind?
 
     private var activeLocaleIdentifier: String {
-        AppLanguage(rawValue: language)?.localeIdentifier ?? Locale.current.identifier
+        AppLocalization.localeIdentifier
     }
 
     var body: some View {

@@ -360,8 +360,8 @@ struct ReportsPage: View {
             ReportSummaryMetric(
                 id: "entries",
                 titleKey: "reports.summary.entries",
-                value: String(format: NSLocalizedString("reports.summary.entries.valueFormat", comment: ""), entryCount),
-                caption: String(format: NSLocalizedString("reports.summary.entries.captionFormat", comment: ""), transferCount),
+                value: String(format: AppLocalization.string("reports.summary.entries.valueFormat", comment: ""), entryCount),
+                caption: String(format: AppLocalization.string("reports.summary.entries.captionFormat", comment: ""), transferCount),
                 systemImage: "list.bullet.rectangle.portrait.fill",
                 color: .orange
             )
@@ -637,8 +637,8 @@ struct ReportsPage: View {
             return [
                 ReportInsight(
                     id: "empty",
-                    title: NSLocalizedString("reports.insight.empty.title", comment: ""),
-                    subtitle: NSLocalizedString("reports.insight.empty.subtitle", comment: ""),
+                    title: AppLocalization.string("reports.insight.empty.title", comment: ""),
+                    subtitle: AppLocalization.string("reports.insight.empty.subtitle", comment: ""),
                     systemImage: "sparkles",
                     color: .secondary
                 )
@@ -649,9 +649,9 @@ struct ReportsPage: View {
             insights.append(
                 ReportInsight(
                     id: "top-category",
-                    title: String(format: NSLocalizedString("reports.insight.topCategory.titleFormat", comment: ""), topCategory.title),
+                    title: String(format: AppLocalization.string("reports.insight.topCategory.titleFormat", comment: ""), topCategory.title),
                     subtitle: String(
-                        format: NSLocalizedString("reports.insight.topCategory.subtitleFormat", comment: ""),
+                        format: AppLocalization.string("reports.insight.topCategory.subtitleFormat", comment: ""),
                         topCategory.title,
                         percentText(part: Decimal(topCategory.amount), total: expense),
                         Self.currencyText(from: Decimal(topCategory.amount))
@@ -666,12 +666,12 @@ struct ReportsPage: View {
             ReportInsight(
                 id: "cash-flow",
                 title: balance >= 0
-                    ? NSLocalizedString("reports.insight.cashFlow.positive.title", comment: "")
-                    : NSLocalizedString("reports.insight.cashFlow.negative.title", comment: ""),
+                    ? AppLocalization.string("reports.insight.cashFlow.positive.title", comment: "")
+                    : AppLocalization.string("reports.insight.cashFlow.negative.title", comment: ""),
                 subtitle: String(
                     format: balance >= 0
-                        ? NSLocalizedString("reports.insight.cashFlow.positive.subtitleFormat", comment: "")
-                        : NSLocalizedString("reports.insight.cashFlow.negative.subtitleFormat", comment: ""),
+                        ? AppLocalization.string("reports.insight.cashFlow.positive.subtitleFormat", comment: "")
+                        : AppLocalization.string("reports.insight.cashFlow.negative.subtitleFormat", comment: ""),
                     Self.currencyText(from: absDecimal(balance))
                 ),
                 systemImage: balance >= 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill",
@@ -683,9 +683,9 @@ struct ReportsPage: View {
             insights.append(
                 ReportInsight(
                     id: "spending-pace",
-                    title: NSLocalizedString("reports.insight.pace.title", comment: ""),
+                    title: AppLocalization.string("reports.insight.pace.title", comment: ""),
                     subtitle: String(
-                        format: NSLocalizedString("reports.insight.pace.subtitleFormat", comment: ""),
+                        format: AppLocalization.string("reports.insight.pace.subtitleFormat", comment: ""),
                         periodName,
                         Self.currencyText(from: averageDailyExpense)
                     ),
@@ -699,10 +699,10 @@ struct ReportsPage: View {
             insights.append(
                 ReportInsight(
                     id: "peak-day",
-                    title: NSLocalizedString("reports.insight.peakDay.title", comment: ""),
+                    title: AppLocalization.string("reports.insight.peakDay.title", comment: ""),
                     subtitle: String(
-                        format: NSLocalizedString("reports.insight.peakDay.subtitleFormat", comment: ""),
-                        Self.mediumDateFormatter.string(from: maxDailyExpense.key),
+                        format: AppLocalization.string("reports.insight.peakDay.subtitleFormat", comment: ""),
+                        Self.mediumDateText(for: maxDailyExpense.key),
                         Self.currencyText(from: maxDailyExpense.value)
                     ),
                     systemImage: "flame.fill",
@@ -714,9 +714,9 @@ struct ReportsPage: View {
         insights.append(
             ReportInsight(
                 id: "activity",
-                title: NSLocalizedString("reports.insight.activity.title", comment: ""),
+                title: AppLocalization.string("reports.insight.activity.title", comment: ""),
                 subtitle: String(
-                    format: NSLocalizedString("reports.insight.activity.subtitleFormat", comment: ""),
+                    format: AppLocalization.string("reports.insight.activity.subtitleFormat", comment: ""),
                     periodName,
                     entryCount,
                     Self.currencyText(from: income),
@@ -731,8 +731,8 @@ struct ReportsPage: View {
             insights.append(
                 ReportInsight(
                     id: "empty",
-                    title: NSLocalizedString("reports.insight.empty.title", comment: ""),
-                    subtitle: NSLocalizedString("reports.insight.empty.subtitle", comment: ""),
+                    title: AppLocalization.string("reports.insight.empty.title", comment: ""),
+                    subtitle: AppLocalization.string("reports.insight.empty.subtitle", comment: ""),
                     systemImage: "sparkles",
                     color: .secondary
                 )
@@ -758,7 +758,7 @@ struct ReportsPage: View {
                 titleKey: "reports.pace.averageDaily",
                 value: Self.currencyText(from: averageDailyExpense),
                 caption: String(
-                    format: NSLocalizedString("reports.pace.averageDaily.captionFormat", comment: ""),
+                    format: AppLocalization.string("reports.pace.averageDaily.captionFormat", comment: ""),
                     periodName
                 ),
                 systemImage: "divide.circle.fill",
@@ -767,8 +767,8 @@ struct ReportsPage: View {
             ReportHighlight(
                 id: "active-days",
                 titleKey: "reports.pace.activeDays",
-                value: String(format: NSLocalizedString("reports.pace.activeDays.valueFormat", comment: ""), activeExpenseDays),
-                caption: String(format: NSLocalizedString("reports.pace.activeDays.captionFormat", comment: ""), dayCount),
+                value: String(format: AppLocalization.string("reports.pace.activeDays.valueFormat", comment: ""), activeExpenseDays),
+                caption: String(format: AppLocalization.string("reports.pace.activeDays.captionFormat", comment: ""), dayCount),
                 systemImage: "calendar.circle.fill",
                 color: .blue
             ),
@@ -776,7 +776,7 @@ struct ReportsPage: View {
                 id: "average-active-day-expense",
                 titleKey: "reports.pace.averageActiveDay",
                 value: Self.currencyText(from: averageActiveDayExpense),
-                caption: NSLocalizedString("reports.pace.averageActiveDay.caption", comment: ""),
+                caption: AppLocalization.string("reports.pace.averageActiveDay.caption", comment: ""),
                 systemImage: "bolt.circle.fill",
                 color: .orange
             )
@@ -788,7 +788,7 @@ struct ReportsPage: View {
                     id: "peak-day",
                     titleKey: "reports.pace.peakDay",
                     value: Self.currencyText(from: maxDailyExpense.value),
-                    caption: Self.mediumDateFormatter.string(from: maxDailyExpense.key),
+                    caption: Self.mediumDateText(for: maxDailyExpense.key),
                     systemImage: "flame.circle.fill",
                     color: .red
                 )
@@ -801,29 +801,29 @@ struct ReportsPage: View {
     private func changeCaption(current: Decimal, previous: Decimal) -> String {
         guard previous > 0 else {
             return current > 0
-                ? NSLocalizedString("reports.summary.caption.noPrevious", comment: "")
-                : NSLocalizedString("reports.summary.caption.noData", comment: "")
+                ? AppLocalization.string("reports.summary.caption.noPrevious", comment: "")
+                : AppLocalization.string("reports.summary.caption.noData", comment: "")
         }
 
         let change = (current - previous) / previous
         let changeText = Self.percentFormatter.string(from: NSDecimalNumber(decimal: change)) ?? "0%"
 
         if change > 0 {
-            return String(format: NSLocalizedString("reports.summary.caption.increasedFormat", comment: ""), changeText)
+            return String(format: AppLocalization.string("reports.summary.caption.increasedFormat", comment: ""), changeText)
         } else if change < 0 {
-            return String(format: NSLocalizedString("reports.summary.caption.decreasedFormat", comment: ""), changeText)
+            return String(format: AppLocalization.string("reports.summary.caption.decreasedFormat", comment: ""), changeText)
         } else {
-            return NSLocalizedString("reports.summary.caption.unchanged", comment: "")
+            return AppLocalization.string("reports.summary.caption.unchanged", comment: "")
         }
     }
 
     private func balanceCaption(for balance: Decimal) -> String {
         if balance > 0 {
-            return NSLocalizedString("reports.summary.balance.caption.positive", comment: "")
+            return AppLocalization.string("reports.summary.balance.caption.positive", comment: "")
         } else if balance < 0 {
-            return NSLocalizedString("reports.summary.balance.caption.negative", comment: "")
+            return AppLocalization.string("reports.summary.balance.caption.negative", comment: "")
         } else {
-            return NSLocalizedString("reports.summary.balance.caption.zero", comment: "")
+            return AppLocalization.string("reports.summary.balance.caption.zero", comment: "")
         }
     }
 
@@ -832,16 +832,16 @@ struct ReportsPage: View {
         let isArchived = draftStore.categories.first(where: { $0.id == id })?.isArchived ?? false
 
         guard isArchived else { return name }
-        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+        return String(format: AppLocalization.string("draft.item.archivedFormat", comment: ""), name)
     }
 
     private func accountDisplayName(for id: String) -> String {
         guard let account = draftStore.accounts.first(where: { $0.id == id }) else {
-            return NSLocalizedString("draft.item.missing", comment: "")
+            return AppLocalization.string("draft.item.missing", comment: "")
         }
 
         guard account.isArchived else { return account.name }
-        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), account.name)
+        return String(format: AppLocalization.string("draft.item.archivedFormat", comment: ""), account.name)
     }
 
     private func normalizedIconName(_ iconName: String?, fallback: String) -> String {
@@ -856,6 +856,7 @@ struct ReportsPage: View {
 
     private func periodRangeText(for interval: DateInterval) -> String {
         let formatter = DateIntervalFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
 
@@ -865,11 +866,11 @@ struct ReportsPage: View {
 
     private func periodSummaryText(entryCount: Int, transferCount: Int, activeExpenseDays: Int, dayCount: Int) -> String {
         if entryCount == 0, transferCount == 0 {
-            return NSLocalizedString("reports.period.summary.empty", comment: "")
+            return AppLocalization.string("reports.period.summary.empty", comment: "")
         }
 
         return String(
-            format: NSLocalizedString("reports.period.summary.format", comment: ""),
+            format: AppLocalization.string("reports.period.summary.format", comment: ""),
             entryCount,
             transferCount,
             activeExpenseDays,
@@ -939,6 +940,7 @@ struct ReportsPage: View {
         var buckets: [ReportTrendBucket] = []
         var start = startOfMonth(for: interval.start, calendar: calendar)
         let formatter = DateFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.setLocalizedDateFormatFromTemplate("MMM")
 
         while start < interval.end {
@@ -978,21 +980,23 @@ struct ReportsPage: View {
         return formatter
     }()
 
-    private static let percentFormatter: NumberFormatter = {
+    private static var percentFormatter: NumberFormatter {
         let formatter = NumberFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.numberStyle = .percent
         formatter.maximumFractionDigits = 0
         return formatter
-    }()
+    }
 
-    private static let mediumDateFormatter: DateFormatter = {
+    private static func mediumDateText(for date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.setLocalizedDateFormatFromTemplate("MMMd")
-        return formatter
-    }()
+        return formatter.string(from: date)
+    }
 
     private static func localizedChartLabel(_ key: String) -> String {
-        NSLocalizedString(key, comment: "")
+        AppLocalization.string(key, comment: "")
     }
 }
 
@@ -1293,7 +1297,7 @@ private struct ReportRankingOptionRow: View {
                         .lineLimit(1)
 
                     if section.itemCount > 0 {
-                        Text(String(format: NSLocalizedString("reports.breakdown.itemCountFormat", comment: ""), section.itemCount))
+                        Text(String(format: AppLocalization.string("reports.breakdown.itemCountFormat", comment: ""), section.itemCount))
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 7)
@@ -1329,23 +1333,24 @@ private struct ReportRankingOptionRow: View {
 
     private var subtitleText: String {
         guard let topItem = section.topItem else {
-            return NSLocalizedString("reports.breakdown.noData", comment: "")
+            return AppLocalization.string("reports.breakdown.noData", comment: "")
         }
 
         let shareText = Self.percentFormatter.string(from: section.topItemShare as NSNumber) ?? "0%"
         return String(
-            format: NSLocalizedString("reports.breakdown.topItemFormat", comment: ""),
+            format: AppLocalization.string("reports.breakdown.topItemFormat", comment: ""),
             topItem.title,
             shareText
         )
     }
 
-    private static let percentFormatter: NumberFormatter = {
+    private static var percentFormatter: NumberFormatter {
         let formatter = NumberFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.numberStyle = .percent
         formatter.maximumFractionDigits = 0
         return formatter
-    }()
+    }
 }
 
 private struct ReportRankingDetailPage: View {
@@ -1452,7 +1457,7 @@ private struct ReportRankingDetailPage: View {
             if let topItem = section.topItem {
                 Text(
                     String(
-                        format: NSLocalizedString("reports.breakdown.topItemFormat", comment: ""),
+                        format: AppLocalization.string("reports.breakdown.topItemFormat", comment: ""),
                         topItem.title,
                         Self.percentFormatter.string(from: section.topItemShare as NSNumber) ?? "0%"
                     )
@@ -1465,15 +1470,16 @@ private struct ReportRankingDetailPage: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private static let percentFormatter: NumberFormatter = {
+    private static var percentFormatter: NumberFormatter {
         let formatter = NumberFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.numberStyle = .percent
         formatter.maximumFractionDigits = 0
         return formatter
-    }()
+    }
 
     private static func localizedChartLabel(_ key: String) -> String {
-        NSLocalizedString(key, comment: "")
+        AppLocalization.string(key, comment: "")
     }
 }
 
@@ -1541,12 +1547,13 @@ private struct ReportRankingRow: View {
         }
     }
 
-    private static let percentFormatter: NumberFormatter = {
+    private static var percentFormatter: NumberFormatter {
         let formatter = NumberFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.numberStyle = .percent
         formatter.maximumFractionDigits = 0
         return formatter
-    }()
+    }
 }
 
 #Preview {

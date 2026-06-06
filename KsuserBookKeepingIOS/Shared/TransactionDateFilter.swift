@@ -143,11 +143,11 @@ struct TransactionDateFilter: Equatable {
     func summaryText(calendar: Calendar = .current) -> String {
         switch mode {
         case .day:
-            return Self.dayFormatter.string(from: referenceDate)
+            return Self.localizedDateText(referenceDate, template: "yMMMd")
         case .month:
-            return Self.monthFormatter.string(from: referenceDate)
+            return Self.localizedDateText(referenceDate, template: "yMMMM")
         case .year:
-            return Self.yearFormatter.string(from: referenceDate)
+            return Self.localizedDateText(referenceDate, template: "y")
         case .range:
             let interval = normalizedRangeBounds(calendar: calendar)
             return "\(rangeText(for: interval.start, unit: rangeUnit)) - \(rangeText(for: interval.end, unit: rangeUnit))"
@@ -157,11 +157,11 @@ struct TransactionDateFilter: Equatable {
     private func rangeText(for date: Date, unit: TransactionDateRangeUnit) -> String {
         switch unit {
         case .day:
-            return Self.dayFormatter.string(from: date)
+            return Self.localizedDateText(date, template: "yMMMd")
         case .month:
-            return Self.monthFormatter.string(from: date)
+            return Self.localizedDateText(date, template: "yMMMM")
         case .year:
-            return Self.yearFormatter.string(from: date)
+            return Self.localizedDateText(date, template: "y")
         }
     }
 
@@ -228,23 +228,12 @@ struct TransactionDateFilter: Equatable {
         return DateInterval(start: start, end: end)
     }
 
-    private static let dayFormatter: DateFormatter = {
+    private static func localizedDateText(_ date: Date, template: String) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMd", options: 0, locale: .current)
-        return formatter
-    }()
-
-    private static let monthFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMM", options: 0, locale: .current)
-        return formatter
-    }()
-
-    private static let yearFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "y", options: 0, locale: .current)
-        return formatter
-    }()
+        formatter.locale = AppLocalization.locale
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: template, options: 0, locale: AppLocalization.locale)
+        return formatter.string(from: date)
+    }
 }
 
 struct TransactionDateHeader: View {

@@ -99,14 +99,14 @@ struct TransactionsPage: View {
                         ForEach(groupedTransactions) { group in
                             Section {
                                 ForEach(group.transactions) { transaction in
-                                    TransactionSummaryCard(
-                                        transaction: transaction,
-                                        accountItem: accountItem(for: transaction),
-                                        categoryItem: categoryItem(for: transaction),
-                                        timeText: Self.timeFormatter.string(from: transaction.date),
-                                        onEdit: {
-                                            editingTransaction = transaction
-                                        }
+                TransactionSummaryCard(
+                    transaction: transaction,
+                    accountItem: accountItem(for: transaction),
+                    categoryItem: categoryItem(for: transaction),
+                    timeText: Self.timeText(for: transaction.date),
+                    onEdit: {
+                        editingTransaction = transaction
+                    }
                                     )
                                     .padding(.vertical, 6)
                                     .swipeActions(edge: .trailing) {
@@ -222,7 +222,7 @@ struct TransactionsPage: View {
             let account = draftStore.accounts.first(where: { $0.id == id })
         else {
             return DraftVisualSummaryItem(
-                name: NSLocalizedString("draft.item.missing", comment: ""),
+                name: AppLocalization.string("draft.item.missing", comment: ""),
                 iconName: "circle-question",
                 colorHex: "#64748B"
             )
@@ -241,7 +241,7 @@ struct TransactionsPage: View {
             let category = draftStore.categories.first(where: { $0.id == id })
         else {
             return DraftVisualSummaryItem(
-                name: NSLocalizedString("draft.item.missing", comment: ""),
+                name: AppLocalization.string("draft.item.missing", comment: ""),
                 iconName: "circle-question",
                 colorHex: "#64748B"
             )
@@ -256,7 +256,7 @@ struct TransactionsPage: View {
 
     private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
         guard isArchived else { return name }
-        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+        return String(format: AppLocalization.string("draft.item.archivedFormat", comment: ""), name)
     }
 
     private func accountItem(for transaction: DraftTransaction) -> DraftVisualSummaryItem {
@@ -268,7 +268,7 @@ struct TransactionsPage: View {
             let toAccount = accountItem(for: transaction.toAccountId)
             return DraftVisualSummaryItem(
                 name: String(
-                    format: NSLocalizedString("dashboard.transferAccountFormat", comment: ""),
+                    format: AppLocalization.string("dashboard.transferAccountFormat", comment: ""),
                     fromAccount.name,
                     toAccount.name
                 ),
@@ -284,19 +284,20 @@ struct TransactionsPage: View {
             return categoryItem(for: transaction.categoryId)
         case .transfer:
             return DraftVisualSummaryItem(
-                name: NSLocalizedString("record.kind.transfer", comment: ""),
+                name: AppLocalization.string("record.kind.transfer", comment: ""),
                 iconName: "right-left",
                 colorHex: "#3B82F6"
             )
         }
     }
 
-    private static let timeFormatter: DateFormatter = {
+    private static func timeText(for date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.dateStyle = .none
         formatter.timeStyle = .short
-        return formatter
-    }()
+        return formatter.string(from: date)
+    }
 }
 
 private struct TransactionDayGroup: Identifiable {
@@ -354,7 +355,7 @@ private struct TransactionFilterBar: View {
                 if hasActiveFilters {
                     Button(action: resetFilters) {
                         TransactionFilterPill(
-                            title: NSLocalizedString("transactions.filter.reset", comment: ""),
+                            title: AppLocalization.string("transactions.filter.reset", comment: ""),
                             systemImage: "xmark.circle",
                             isActive: false
                         )
@@ -368,7 +369,7 @@ private struct TransactionFilterBar: View {
 
     private var accountTitle: String {
         guard let account = selectedAccount else {
-            return NSLocalizedString("transactions.filter.allAccounts", comment: "")
+            return AppLocalization.string("transactions.filter.allAccounts", comment: "")
         }
 
         return archivedAwareName(account.name, isArchived: account.isArchived)
@@ -376,7 +377,7 @@ private struct TransactionFilterBar: View {
 
     private var categoryTitle: String {
         guard let category = selectedCategory else {
-            return NSLocalizedString("transactions.filter.allCategories", comment: "")
+            return AppLocalization.string("transactions.filter.allCategories", comment: "")
         }
 
         return archivedAwareName(categoryDisplayName(category.id), isArchived: category.isArchived)
@@ -421,7 +422,7 @@ private struct TransactionFilterBar: View {
 
     private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
         guard isArchived else { return name }
-        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+        return String(format: AppLocalization.string("draft.item.archivedFormat", comment: ""), name)
     }
 }
 
@@ -478,7 +479,7 @@ private struct TransactionAccountFilterSelectionPage: View {
                 dismiss()
             } label: {
                 TransactionFilterSelectionRow(
-                    title: NSLocalizedString("transactions.filter.allAccounts", comment: ""),
+                    title: AppLocalization.string("transactions.filter.allAccounts", comment: ""),
                     subtitle: "",
                     iconName: "credit-card",
                     colorHex: "#64748B",
@@ -513,7 +514,7 @@ private struct TransactionAccountFilterSelectionPage: View {
 
     private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
         guard isArchived else { return name }
-        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+        return String(format: AppLocalization.string("draft.item.archivedFormat", comment: ""), name)
     }
 }
 
@@ -532,8 +533,8 @@ private struct TransactionCategoryFilterSelectionPage: View {
             let category = item.category
             return normalized(displayName(category.id)).localizedCaseInsensitiveContains(query)
                 || normalized(category.name).localizedCaseInsensitiveContains(query)
-                || NSLocalizedString(category.kind.localizationKey, comment: "").localizedCaseInsensitiveContains(query)
-                || NSLocalizedString(levelTitleKey(for: item.depth), comment: "").localizedCaseInsensitiveContains(query)
+                || AppLocalization.string(category.kind.localizationKey, comment: "").localizedCaseInsensitiveContains(query)
+                || AppLocalization.string(levelTitleKey(for: item.depth), comment: "").localizedCaseInsensitiveContains(query)
         }
     }
 
@@ -544,7 +545,7 @@ private struct TransactionCategoryFilterSelectionPage: View {
                 dismiss()
             } label: {
                 TransactionFilterSelectionRow(
-                    title: NSLocalizedString("transactions.filter.allCategories", comment: ""),
+                    title: AppLocalization.string("transactions.filter.allCategories", comment: ""),
                     subtitle: "",
                     iconName: "tag",
                     colorHex: "#64748B",
@@ -581,7 +582,7 @@ private struct TransactionCategoryFilterSelectionPage: View {
 
     private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
         guard isArchived else { return name }
-        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+        return String(format: AppLocalization.string("draft.item.archivedFormat", comment: ""), name)
     }
 
     private func levelTitleKey(for depth: Int) -> String {
@@ -683,12 +684,12 @@ private struct TransactionCategoryFilterSelectionRow: View {
 
 private extension DraftAccount {
     var typeTitle: String {
-        NSLocalizedString(type.localizationKey, comment: "")
+        AppLocalization.string(type.localizationKey, comment: "")
     }
 
     var filterSubtitle: String {
         String(
-            format: NSLocalizedString("transactions.filter.accountBalanceFormat", comment: ""),
+            format: AppLocalization.string("transactions.filter.accountBalanceFormat", comment: ""),
             typeTitle,
             DraftAmountFormatter.currencyText(from: balanceText)
         )
@@ -701,18 +702,18 @@ private struct TransactionDayHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(Self.dayFormatter.string(from: date))
+                Text(Self.dayText(for: date))
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.primary)
 
-                Text(Self.weekdayFormatter.string(from: date))
+                Text(Self.weekdayText(for: date))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .frame(width: 44, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(Self.fullDateFormatter.string(from: date))
+                Text(Self.fullDateText(for: date))
                     .font(.subheadline.weight(.semibold))
             }
 
@@ -720,23 +721,26 @@ private struct TransactionDayHeader: View {
         }
     }
 
-    private static let dayFormatter: DateFormatter = {
+    private static func dayText(for date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.dateFormat = "d"
-        return formatter
-    }()
+        return formatter.string(from: date)
+    }
 
-    private static let weekdayFormatter: DateFormatter = {
+    private static func weekdayText(for date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = AppLocalization.locale
         formatter.dateFormat = "EEE"
-        return formatter
-    }()
+        return formatter.string(from: date)
+    }
 
-    private static let fullDateFormatter: DateFormatter = {
+    private static func fullDateText(for date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMd", options: 0, locale: .current)
-        return formatter
-    }()
+        formatter.locale = AppLocalization.locale
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMd", options: 0, locale: AppLocalization.locale)
+        return formatter.string(from: date)
+    }
 }
 
 private struct TransactionEmptyFilteredView: View {
@@ -859,7 +863,7 @@ private struct TransactionLocationButton: View {
         .accessibilityLabel(
             Text(
                 String(
-                    format: NSLocalizedString("transactions.location.openInMaps.accessibility", comment: ""),
+                    format: AppLocalization.string("transactions.location.openInMaps.accessibility", comment: ""),
                     location.displayName
                 )
             )
@@ -1394,7 +1398,7 @@ private struct TransactionEditorPage: View {
     private static var unselectedSelectionItem: TransactionVisualSelectionItem {
         TransactionVisualSelectionItem(
             id: "",
-            name: NSLocalizedString("record.picker.unselected", comment: ""),
+            name: AppLocalization.string("record.picker.unselected", comment: ""),
             iconName: "circle-question",
             colorHex: "#64748B",
             subtitle: "",
@@ -1404,7 +1408,7 @@ private struct TransactionEditorPage: View {
 
     private func archivedAwareName(_ name: String, isArchived: Bool) -> String {
         guard isArchived else { return name }
-        return String(format: NSLocalizedString("draft.item.archivedFormat", comment: ""), name)
+        return String(format: AppLocalization.string("draft.item.archivedFormat", comment: ""), name)
     }
 
     private func defaultAccountId(in accounts: [DraftAccount]) -> String {
