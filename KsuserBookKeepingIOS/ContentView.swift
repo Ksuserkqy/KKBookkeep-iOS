@@ -13,19 +13,12 @@ struct ContentView: View {
     @EnvironmentObject private var profileStore: ProfileStore
     @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
     @EnvironmentObject private var draftBookkeepingStore: DraftBookkeepingStore
+    @EnvironmentObject private var syncCoordinator: SyncCoordinator
     @EnvironmentObject private var quickActionRouter: HomeScreenQuickActionRouter
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
     @StateObject private var appLock = AppLockManager()
     @State private var isPrivacyCovered = false
-    @State private var isImportingRemoteData = false
-    @State private var lastRemoteDataImportAt: Date?
-    @State private var isBackingUpLedgerData = false
-    @State private var hasPendingLedgerDataBackup = false
-    @State private var ledgerDataBackupTask: Task<Void, Never>?
-    @State private var fallbackSyncTask: Task<Void, Never>?
-    @State private var fallbackSyncConfiguration: SyncConfiguration?
-    @State private var isShowingInitialSyncSetup = false
     @State private var selectedTab = AppTab.dashboard
     @State private var requestedRecordKind: DraftEntryKind?
 
@@ -89,149 +82,60 @@ struct ContentView: View {
         .environmentObject(appLock)
         .preferredColorScheme(AppTheme(rawValue: theme)?.colorScheme)
         .task {
+            syncCoordinator.configure(
+                profileStore: profileStore,
+                syncSettingsStore: syncSettingsStore,
+                draftBookkeepingStore: draftBookkeepingStore
+            )
             quickActionRouter.configureShortcuts()
             handleQuickAction(quickActionRouter.pendingAction)
-            if syncSettingsStore.needsInitialSyncSetup {
-                isShowingInitialSyncSetup = true
-            } else {
-                await importRemoteDataIfNeeded(force: true)
-            }
-            restartFallbackSyncCheck()
+            syncCoordinator.startIfNeeded()
         }
         .onChange(of: quickActionRouter.pendingAction) { _, action in
             handleQuickAction(action)
         }
         .onChange(of: syncSettingsStore.configuration) { _, _ in
-            restartFallbackSyncCheck()
+            syncCoordinator.handleConfigurationChanged()
         }
         .onOpenURL { url in
             handleDeepLink(url)
         }
         .onReceive(draftBookkeepingStore.$localMetadataChangeToken.dropFirst()) { _ in
-            scheduleLedgerDataBackup()
+            syncCoordinator.scheduleBackupAfterLocalChange()
         }
         .onReceive(draftBookkeepingStore.$localTransactionsChangeToken.dropFirst()) { _ in
-            scheduleLedgerDataBackup()
+            syncCoordinator.scheduleBackupAfterLocalChange()
         }
         .onReceive(draftBookkeepingStore.$localTemplatesChangeToken.dropFirst()) { _ in
-            scheduleLedgerDataBackup()
+            syncCoordinator.scheduleBackupAfterLocalChange()
         }
         .onReceive(draftBookkeepingStore.$localBudgetsChangeToken.dropFirst()) { _ in
-            scheduleLedgerDataBackup()
+            syncCoordinator.scheduleBackupAfterLocalChange()
         }
         .onChange(of: scenePhase) { _, newPhase in
             switch newPhase {
             case .active:
                 isPrivacyCovered = false
                 appLock.refreshConfiguration()
-                Task {
-                    if syncSettingsStore.needsInitialSyncSetup {
-                        isShowingInitialSyncSetup = true
-                    } else {
-                        await importRemoteDataIfNeeded()
-                    }
-                }
-                restartFallbackSyncCheck()
+                syncCoordinator.handleSceneBecameActive()
             case .inactive:
                 isPrivacyCovered = appLock.isPasswordEnabled && !appLock.isLocked
             case .background:
                 isPrivacyCovered = false
                 appLock.lockIfNeeded()
-                fallbackSyncTask?.cancel()
-                fallbackSyncTask = nil
-                fallbackSyncConfiguration = nil
+                syncCoordinator.handleSceneEnteredBackground()
             @unknown default:
                 break
             }
         }
-        .fullScreenCover(isPresented: $isShowingInitialSyncSetup) {
+        .fullScreenCover(isPresented: $syncCoordinator.isShowingInitialSyncSetup) {
             InitialSyncSetupPage {
-                isShowingInitialSyncSetup = false
-                Task {
-                    await importRemoteDataIfNeeded(force: true)
-                }
+                syncCoordinator.completeInitialSyncSetupFlow()
             }
             .environmentObject(profileStore)
             .environmentObject(syncSettingsStore)
             .environmentObject(draftBookkeepingStore)
-        }
-    }
-
-    private func importRemoteDataIfNeeded(force: Bool = false) async {
-        let configuration = syncSettingsStore.configuration
-        guard configuration.backupEnabled, configuration.autoImport else { return }
-        guard !isImportingRemoteData else { return }
-
-        if
-            !force,
-            let lastRemoteDataImportAt,
-            Date().timeIntervalSince(lastRemoteDataImportAt) < 60
-        {
-            return
-        }
-
-        isImportingRemoteData = true
-        let secrets = syncSettingsStore.secrets(for: configuration)
-        await profileStore.importIfRemoteProfileIsNewer(
-            configuration: configuration,
-            secrets: secrets
-        )
-        await draftBookkeepingStore.importIfRemoteMetadataIsNewer(
-            configuration: configuration,
-            secrets: secrets
-        )
-        await draftBookkeepingStore.importIfRemoteTransactionsAreNewer(
-            configuration: configuration,
-            secrets: secrets
-        )
-        await draftBookkeepingStore.importIfRemoteTemplatesAreNewer(
-            configuration: configuration,
-            secrets: secrets
-        )
-        await draftBookkeepingStore.importIfRemoteBudgetsAreNewer(
-            configuration: configuration,
-            secrets: secrets
-        )
-        lastRemoteDataImportAt = Date()
-        isImportingRemoteData = false
-    }
-
-    private func restartFallbackSyncCheck() {
-        let configuration = syncSettingsStore.configuration
-        if
-            fallbackSyncTask != nil,
-            let fallbackSyncConfiguration,
-            hasSameSyncParameters(fallbackSyncConfiguration, configuration)
-        {
-            return
-        }
-
-        fallbackSyncTask?.cancel()
-        fallbackSyncTask = nil
-        fallbackSyncConfiguration = nil
-
-        guard configuration.backupEnabled, configuration.autoImport || configuration.backupOnChange else { return }
-
-        fallbackSyncConfiguration = configuration
-        fallbackSyncTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: UInt64(configuration.backupInterval.timeInterval * 1_000_000_000))
-                guard !Task.isCancelled else { return }
-                await runFallbackSyncCheck(expectedConfiguration: configuration)
-            }
-        }
-    }
-
-    private func runFallbackSyncCheck(expectedConfiguration: SyncConfiguration) async {
-        let configuration = syncSettingsStore.configuration
-        guard hasSameSyncParameters(configuration, expectedConfiguration), configuration.backupEnabled else { return }
-
-        if configuration.autoImport {
-            await importRemoteDataIfNeeded(force: true)
-        }
-
-        if configuration.backupOnChange {
-            await backupLedgerDataIfNeeded(configuration: configuration)
+            .environmentObject(syncCoordinator)
         }
     }
 
@@ -269,57 +173,6 @@ struct ContentView: View {
         }
     }
 
-    private func scheduleLedgerDataBackup() {
-        let configuration = syncSettingsStore.configuration
-        guard configuration.backupEnabled, configuration.backupOnChange else { return }
-
-        guard !isBackingUpLedgerData else {
-            hasPendingLedgerDataBackup = true
-            return
-        }
-
-        ledgerDataBackupTask?.cancel()
-        ledgerDataBackupTask = Task {
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard !Task.isCancelled else { return }
-            await backupLedgerDataIfNeeded(configuration: configuration)
-        }
-    }
-
-    private func backupLedgerDataIfNeeded(configuration: SyncConfiguration) async {
-        guard !isBackingUpLedgerData else {
-            hasPendingLedgerDataBackup = true
-            return
-        }
-        guard hasSameSyncParameters(configuration, syncSettingsStore.configuration) else { return }
-
-        isBackingUpLedgerData = true
-        let didBackup = await draftBookkeepingStore.backupLedgerDataNow(
-            configuration: configuration,
-            secrets: syncSettingsStore.secrets(for: configuration)
-        )
-        if didBackup {
-            try? syncSettingsStore.markBackupCompleted()
-        }
-        isBackingUpLedgerData = false
-
-        if hasPendingLedgerDataBackup {
-            hasPendingLedgerDataBackup = false
-            scheduleLedgerDataBackup()
-        }
-    }
-
-    private func hasSameSyncParameters(_ lhs: SyncConfiguration, _ rhs: SyncConfiguration) -> Bool {
-        lhs.backupEnabled == rhs.backupEnabled &&
-            lhs.provider == rhs.provider &&
-            lhs.webDAVAuthentication == rhs.webDAVAuthentication &&
-            lhs.webDAVServerURL == rhs.webDAVServerURL &&
-            lhs.webDAVUsername == rhs.webDAVUsername &&
-            lhs.backupOnChange == rhs.backupOnChange &&
-            lhs.autoImport == rhs.autoImport &&
-            lhs.backupInterval == rhs.backupInterval &&
-            lhs.encryptionEnabled == rhs.encryptionEnabled
-    }
 }
 
 enum AppTab: Hashable {
@@ -335,5 +188,6 @@ enum AppTab: Hashable {
         .environmentObject(ProfileStore())
         .environmentObject(SyncSettingsStore())
         .environmentObject(DraftBookkeepingStore())
+        .environmentObject(SyncCoordinator())
         .environmentObject(HomeScreenQuickActionRouter.shared)
 }

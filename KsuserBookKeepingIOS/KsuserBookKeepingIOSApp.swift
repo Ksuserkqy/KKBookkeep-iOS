@@ -164,6 +164,7 @@ struct KsuserBookKeepingIOSApp: App {
     @StateObject private var profileStore = ProfileStore()
     @StateObject private var syncSettingsStore = SyncSettingsStore()
     @StateObject private var draftBookkeepingStore = DraftBookkeepingStore()
+    @StateObject private var syncCoordinator = SyncCoordinator()
     @StateObject private var quickActionRouter = HomeScreenQuickActionRouter.shared
 
     var body: some Scene {
@@ -172,6 +173,7 @@ struct KsuserBookKeepingIOSApp: App {
                 .environmentObject(profileStore)
                 .environmentObject(syncSettingsStore)
                 .environmentObject(draftBookkeepingStore)
+                .environmentObject(syncCoordinator)
                 .environmentObject(quickActionRouter)
         }
     }

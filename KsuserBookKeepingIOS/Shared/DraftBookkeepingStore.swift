@@ -275,10 +275,7 @@ final class DraftBookkeepingStore: ObservableObject {
     @Published private(set) var localBudgetsChangeToken = 0
 
     private let sqliteStore: LedgerSQLiteStore
-    private let syncService: BookkeepingMetadataSyncService
-    private let transactionsSyncService: BookkeepingTransactionsSyncService
-    private let templatesSyncService: BookkeepingTemplatesSyncService
-    private let budgetsSyncService: BookkeepingBudgetsSyncService
+    private let ledgerSyncFacade: LedgerSyncFacade
     private var metadataRevision: Int
     private var metadataUpdatedAt: Date
     private var metadataUpdatedByDeviceId: String
@@ -317,18 +314,16 @@ final class DraftBookkeepingStore: ObservableObject {
 
     private static let maxCategoryDepth = 3
 
+    convenience init() {
+        self.init(sqliteStore: .shared, ledgerSyncFacade: LedgerSyncFacade())
+    }
+
     init(
-        sqliteStore: LedgerSQLiteStore = .shared,
-        syncService: BookkeepingMetadataSyncService = BookkeepingMetadataSyncService(),
-        transactionsSyncService: BookkeepingTransactionsSyncService = BookkeepingTransactionsSyncService(),
-        templatesSyncService: BookkeepingTemplatesSyncService = BookkeepingTemplatesSyncService(),
-        budgetsSyncService: BookkeepingBudgetsSyncService = BookkeepingBudgetsSyncService()
+        sqliteStore: LedgerSQLiteStore,
+        ledgerSyncFacade: LedgerSyncFacade
     ) {
         self.sqliteStore = sqliteStore
-        self.syncService = syncService
-        self.transactionsSyncService = transactionsSyncService
-        self.templatesSyncService = templatesSyncService
-        self.budgetsSyncService = budgetsSyncService
+        self.ledgerSyncFacade = ledgerSyncFacade
         let snapshot = Self.initialSnapshot(from: sqliteStore)
         let sortedTransactions = snapshot.transactions.sorted(by: Self.transactionSort)
 
@@ -1349,7 +1344,11 @@ final class DraftBookkeepingStore: ObservableObject {
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
         let opsToWrite = sqliteStore.metadataOps(fileIndexes: pendingFileIndexes)
-        try await syncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        try await ledgerSyncFacade.backupMetadata(
+            ops: opsToWrite,
+            configuration: configuration,
+            secrets: secrets
+        )
         uploadedMetadataOpIds.formUnion(opsToWrite.map(\.opId))
         sqliteStore.markOpsUploaded(domain: .metadata, opIds: opsToWrite.map(\.opId))
         persistMetadataSyncState()
@@ -1360,10 +1359,13 @@ final class DraftBookkeepingStore: ObservableObject {
         configuration: SyncConfiguration,
         secrets: SyncSecrets
     ) async throws -> Bool {
-        let remoteOps = try await syncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let remoteOps = try await ledgerSyncFacade.importMetadata(
+            configuration: configuration,
+            secrets: secrets
+        )
         let unappliedOps = remoteOps
             .filter { !processedMetadataOpIds.contains($0.opId) }
-            .sorted(by: Self.metadataOpReplaySort)
+            .sorted(by: LedgerOpReplayer.replaySort)
 
         guard !unappliedOps.isEmpty else {
             return false
@@ -1534,34 +1536,19 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func shouldApplyMetadataOp(_ op: BookkeepingMetadataOp) -> Bool {
-        let key = metadataStateKey(entity: op.entity, id: op.entityId)
-        let incomingKey = op.sortKey
-        let currentKey = metadataOpSortKeysById[key] ?? .zero
-        let deletedKey = deletedMetadataOpSortKeysById[key] ?? .zero
-
-        switch op.action {
-        case .create, .update, .archive, .upsert:
-            guard incomingKey >= currentKey else { return false }
-            guard incomingKey > deletedKey else { return false }
-            return true
-        case .delete:
-            return incomingKey >= currentKey && incomingKey >= deletedKey
-        }
+        LedgerOpReplayer.shouldApply(
+            op,
+            currentSortKeysById: metadataOpSortKeysById,
+            deletedSortKeysById: deletedMetadataOpSortKeysById
+        )
     }
 
     private func applyMetadataOpState(_ op: BookkeepingMetadataOp) {
-        let key = metadataStateKey(entity: op.entity, id: op.entityId)
-        switch op.action {
-        case .create, .update, .archive, .upsert:
-            metadataOpSortKeysById[key] = op.sortKey
-            deletedMetadataOpSortKeysById.removeValue(forKey: key)
-        case .delete:
-            deletedMetadataOpSortKeysById[key] = op.sortKey
-        }
-    }
-
-    private func metadataStateKey(entity: BookkeepingMetadataEntity, id: String) -> String {
-        "\(entity.rawValue):\(id)"
+        LedgerOpReplayer.applyState(
+            op,
+            currentSortKeysById: &metadataOpSortKeysById,
+            deletedSortKeysById: &deletedMetadataOpSortKeysById
+        )
     }
 
     private func initializeMetadataSyncStateIfNeeded() {
@@ -1583,7 +1570,7 @@ final class DraftBookkeepingStore: ObservableObject {
             localMetadataOps.append(op)
             processedMetadataOpIds.insert(op.opId)
             importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
-            metadataOpSortKeysById[metadataStateKey(entity: .account, id: account.id)] = op.sortKey
+            metadataOpSortKeysById[BookkeepingMetadataOp.replayEntityKey(entity: .account, id: account.id)] = op.sortKey
         }
 
         for category in categories {
@@ -1601,7 +1588,7 @@ final class DraftBookkeepingStore: ObservableObject {
             localMetadataOps.append(op)
             processedMetadataOpIds.insert(op.opId)
             importedMetadataSeqByDeviceId[op.deviceId] = max(importedMetadataSeqByDeviceId[op.deviceId] ?? 0, op.seq)
-            metadataOpSortKeysById[metadataStateKey(entity: .category, id: category.id)] = op.sortKey
+            metadataOpSortKeysById[BookkeepingMetadataOp.replayEntityKey(entity: .category, id: category.id)] = op.sortKey
         }
 
         persistMetadataSyncState()
@@ -1618,7 +1605,11 @@ final class DraftBookkeepingStore: ObservableObject {
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
         let opsToWrite = sqliteStore.transactionOps(fileIndexes: pendingFileIndexes)
-        try await transactionsSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        try await ledgerSyncFacade.backupTransactions(
+            ops: opsToWrite,
+            configuration: configuration,
+            secrets: secrets
+        )
         uploadedTransactionOpIds.formUnion(opsToWrite.map(\.opId))
         sqliteStore.markOpsUploaded(domain: .transactions, opIds: opsToWrite.map(\.opId))
         persistTransactionSyncState()
@@ -1635,7 +1626,11 @@ final class DraftBookkeepingStore: ObservableObject {
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
         let opsToWrite = sqliteStore.templateOps(fileIndexes: pendingFileIndexes)
-        try await templatesSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        try await ledgerSyncFacade.backupTemplates(
+            ops: opsToWrite,
+            configuration: configuration,
+            secrets: secrets
+        )
         uploadedTemplateOpIds.formUnion(opsToWrite.map(\.opId))
         sqliteStore.markOpsUploaded(domain: .templates, opIds: opsToWrite.map(\.opId))
         persistTemplateSyncState()
@@ -1652,7 +1647,11 @@ final class DraftBookkeepingStore: ObservableObject {
 
         let pendingFileIndexes = Set(uploadCandidates.map(\.fileIndex))
         let opsToWrite = sqliteStore.budgetOps(fileIndexes: pendingFileIndexes)
-        try await budgetsSyncService.backup(ops: opsToWrite, configuration: configuration, secrets: secrets)
+        try await ledgerSyncFacade.backupBudgets(
+            ops: opsToWrite,
+            configuration: configuration,
+            secrets: secrets
+        )
         uploadedBudgetOpIds.formUnion(opsToWrite.map(\.opId))
         sqliteStore.markOpsUploaded(domain: .budgets, opIds: opsToWrite.map(\.opId))
         persistBudgetSyncState()
@@ -1663,10 +1662,13 @@ final class DraftBookkeepingStore: ObservableObject {
         configuration: SyncConfiguration,
         secrets: SyncSecrets
     ) async throws -> Bool {
-        let remoteOps = try await transactionsSyncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let remoteOps = try await ledgerSyncFacade.importTransactions(
+            configuration: configuration,
+            secrets: secrets
+        )
         let unappliedOps = remoteOps
             .filter { !processedTransactionOpIds.contains($0.opId) }
-            .sorted(by: Self.transactionOpReplaySort)
+            .sorted(by: LedgerOpReplayer.replaySort)
 
         guard !unappliedOps.isEmpty else {
             return false
@@ -1694,10 +1696,13 @@ final class DraftBookkeepingStore: ObservableObject {
         secrets: SyncSecrets
     ) async throws -> Bool {
         initializeTemplateSyncStateIfNeeded()
-        let remoteOps = try await templatesSyncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let remoteOps = try await ledgerSyncFacade.importTemplates(
+            configuration: configuration,
+            secrets: secrets
+        )
         let unappliedOps = remoteOps
             .filter { !processedTemplateOpIds.contains($0.opId) }
-            .sorted(by: Self.templateOpReplaySort)
+            .sorted(by: LedgerOpReplayer.replaySort)
 
         guard !unappliedOps.isEmpty else {
             return false
@@ -1719,10 +1724,13 @@ final class DraftBookkeepingStore: ObservableObject {
         secrets: SyncSecrets
     ) async throws -> Bool {
         initializeBudgetSyncStateIfNeeded()
-        let remoteOps = try await budgetsSyncService.importRemoteOps(configuration: configuration, secrets: secrets)
+        let remoteOps = try await ledgerSyncFacade.importBudgets(
+            configuration: configuration,
+            secrets: secrets
+        )
         let unappliedOps = remoteOps
             .filter { !processedBudgetOpIds.contains($0.opId) }
-            .sorted(by: Self.budgetOpReplaySort)
+            .sorted(by: LedgerOpReplayer.replaySort)
 
         guard !unappliedOps.isEmpty else {
             return false
@@ -1830,28 +1838,19 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func shouldApplyTransactionOp(_ op: BookkeepingTransactionOp) -> Bool {
-        let incomingKey = op.sortKey
-        let currentKey = transactionOpSortKeysById[op.entityId] ?? .zero
-        let deletedKey = deletedTransactionOpSortKeysById[op.entityId] ?? .zero
-
-        switch op.action {
-        case .create, .update:
-            guard incomingKey >= currentKey else { return false }
-            guard incomingKey > deletedKey else { return false }
-            return true
-        case .delete:
-            return incomingKey >= currentKey && incomingKey >= deletedKey
-        }
+        LedgerOpReplayer.shouldApply(
+            op,
+            currentSortKeysById: transactionOpSortKeysById,
+            deletedSortKeysById: deletedTransactionOpSortKeysById
+        )
     }
 
     private func applyTransactionOpState(_ op: BookkeepingTransactionOp) {
-        switch op.action {
-        case .create, .update:
-            transactionOpSortKeysById[op.entityId] = op.sortKey
-            deletedTransactionOpSortKeysById.removeValue(forKey: op.entityId)
-        case .delete:
-            deletedTransactionOpSortKeysById[op.entityId] = op.sortKey
-        }
+        LedgerOpReplayer.applyState(
+            op,
+            currentSortKeysById: &transactionOpSortKeysById,
+            deletedSortKeysById: &deletedTransactionOpSortKeysById
+        )
     }
 
     private func applyRemoteTemplateOp(_ op: BookkeepingTemplateOp) {
@@ -1899,28 +1898,19 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func shouldApplyTemplateOp(_ op: BookkeepingTemplateOp) -> Bool {
-        let incomingKey = op.sortKey
-        let currentKey = templateOpSortKeysById[op.entityId] ?? .zero
-        let deletedKey = deletedTemplateOpSortKeysById[op.entityId] ?? .zero
-
-        switch op.action {
-        case .create, .update:
-            guard incomingKey >= currentKey else { return false }
-            guard incomingKey > deletedKey else { return false }
-            return true
-        case .delete:
-            return incomingKey >= currentKey && incomingKey >= deletedKey
-        }
+        LedgerOpReplayer.shouldApply(
+            op,
+            currentSortKeysById: templateOpSortKeysById,
+            deletedSortKeysById: deletedTemplateOpSortKeysById
+        )
     }
 
     private func applyTemplateOpState(_ op: BookkeepingTemplateOp) {
-        switch op.action {
-        case .create, .update:
-            templateOpSortKeysById[op.entityId] = op.sortKey
-            deletedTemplateOpSortKeysById.removeValue(forKey: op.entityId)
-        case .delete:
-            deletedTemplateOpSortKeysById[op.entityId] = op.sortKey
-        }
+        LedgerOpReplayer.applyState(
+            op,
+            currentSortKeysById: &templateOpSortKeysById,
+            deletedSortKeysById: &deletedTemplateOpSortKeysById
+        )
     }
 
     private func applyRemoteBudgetOp(_ op: BookkeepingBudgetOp) {
@@ -1968,28 +1958,19 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     private func shouldApplyBudgetOp(_ op: BookkeepingBudgetOp) -> Bool {
-        let incomingKey = op.sortKey
-        let currentKey = budgetOpSortKeysById[op.entityId] ?? .zero
-        let deletedKey = deletedBudgetOpSortKeysById[op.entityId] ?? .zero
-
-        switch op.action {
-        case .create, .update:
-            guard incomingKey >= currentKey else { return false }
-            guard incomingKey > deletedKey else { return false }
-            return true
-        case .delete:
-            return incomingKey >= currentKey && incomingKey >= deletedKey
-        }
+        LedgerOpReplayer.shouldApply(
+            op,
+            currentSortKeysById: budgetOpSortKeysById,
+            deletedSortKeysById: deletedBudgetOpSortKeysById
+        )
     }
 
     private func applyBudgetOpState(_ op: BookkeepingBudgetOp) {
-        switch op.action {
-        case .create, .update:
-            budgetOpSortKeysById[op.entityId] = op.sortKey
-            deletedBudgetOpSortKeysById.removeValue(forKey: op.entityId)
-        case .delete:
-            deletedBudgetOpSortKeysById[op.entityId] = op.sortKey
-        }
+        LedgerOpReplayer.applyState(
+            op,
+            currentSortKeysById: &budgetOpSortKeysById,
+            deletedSortKeysById: &deletedBudgetOpSortKeysById
+        )
     }
 
     private func initializeTransactionSyncStateIfNeeded() {
@@ -2745,54 +2726,6 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         return lhs.updatedAt > rhs.updatedAt
-    }
-
-    private static func metadataOpReplaySort(_ lhs: BookkeepingMetadataOp, _ rhs: BookkeepingMetadataOp) -> Bool {
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-
-        if lhs.deviceId != rhs.deviceId {
-            return lhs.deviceId < rhs.deviceId
-        }
-
-        return lhs.seq < rhs.seq
-    }
-
-    private static func transactionOpReplaySort(_ lhs: BookkeepingTransactionOp, _ rhs: BookkeepingTransactionOp) -> Bool {
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-
-        if lhs.deviceId != rhs.deviceId {
-            return lhs.deviceId < rhs.deviceId
-        }
-
-        return lhs.seq < rhs.seq
-    }
-
-    private static func templateOpReplaySort(_ lhs: BookkeepingTemplateOp, _ rhs: BookkeepingTemplateOp) -> Bool {
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-
-        if lhs.deviceId != rhs.deviceId {
-            return lhs.deviceId < rhs.deviceId
-        }
-
-        return lhs.seq < rhs.seq
-    }
-
-    private static func budgetOpReplaySort(_ lhs: BookkeepingBudgetOp, _ rhs: BookkeepingBudgetOp) -> Bool {
-        if lhs.createdAt != rhs.createdAt {
-            return lhs.createdAt < rhs.createdAt
-        }
-
-        if lhs.deviceId != rhs.deviceId {
-            return lhs.deviceId < rhs.deviceId
-        }
-
-        return lhs.seq < rhs.seq
     }
 
     private static func plainAmountText(from decimal: Decimal) -> String {

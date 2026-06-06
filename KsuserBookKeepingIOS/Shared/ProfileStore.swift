@@ -152,17 +152,20 @@ final class ProfileStore: ObservableObject {
         }
     }
 
-    func testSyncLocation(configuration: SyncConfiguration, secrets: SyncSecrets) async {
+    @discardableResult
+    func testSyncLocation(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
         guard configuration.backupEnabled else {
             messageKey = "profile.sync.error.backupDisabled"
-            return
+            return false
         }
 
         do {
             try await syncService.testConnection(configuration: configuration, secrets: secrets)
             messageKey = "profile.sync.testSucceeded"
+            return true
         } catch {
             messageKey = "profile.sync.error.testFailed"
+            return false
         }
     }
 }
@@ -202,53 +205,6 @@ struct ProfileRepository {
             .appendingPathComponent("KKBookkeep", isDirectory: true)
             .appendingPathComponent("Profile", isDirectory: true)
             .appendingPathComponent("personal-profile.json")
-    }
-
-    private static let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return encoder
-    }()
-
-    private static let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
-}
-
-struct ProfileSyncService {
-    private let profilePath = "KKBookKeep/v1/profile/personal-profile.json"
-
-    func backup(profile: PersonalProfile, configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
-        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
-        var data = try Self.encoder.encode(PersonalProfileSyncDocument(profile: profile))
-
-        if configuration.encryptionEnabled {
-            data = try SyncFileEncryption.encrypt(data, password: secrets.encryptionPassword)
-        }
-
-        try await storage.writeFileAtomic(data, to: profilePath)
-    }
-
-    func importProfile(configuration: SyncConfiguration, secrets: SyncSecrets) async throws -> PersonalProfile? {
-        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
-
-        do {
-            let remoteData = try await storage.readFile(at: profilePath)
-            let data = try SyncFileEncryption.decryptIfNeeded(remoteData, password: secrets.encryptionPassword)
-            return try Self.decoder.decode(PersonalProfileSyncDocument.self, from: data).profile
-        } catch SyncStorageError.fileNotFound {
-            return nil
-        }
-    }
-
-    func testConnection(configuration: SyncConfiguration, secrets: SyncSecrets) async throws {
-        let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
-        let testPath = "KKBookKeep/v1/profile/.connection-test.json"
-        try await storage.writeFileAtomic(Data("{\"ok\":true}".utf8), to: testPath)
-        try await storage.deleteFile(at: testPath)
     }
 
     private static let encoder: JSONEncoder = {

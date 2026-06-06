@@ -171,10 +171,175 @@ final class LedgerSQLiteStoreTests: XCTestCase {
         XCTAssertEqual(loaded?.deletedBudgetOpSortKeysById["budget.deleted"]?.seq, budgetKey.seq)
     }
 
+    func testJSONLSyncLogBackupMergesRemoteOpsInSequenceFile() async throws {
+        let storage = InMemorySyncStorage()
+        let service = JSONLSyncLogService<BookkeepingTransactionOp> { _, _ in storage }
+        let descriptor = SyncLogDescriptor(
+            domain: .transactions,
+            remoteDirectory: "KKBookKeep/v1/ledgers/default/devices"
+        )
+        let configuration = syncConfiguration(encryptionEnabled: false)
+        let remoteOp = transactionOp(opId: "op.remote", seq: 2)
+        let localOp = transactionOp(opId: "op.local", seq: 1)
+        try await storage.writeFileAtomic(
+            JSONLSyncLogService<BookkeepingTransactionOp>.encodeJSONL([remoteOp]),
+            to: "KKBookKeep/v1/ledgers/default/devices/device-a/0000000001-0000000100.jsonl"
+        )
+
+        try await service.backup(
+            ops: [localOp],
+            configuration: configuration,
+            secrets: SyncSecrets(webDAVSecret: "", encryptionPassword: ""),
+            descriptor: descriptor
+        )
+
+        let data = try await storage.readFile(at: "KKBookKeep/v1/ledgers/default/devices/device-a/0000000001-0000000100.jsonl")
+        let ops = try JSONLSyncLogService<BookkeepingTransactionOp>.decodeJSONL(data)
+        XCTAssertEqual(ops.map(\.opId), ["op.local", "op.remote"])
+    }
+
+    func testJSONLSyncLogImportReturnsEmptyWhenDirectoryIsMissing() async throws {
+        let storage = InMemorySyncStorage()
+        let service = JSONLSyncLogService<BookkeepingTransactionOp> { _, _ in storage }
+        let ops = try await service.importRemoteOps(
+            configuration: syncConfiguration(encryptionEnabled: false),
+            secrets: SyncSecrets(webDAVSecret: "", encryptionPassword: ""),
+            descriptor: SyncLogDescriptor(domain: .transactions, remoteDirectory: "missing")
+        )
+
+        XCTAssertTrue(ops.isEmpty)
+    }
+
+    func testJSONLSyncLogSupportsEncryptedFiles() async throws {
+        let storage = InMemorySyncStorage()
+        let service = JSONLSyncLogService<BookkeepingTransactionOp> { _, _ in storage }
+        let descriptor = SyncLogDescriptor(
+            domain: .transactions,
+            remoteDirectory: "KKBookKeep/v1/ledgers/default/devices"
+        )
+        let configuration = syncConfiguration(encryptionEnabled: true)
+        let secrets = SyncSecrets(webDAVSecret: "", encryptionPassword: "sync-password")
+
+        try await service.backup(
+            ops: [transactionOp(opId: "op.encrypted", seq: 1)],
+            configuration: configuration,
+            secrets: secrets,
+            descriptor: descriptor
+        )
+
+        let ops = try await service.importRemoteOps(
+            configuration: configuration,
+            secrets: secrets,
+            descriptor: descriptor
+        )
+        XCTAssertEqual(ops.map(\.opId), ["op.encrypted"])
+    }
+
     private func makeStore() -> LedgerSQLiteStore {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let url = directory.appendingPathComponent("bookkeeping.sqlite")
         return LedgerSQLiteStore(databaseURL: url)
+    }
+
+    private func syncConfiguration(encryptionEnabled: Bool) -> SyncConfiguration {
+        SyncConfiguration(
+            backupEnabled: true,
+            provider: .webDAV,
+            webDAVAuthentication: .password,
+            webDAVServerURL: "https://example.com",
+            webDAVUsername: "user",
+            backupOnChange: true,
+            autoImport: true,
+            backupInterval: .tenMinutes,
+            encryptionEnabled: encryptionEnabled,
+            lastBackupAt: nil
+        )
+    }
+
+    private func transactionOp(opId: String, seq: Int) -> BookkeepingTransactionOp {
+        let transaction = DraftTransaction(
+            id: "transaction.\(opId)",
+            kind: .expense,
+            amountText: "12",
+            transferInAmountText: nil,
+            categoryId: "category.food",
+            accountId: "account.test",
+            fromAccountId: nil,
+            toAccountId: nil,
+            date: Date(timeIntervalSince1970: TimeInterval(seq)),
+            note: "",
+            location: nil,
+            createdAt: Date(timeIntervalSince1970: TimeInterval(seq))
+        )
+        return BookkeepingTransactionOp(
+            opId: opId,
+            deviceId: "device-a",
+            seq: seq,
+            entityId: transaction.id,
+            action: .create,
+            occurredAt: transaction.createdAt,
+            createdAt: transaction.createdAt,
+            payload: transaction
+        )
+    }
+}
+
+private final class InMemorySyncStorage: SyncStorage {
+    private var files: [String: Data] = [:]
+
+    func listFiles(at path: String) async throws -> [String] {
+        let prefix = normalizedDirectory(path)
+        let names = files.keys.compactMap { filePath -> String? in
+            guard filePath.hasPrefix(prefix) else { return nil }
+            let relativePath = String(filePath.dropFirst(prefix.count))
+            guard !relativePath.isEmpty, !relativePath.contains("/") else { return nil }
+            return relativePath
+        }
+        guard !names.isEmpty else { throw SyncStorageError.fileNotFound }
+        return names.sorted()
+    }
+
+    func listDirectories(at path: String) async throws -> [String] {
+        let prefix = normalizedDirectory(path)
+        let names = Set(files.keys.compactMap { filePath -> String? in
+            guard filePath.hasPrefix(prefix) else { return nil }
+            let relativePath = String(filePath.dropFirst(prefix.count))
+            return relativePath.split(separator: "/").first.map(String.init)
+        })
+        guard !names.isEmpty else { throw SyncStorageError.fileNotFound }
+        return names.sorted()
+    }
+
+    func readFile(at path: String) async throws -> Data {
+        guard let data = files[normalizedFile(path)] else {
+            throw SyncStorageError.fileNotFound
+        }
+        return data
+    }
+
+    func writeFileAtomic(_ data: Data, to path: String) async throws {
+        files[normalizedFile(path)] = data
+    }
+
+    func moveFile(from sourcePath: String, to destinationPath: String) async throws {
+        let source = normalizedFile(sourcePath)
+        guard let data = files.removeValue(forKey: source) else {
+            throw SyncStorageError.fileNotFound
+        }
+        files[normalizedFile(destinationPath)] = data
+    }
+
+    func deleteFile(at path: String) async throws {
+        files.removeValue(forKey: normalizedFile(path))
+    }
+
+    private func normalizedDirectory(_ path: String) -> String {
+        let file = normalizedFile(path)
+        return file.isEmpty ? "" : "\(file)/"
+    }
+
+    private func normalizedFile(_ path: String) -> String {
+        path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 }
