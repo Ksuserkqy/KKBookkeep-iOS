@@ -39,6 +39,16 @@ struct AppSettingsPage: View {
             }
 
             Section {
+                NavigationLink {
+                    AIModelSettingsPage()
+                } label: {
+                    Label("ai.settings.title", systemImage: "sparkles")
+                }
+            } footer: {
+                Text("ai.settings.localOnly.footer")
+            }
+
+            Section {
                 Toggle("settings.liveActivities.enabled", isOn: Binding(
                     get: { liveActivitiesEnabled },
                     set: { enabled in

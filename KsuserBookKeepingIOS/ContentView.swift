@@ -228,6 +228,7 @@ enum AppTab: Hashable {
     ContentView()
         .environmentObject(ProfileStore())
         .environmentObject(SyncSettingsStore())
+        .environmentObject(AIModelSettingsStore())
         .environmentObject(DraftBookkeepingStore())
         .environmentObject(SyncCoordinator())
         .environmentObject(HomeScreenQuickActionRouter.shared)
