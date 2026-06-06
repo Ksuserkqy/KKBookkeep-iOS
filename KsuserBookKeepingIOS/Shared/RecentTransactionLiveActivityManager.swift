@@ -7,11 +7,11 @@ import ActivityKit
 @MainActor
 enum RecentTransactionLiveActivityManager {
     static var isFeatureEnabled: Bool {
-        UserDefaults.standard.object(forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey) as? Bool ?? true
+        UserDefaults.standard.object(forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey) as? Bool ?? false
     }
 
     static var isBudgetFeatureEnabled: Bool {
-        UserDefaults.standard.object(forKey: WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey) as? Bool ?? false
+        UserDefaults.standard.object(forKey: WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey) as? Bool ?? true
     }
 
     static var selectedBudgetId: String {
@@ -20,8 +20,8 @@ enum RecentTransactionLiveActivityManager {
 
     static var displayDurationSeconds: TimeInterval {
         let storedValue = UserDefaults.standard.integer(forKey: WidgetSharedConfiguration.liveActivityDisplayDurationKey)
-        let allowedValues = [30, 60, 180, 300]
-        let seconds = allowedValues.contains(storedValue) ? storedValue : 60
+        let allowedValues = [5, 10, 30, 60]
+        let seconds = allowedValues.contains(storedValue) ? storedValue : 10
 
         return TimeInterval(seconds)
     }

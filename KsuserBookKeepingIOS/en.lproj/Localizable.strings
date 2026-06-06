@@ -692,11 +692,11 @@
 "settings.liveActivities.budget.enabled" = "Show Budget Usage After Expense";
 "settings.liveActivities.budget.selection" = "Budget to Show";
 "settings.liveActivities.duration" = "Dynamic Island Display Time";
+"settings.liveActivities.duration.5s" = "5 seconds";
+"settings.liveActivities.duration.10s" = "10 seconds";
 "settings.liveActivities.duration.30s" = "30 seconds";
 "settings.liveActivities.duration.1m" = "1 minute";
-"settings.liveActivities.duration.3m" = "3 minutes";
-"settings.liveActivities.duration.5m" = "5 minutes";
-"settings.liveActivities.footer" = "Recent transaction and budget usage displays are mutually exclusive. Budget usage appears only after saving an expense and uses the selected enabled budget. These settings stay on this device and are not backed up or synced.";
+"settings.liveActivities.footer" = "Recent transaction and budget usage displays are mutually exclusive. Budget usage appears only after saving an expense that matches an existing enabled budget. These settings stay on this device and are not backed up or synced.";
 "settings.security.section" = "Security";
 "settings.security.appLock" = "Require Password on Launch";
 "settings.security.changePassword" = "Change Unlock Password";

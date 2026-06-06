@@ -13,8 +13,8 @@ final class SyncSettingsViewModel: ObservableObject {
     @Published var accessToken = ""
     @Published var backupOnChange = true
     @Published var autoImport = true
-    @Published var backupInterval = BackupInterval.tenMinutes
-    @Published var encryptionEnabled = true
+    @Published var backupInterval = BackupInterval.fiveMinutes
+    @Published var encryptionEnabled = false
     @Published var encryptionPassword = ""
     @Published var encryptionPasswordConfirmation = ""
     @Published var isSaving = false

@@ -98,8 +98,8 @@ struct SyncConfiguration: Codable, Equatable {
         webDAVUsername: "",
         backupOnChange: true,
         autoImport: true,
-        backupInterval: .tenMinutes,
-        encryptionEnabled: true,
+        backupInterval: .fiveMinutes,
+        encryptionEnabled: false,
         lastBackupAt: nil
     )
 }

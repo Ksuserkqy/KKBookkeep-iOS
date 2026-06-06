@@ -5,10 +5,10 @@ struct AppSettingsPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
-    @AppStorage(WidgetSharedConfiguration.liveActivitiesEnabledKey) private var liveActivitiesEnabled = true
-    @AppStorage(WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey) private var budgetLiveActivitiesEnabled = false
+    @AppStorage(WidgetSharedConfiguration.liveActivitiesEnabledKey) private var liveActivitiesEnabled = false
+    @AppStorage(WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey) private var budgetLiveActivitiesEnabled = true
     @AppStorage(WidgetSharedConfiguration.selectedBudgetLiveActivityIdKey) private var selectedBudgetLiveActivityId = ""
-    @AppStorage(WidgetSharedConfiguration.liveActivityDisplayDurationKey) private var liveActivityDisplayDuration = LiveActivityDisplayDuration.oneMinute.rawValue
+    @AppStorage(WidgetSharedConfiguration.liveActivityDisplayDurationKey) private var liveActivityDisplayDuration = LiveActivityDisplayDuration.tenSeconds.rawValue
     @State private var passwordSheetMode = PasswordSheetMode.setup
     @State private var isPasswordSheetPresented = false
 
@@ -173,23 +173,23 @@ struct AppSettingsPage: View {
 }
 
 private enum LiveActivityDisplayDuration: Int, CaseIterable, Identifiable {
+    case fiveSeconds = 5
+    case tenSeconds = 10
     case thirtySeconds = 30
     case oneMinute = 60
-    case threeMinutes = 180
-    case fiveMinutes = 300
 
     var id: Int { rawValue }
 
     var titleKey: LocalizedStringKey {
         switch self {
+        case .fiveSeconds:
+            return "settings.liveActivities.duration.5s"
+        case .tenSeconds:
+            return "settings.liveActivities.duration.10s"
         case .thirtySeconds:
             return "settings.liveActivities.duration.30s"
         case .oneMinute:
             return "settings.liveActivities.duration.1m"
-        case .threeMinutes:
-            return "settings.liveActivities.duration.3m"
-        case .fiveMinutes:
-            return "settings.liveActivities.duration.5m"
         }
     }
 }

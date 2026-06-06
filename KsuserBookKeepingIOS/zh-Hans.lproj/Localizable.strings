@@ -692,11 +692,11 @@
 "settings.liveActivities.budget.enabled" = "记支出后显示预算消耗";
 "settings.liveActivities.budget.selection" = "显示的预算";
 "settings.liveActivities.duration" = "灵动岛停留时间";
+"settings.liveActivities.duration.5s" = "5 秒";
+"settings.liveActivities.duration.10s" = "10 秒";
 "settings.liveActivities.duration.30s" = "30 秒";
 "settings.liveActivities.duration.1m" = "1 分钟";
-"settings.liveActivities.duration.3m" = "3 分钟";
-"settings.liveActivities.duration.5m" = "5 分钟";
-"settings.liveActivities.footer" = "最近流水和预算消耗两种灵动岛展示互斥，只能开启一种。预算消耗仅在保存支出后显示，并使用选中的已启用预算。这些设置只保存在本机，不参与备份或同步。";
+"settings.liveActivities.footer" = "最近流水和预算消耗两种灵动岛展示互斥，只能开启一种。预算消耗仅在保存支出后显示，且仅当这笔支出命中已有启用预算时出现。这些设置只保存在本机，不参与备份或同步。";
 "settings.security.section" = "安全";
 "settings.security.appLock" = "进入应用时需要密码";
 "settings.security.changePassword" = "修改解锁密码";

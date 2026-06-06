@@ -670,7 +670,7 @@ final class DraftBookkeepingStore: ObservableObject {
         let enabledUsages = budgetUsages(now: referenceDate, calendar: calendar)
         if
             let preferredBudgetId,
-            let usage = enabledUsages.first(where: { $0.budget.id == preferredBudgetId })
+            let usage = enabledUsages.first(where: { $0.budget.id == preferredBudgetId && budgetIncludes($0.budget, transaction: transaction) })
         {
             return usage
         }

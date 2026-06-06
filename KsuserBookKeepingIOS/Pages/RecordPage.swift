@@ -622,19 +622,20 @@ struct RecordPage: View {
     private func showLiveActivityIfNeeded(for transaction: DraftTransaction) {
         let categoryName = draftStore.categoryDisplayName(for: transaction.categoryId)
 
-        if
-            RecentTransactionLiveActivityManager.isBudgetFeatureEnabled,
-            transaction.kind == .expense,
-            let usage = draftStore.budgetUsageForRecentExpense(
-                transaction,
-                preferredBudgetId: RecentTransactionLiveActivityManager.selectedBudgetId
-            )
-        {
-            RecentTransactionLiveActivityManager.showBudgetUsage(
-                usage: usage,
-                transaction: transaction,
-                transactionTitle: categoryName
-            )
+        if RecentTransactionLiveActivityManager.isBudgetFeatureEnabled {
+            if
+                transaction.kind == .expense,
+                let usage = draftStore.budgetUsageForRecentExpense(
+                    transaction,
+                    preferredBudgetId: RecentTransactionLiveActivityManager.selectedBudgetId
+                )
+            {
+                RecentTransactionLiveActivityManager.showBudgetUsage(
+                    usage: usage,
+                    transaction: transaction,
+                    transactionTitle: categoryName
+                )
+            }
             return
         }
 

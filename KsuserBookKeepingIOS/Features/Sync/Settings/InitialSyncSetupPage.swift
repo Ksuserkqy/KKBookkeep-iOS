@@ -18,7 +18,7 @@ struct InitialSyncSetupPage: View {
     @State private var accessToken = ""
     @State private var autoImport = true
     @State private var backupOnChange = true
-    @State private var encryptionEnabled = true
+    @State private var encryptionEnabled = false
     @State private var encryptionPassword = ""
     @State private var encryptionPasswordConfirmation = ""
     @State private var isWorking = false
@@ -470,7 +470,7 @@ struct InitialSyncSetupPage: View {
             webDAVUsername: username.trimmingCharacters(in: .whitespacesAndNewlines),
             backupOnChange: backupOnChange,
             autoImport: autoImport,
-            backupInterval: .tenMinutes,
+            backupInterval: .fiveMinutes,
             encryptionEnabled: encryptionEnabled,
             lastBackupAt: syncSettingsStore.configuration.lastBackupAt
         )
