@@ -502,6 +502,72 @@ final class DraftBookkeepingStore: ObservableObject {
         messageKey = nil
     }
 
+    func resetAllLocalData() throws {
+        try sqliteStore.resetLedgerData()
+        let snapshot = Self.initialSnapshot(from: sqliteStore)
+        let sortedTransactions = snapshot.transactions.sorted(by: Self.transactionSort)
+
+        accounts = snapshot.accounts
+        categories = snapshot.categories
+        transactions = sortedTransactions
+        transactionTemplates = snapshot.transactionTemplates
+        budgets = snapshot.budgets
+        lastDraft = snapshot.lastDraft ?? sortedTransactions.first
+        metadataRevision = snapshot.metadataRevision
+        metadataUpdatedAt = snapshot.metadataUpdatedAt
+        metadataUpdatedByDeviceId = snapshot.metadataUpdatedByDeviceId
+        nextMetadataOpSeq = max(1, snapshot.nextMetadataOpSeq)
+        localMetadataOps = snapshot.localMetadataOps
+        uploadedMetadataOpIds = snapshot.uploadedMetadataOpIds
+        processedMetadataOpIds = snapshot.processedMetadataOpIds
+        importedMetadataSeqByDeviceId = snapshot.importedMetadataSeqByDeviceId
+        metadataOpSortKeysById = snapshot.metadataOpSortKeysById
+        deletedMetadataOpSortKeysById = snapshot.deletedMetadataOpSortKeysById
+        transactionsRevision = snapshot.transactionsRevision
+        transactionsUpdatedAt = snapshot.transactionsUpdatedAt
+        transactionsUpdatedByDeviceId = snapshot.transactionsUpdatedByDeviceId
+        nextTransactionOpSeq = max(1, snapshot.nextTransactionOpSeq)
+        localTransactionOps = snapshot.localTransactionOps
+        uploadedTransactionOpIds = snapshot.uploadedTransactionOpIds
+        processedTransactionOpIds = snapshot.processedTransactionOpIds
+        importedTransactionSeqByDeviceId = snapshot.importedTransactionSeqByDeviceId
+        transactionOpSortKeysById = snapshot.transactionOpSortKeysById
+        deletedTransactionOpSortKeysById = snapshot.deletedTransactionOpSortKeysById
+        accountBaseBalanceTextById = snapshot.accountBaseBalanceTextById
+        nextTemplateOpSeq = max(1, snapshot.nextTemplateOpSeq)
+        localTemplateOps = snapshot.localTemplateOps
+        uploadedTemplateOpIds = snapshot.uploadedTemplateOpIds
+        processedTemplateOpIds = snapshot.processedTemplateOpIds
+        importedTemplateSeqByDeviceId = snapshot.importedTemplateSeqByDeviceId
+        templateOpSortKeysById = snapshot.templateOpSortKeysById
+        deletedTemplateOpSortKeysById = snapshot.deletedTemplateOpSortKeysById
+        nextBudgetOpSeq = max(1, snapshot.nextBudgetOpSeq)
+        localBudgetOps = snapshot.localBudgetOps
+        uploadedBudgetOpIds = snapshot.uploadedBudgetOpIds
+        processedBudgetOpIds = snapshot.processedBudgetOpIds
+        importedBudgetSeqByDeviceId = snapshot.importedBudgetSeqByDeviceId
+        budgetOpSortKeysById = snapshot.budgetOpSortKeysById
+        deletedBudgetOpSortKeysById = snapshot.deletedBudgetOpSortKeysById
+
+        normalizeDefaultNames()
+        normalizeCategoryHierarchy()
+        normalizeDefaultSelections()
+        normalizeTransactionsAfterMetadataChange()
+        normalizeTransactionTemplates()
+        normalizeBudgets()
+        initializeTemplateSyncStateIfNeeded()
+        initializeBudgetSyncStateIfNeeded()
+        initializeTransactionSyncStateIfNeeded()
+        recomputeAccountBalancesFromBase()
+        persistLedgerSnapshot()
+        persistWidgetSnapshot()
+        localMetadataChangeToken += 1
+        localTransactionsChangeToken += 1
+        localTemplatesChangeToken += 1
+        localBudgetsChangeToken += 1
+        messageKey = "settings.dataReset.completed"
+    }
+
     func categories(for kind: DraftEntryKind) -> [DraftCategory] {
         categories.filter { $0.kind == kind && !$0.isArchived }
     }

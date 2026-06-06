@@ -14,6 +14,7 @@ final class SyncCoordinator: ObservableObject {
     private var lastRemoteDataImportAt: Date?
     private var isBackingUpLedgerData = false
     private var hasPendingLedgerDataBackup = false
+    private var isBackupSchedulingSuspended = false
     private var ledgerDataBackupTask: Task<Void, Never>?
     private var fallbackSyncTask: Task<Void, Never>?
     private var fallbackSyncConfiguration: SyncConfiguration?
@@ -75,6 +76,7 @@ final class SyncCoordinator: ObservableObject {
     }
 
     func scheduleBackupAfterLocalChange() {
+        guard !isBackupSchedulingSuspended else { return }
         guard
             let syncSettingsStore,
             syncSettingsStore.configuration.backupEnabled,
@@ -185,6 +187,29 @@ final class SyncCoordinator: ObservableObject {
         }
 
         return false
+    }
+
+    func clearRemoteBackupData(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else { return true }
+
+        do {
+            let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
+            try await deleteRemoteSyncTree(storage: storage, path: "KKBookKeep/v1")
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func suspendBackupSchedulingForLocalReset() {
+        isBackupSchedulingSuspended = true
+        hasPendingLedgerDataBackup = false
+        ledgerDataBackupTask?.cancel()
+        ledgerDataBackupTask = nil
+    }
+
+    func resumeBackupSchedulingAfterLocalReset() {
+        isBackupSchedulingSuspended = false
     }
 
     func importRemoteDataBeforeBackup(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
@@ -388,6 +413,38 @@ final class SyncCoordinator: ObservableObject {
         if hasPendingLedgerDataBackup {
             hasPendingLedgerDataBackup = false
             scheduleBackupAfterLocalChange()
+        }
+    }
+
+    private func deleteRemoteSyncTree(storage: SyncStorage, path: String) async throws {
+        let files = try await remoteFiles(storage: storage, path: path)
+        for file in files {
+            try await storage.deleteFile(at: "\(path)/\(file)")
+        }
+
+        let directories = try await remoteDirectories(storage: storage, path: path)
+        for directory in directories {
+            try await deleteRemoteSyncTree(storage: storage, path: "\(path)/\(directory)")
+        }
+
+        if path != "KKBookKeep/v1" {
+            try? await storage.deleteFile(at: path)
+        }
+    }
+
+    private func remoteFiles(storage: SyncStorage, path: String) async throws -> [String] {
+        do {
+            return try await storage.listFiles(at: path)
+        } catch SyncStorageError.fileNotFound {
+            return []
+        }
+    }
+
+    private func remoteDirectories(storage: SyncStorage, path: String) async throws -> [String] {
+        do {
+            return try await storage.listDirectories(at: path)
+        } catch SyncStorageError.fileNotFound {
+            return []
         }
     }
 }

@@ -733,3 +733,22 @@
 "legal.title" = "Legal Information";
 "legal.userAgreement" = "User Agreement";
 "legal.privacyPolicy" = "Privacy Policy";
+
+"settings.data.section" = "Data";
+"settings.dataReset.action" = "Clear All Data";
+"settings.dataReset.footer.localOnly" = "Deletes local profile and ledger data on this device. Sync settings and credentials are kept.";
+"settings.dataReset.footer.syncEnabled" = "Deletes local profile and ledger data on this device. Because file backup is enabled, the current sync backup under KKBookKeep/v1 will also be deleted.";
+"settings.dataReset.warning.title" = "Clear all data?";
+"settings.dataReset.warning.message.localOnly" = "This will delete your local profile, transactions, accounts, categories, templates, budgets, and sync history. This cannot be undone.";
+"settings.dataReset.warning.message.syncEnabled" = "This will delete your local profile, transactions, accounts, categories, templates, budgets, sync history, and the current file backup under KKBookKeep/v1. This cannot be undone.";
+"settings.dataReset.warning.continue" = "Continue";
+"settings.dataReset.confirm.title" = "Final Confirmation";
+"settings.dataReset.confirm.message.localOnly" = "Type the exact confirmation phrase to delete all local data.";
+"settings.dataReset.confirm.message.syncEnabled" = "Type the exact confirmation phrase to delete all local data and the current sync backup.";
+"settings.dataReset.confirm.placeholder" = "I do not want to keep bookkeeping anymore";
+"settings.dataReset.confirm.footer" = "Confirmation phrases: 我不想记账辣 or I do not want to keep bookkeeping anymore";
+"settings.dataReset.confirm.delete" = "Delete";
+"settings.dataReset.completed" = "All data has been cleared.";
+"settings.dataReset.error.confirmationMismatch" = "The confirmation phrase does not match.";
+"settings.dataReset.error.remoteFailed" = "Could not delete the sync backup. Local data was not changed.";
+"settings.dataReset.error.localFailed" = "Could not clear local data. Please try again.";

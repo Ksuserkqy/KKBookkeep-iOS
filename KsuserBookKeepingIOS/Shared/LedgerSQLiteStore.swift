@@ -131,6 +131,22 @@ final class LedgerSQLiteStore {
         }
     }
 
+    func resetLedgerData() throws {
+        try ensureNormalizedSchema()
+        try transaction {
+            try execute("DELETE FROM processed_ops")
+            try execute("DELETE FROM sync_ops")
+            try execute("DELETE FROM entity_sync_state")
+            try execute("DELETE FROM sync_cursors")
+            try execute("DELETE FROM ledger_metadata")
+            try execute("DELETE FROM budgets")
+            try execute("DELETE FROM transaction_templates")
+            try execute("DELETE FROM transactions")
+            try execute("DELETE FROM categories")
+            try execute("DELETE FROM accounts")
+        }
+    }
+
     func pendingMetadataOps(forceFullUpload: Bool) -> [BookkeepingMetadataOp] {
         (try? readMetadataOps(pendingOnly: !forceFullUpload)) ?? []
     }

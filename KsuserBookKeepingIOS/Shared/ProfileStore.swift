@@ -29,6 +29,15 @@ final class ProfileStore: ObservableObject {
         messageKey = nil
     }
 
+    func resetLocalProfile() throws {
+        let emptyProfile = PersonalProfile.empty()
+        try repository.save(emptyProfile)
+        try repository.saveSyncState(.empty)
+        profile = emptyProfile
+        syncState = .empty
+        messageKey = nil
+    }
+
     func save(
         displayName: String,
         email: String,
