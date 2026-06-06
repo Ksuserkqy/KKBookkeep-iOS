@@ -13,7 +13,7 @@
 "launch.loading.subtitle" = "正在整理本机账本和同步数据…";
 
 "initialSync.legal.navigationTitle" = "欢迎使用";
-"initialSync.legal.title" = "欢迎使用羊羊记账";
+"initialSync.legal.title" = "欢迎使用羊阳记账";
 "initialSync.legal.subtitle" = "继续前请阅读并同意以下条款。";
 "initialSync.legal.terms" = "服务条款";
 "initialSync.legal.privacy" = "隐私政策";
@@ -686,7 +686,7 @@
 "settings.theme.system" = "跟随系统";
 "settings.theme.light" = "浅色";
 "settings.theme.dark" = "深色";
-"settings.theme.footer" = "选择羊羊记账在此设备上的显示风格。";
+"settings.theme.footer" = "选择羊阳记账在此设备上的显示风格。";
 "settings.liveActivities.section" = "实时活动";
 "settings.liveActivities.enabled" = "在灵动岛显示最近一笔流水";
 "settings.liveActivities.budget.enabled" = "记支出后显示预算消耗";
@@ -714,19 +714,33 @@
 "settings.security.error.biometricUnavailable" = "当前设备无法使用生物识别。";
 "settings.security.error.biometricFailed" = "生物识别验证未通过。";
 
-"appLock.title" = "羊羊记账已锁定";
+"appLock.title" = "羊阳记账已锁定";
 "appLock.subtitle" = "输入本机解锁密码后继续使用。";
 "appLock.password.placeholder" = "解锁密码";
 "appLock.unlock" = "解锁";
 "appLock.useBiometrics" = "使用生物识别";
-"appLock.biometric.reason" = "验证身份后解锁羊羊记账。";
+"appLock.biometric.reason" = "验证身份后解锁羊阳记账。";
 "appLock.error.wrongPassword" = "密码不正确。";
 "appLock.error.biometricFailed" = "生物识别验证未通过。";
 
-"app.name" = "羊羊记账";
+"app.name" = "羊阳记账";
 "about.title" = "关于";
 "about.version" = "版本信息";
 "about.legalInfo" = "法律信息";
+"about.feedback" = "向我提意见";
+"about.sponsor" = "赞助我";
+"feedback.title" = "向我提意见";
+"feedback.email" = "发送邮件";
+"feedback.githubIssue" = "在 GitHub 提 Issue";
+"sponsor.title" = "赞助我";
+"sponsor.wechat" = "微信支付";
+"sponsor.wechat.instruction" = "使用微信扫码赞助。";
+"sponsor.alipay" = "支付宝";
+"sponsor.alipay.instruction" = "使用支付宝扫码赞助。";
+"sponsor.qrCode.loadFailed" = "二维码加载失败，请稍后重试。";
+"about.openSource.title" = "开源项目";
+"about.openSource.description" = "羊阳记账是一个开源项目，遵循 Apache-2.0 协议。";
+"about.openSource.repository" = "开源地址";
 "about.icp" = "沪ICP备XXXXX";
 "about.copyright" = "版权所有 Ksuser KsuserKqy";
 

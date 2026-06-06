@@ -635,7 +635,16 @@ struct RecordPage: View {
                     transaction: transaction,
                     transactionTitle: categoryName
                 )
+                return
             }
+        }
+
+        if RecentTransactionLiveActivityManager.isBudgetFeatureEnabled {
+            RecentTransactionLiveActivityManager.showRecentTransactionFallback(
+                transaction,
+                accounts: draftStore.accounts,
+                categoryName: categoryName
+            )
             return
         }
 

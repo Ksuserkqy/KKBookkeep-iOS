@@ -727,6 +727,20 @@
 "about.title" = "About";
 "about.version" = "Version";
 "about.legalInfo" = "Legal Information";
+"about.feedback" = "Send Feedback";
+"about.sponsor" = "Sponsor Me";
+"feedback.title" = "Send Feedback";
+"feedback.email" = "Send Email";
+"feedback.githubIssue" = "Open a GitHub Issue";
+"sponsor.title" = "Sponsor Me";
+"sponsor.wechat" = "WeChat Pay";
+"sponsor.wechat.instruction" = "Scan with WeChat to sponsor.";
+"sponsor.alipay" = "Alipay";
+"sponsor.alipay.instruction" = "Scan with Alipay to sponsor.";
+"sponsor.qrCode.loadFailed" = "Could not load the QR code. Please try again later.";
+"about.openSource.title" = "Open Source";
+"about.openSource.description" = "KKBookkeep is an open-source project licensed under Apache-2.0.";
+"about.openSource.repository" = "Source Repository";
 "about.icp" = "沪ICP备XXXXX";
 "about.copyright" = "Copyright Ksuser KsuserKqy";
 

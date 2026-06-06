@@ -7,7 +7,7 @@ import ActivityKit
 @MainActor
 enum RecentTransactionLiveActivityManager {
     static var isFeatureEnabled: Bool {
-        UserDefaults.standard.object(forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey) as? Bool ?? false
+        UserDefaults.standard.object(forKey: WidgetSharedConfiguration.liveActivitiesEnabledKey) as? Bool ?? true
     }
 
     static var isBudgetFeatureEnabled: Bool {
@@ -64,6 +64,34 @@ enum RecentTransactionLiveActivityManager {
         categoryName: String
     ) {
         guard isFeatureEnabled else { return }
+        showRecentTransaction(
+            transaction,
+            accounts: accounts,
+            categoryName: categoryName,
+            bypassFeatureToggle: false
+        )
+    }
+
+    static func showRecentTransactionFallback(
+        _ transaction: DraftTransaction,
+        accounts: [DraftAccount],
+        categoryName: String
+    ) {
+        showRecentTransaction(
+            transaction,
+            accounts: accounts,
+            categoryName: categoryName,
+            bypassFeatureToggle: true
+        )
+    }
+
+    private static func showRecentTransaction(
+        _ transaction: DraftTransaction,
+        accounts: [DraftAccount],
+        categoryName: String,
+        bypassFeatureToggle: Bool
+    ) {
+        guard bypassFeatureToggle || isFeatureEnabled else { return }
 
         #if canImport(ActivityKit)
         guard #available(iOS 16.2, *) else { return }

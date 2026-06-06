@@ -8,7 +8,7 @@ struct AppSettingsPage: View {
     @EnvironmentObject private var syncCoordinator: SyncCoordinator
     @AppStorage("app.language") private var language = AppLanguage.system.rawValue
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
-    @AppStorage(WidgetSharedConfiguration.liveActivitiesEnabledKey) private var liveActivitiesEnabled = false
+    @AppStorage(WidgetSharedConfiguration.liveActivitiesEnabledKey) private var liveActivitiesEnabled = true
     @AppStorage(WidgetSharedConfiguration.budgetLiveActivitiesEnabledKey) private var budgetLiveActivitiesEnabled = true
     @AppStorage(WidgetSharedConfiguration.selectedBudgetLiveActivityIdKey) private var selectedBudgetLiveActivityId = ""
     @AppStorage(WidgetSharedConfiguration.liveActivityDisplayDurationKey) private var liveActivityDisplayDuration = LiveActivityDisplayDuration.tenSeconds.rawValue
@@ -67,16 +67,14 @@ struct AppSettingsPage: View {
                 Toggle("settings.liveActivities.budget.enabled", isOn: Binding(
                     get: { budgetLiveActivitiesEnabled },
                     set: { enabled in
-                        let resolvedEnabled = enabled && !selectableBudgetUsages.isEmpty
-                        budgetLiveActivitiesEnabled = resolvedEnabled
-                        RecentTransactionLiveActivityManager.setBudgetFeatureEnabled(resolvedEnabled)
-                        if resolvedEnabled {
+                        budgetLiveActivitiesEnabled = enabled
+                        RecentTransactionLiveActivityManager.setBudgetFeatureEnabled(enabled)
+                        if enabled {
                             liveActivitiesEnabled = false
                             ensureSelectedBudget()
                         }
                     }
                 ))
-                .disabled(selectableBudgetUsages.isEmpty)
 
                 if !selectableBudgetUsages.isEmpty {
                     Picker("settings.liveActivities.budget.selection", selection: $selectedBudgetLiveActivityId) {
@@ -213,10 +211,6 @@ struct AppSettingsPage: View {
             RecentTransactionLiveActivityManager.setSelectedBudgetId(selectedBudgetLiveActivityId)
         }
 
-        if budgetLiveActivitiesEnabled, selectedBudgetLiveActivityId.isEmpty {
-            budgetLiveActivitiesEnabled = false
-            RecentTransactionLiveActivityManager.setBudgetFeatureEnabled(false)
-        }
     }
 
     private func resetAllData() async {
