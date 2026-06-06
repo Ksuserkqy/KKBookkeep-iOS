@@ -163,7 +163,6 @@ struct KsuserBookKeepingIOSApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var profileStore = ProfileStore()
     @StateObject private var syncSettingsStore = SyncSettingsStore()
-    @StateObject private var aiModelSettingsStore = AIModelSettingsStore()
     @StateObject private var draftBookkeepingStore = DraftBookkeepingStore()
     @StateObject private var syncCoordinator = SyncCoordinator()
     @StateObject private var quickActionRouter = HomeScreenQuickActionRouter.shared
@@ -173,7 +172,6 @@ struct KsuserBookKeepingIOSApp: App {
             ContentView()
                 .environmentObject(profileStore)
                 .environmentObject(syncSettingsStore)
-                .environmentObject(aiModelSettingsStore)
                 .environmentObject(draftBookkeepingStore)
                 .environmentObject(syncCoordinator)
                 .environmentObject(quickActionRouter)
