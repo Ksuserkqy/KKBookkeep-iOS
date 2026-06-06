@@ -10,11 +10,7 @@ struct AboutPage: View {
     }
 
     private var shouldShowIcp: Bool {
-        let identifier = locale.identifier.lowercased()
-        return identifier.hasPrefix("zh-hans")
-            || identifier.hasPrefix("zh_hans")
-            || identifier.hasPrefix("zh-cn")
-            || identifier.hasPrefix("zh_cn")
+        AppLocalization.isSimplifiedChinese(locale: locale)
     }
 
     var body: some View {

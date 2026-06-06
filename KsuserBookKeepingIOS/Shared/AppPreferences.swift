@@ -89,4 +89,28 @@ enum AppLocalization {
     static func format(_ key: String, _ arguments: CVarArg...) -> String {
         String(format: string(key), locale: locale, arguments: arguments)
     }
+
+    static func isSimplifiedChinese(locale: Locale = locale) -> Bool {
+        let identifier = locale.identifier.lowercased()
+        return identifier.hasPrefix("zh-hans")
+            || identifier.hasPrefix("zh_hans")
+            || identifier.hasPrefix("zh-cn")
+            || identifier.hasPrefix("zh_cn")
+    }
+}
+
+enum LegalDocumentLinks {
+    static func userAgreementURL(for locale: Locale = AppLocalization.locale) -> URL {
+        URL(string: AppLocalization.isSimplifiedChinese(locale: locale)
+            ? "https://docs.ksuser.cn/agreement/KKBookKeep/user.html"
+            : "https://docs.ksuser.cn/en/agreement/KKBookKeep/user.html"
+        )!
+    }
+
+    static func privacyPolicyURL(for locale: Locale = AppLocalization.locale) -> URL {
+        URL(string: AppLocalization.isSimplifiedChinese(locale: locale)
+            ? "https://docs.ksuser.cn/agreement/KKBookKeep/privacy.html"
+            : "https://docs.ksuser.cn/en/agreement/KKBookKeep/privacy.html"
+        )!
+    }
 }

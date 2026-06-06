@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct InitialSyncSetupPage: View {
+    @Environment(\.locale) private var locale
     @EnvironmentObject private var profileStore: ProfileStore
     @EnvironmentObject private var draftBookkeepingStore: DraftBookkeepingStore
     @EnvironmentObject private var syncSettingsStore: SyncSettingsStore
@@ -24,9 +25,6 @@ struct InitialSyncSetupPage: View {
     @State private var messageKey: String?
     @State private var isShowingMessage = false
     @State private var safariPage: SafariPage?
-
-    private let userAgreementURL = URL(string: "https://www.ksuser.cn/agreement/user.html")!
-    private let privacyPolicyURL = URL(string: "https://www.ksuser.cn/agreement/privacy.html")!
 
     var body: some View {
         NavigationStack {
@@ -97,14 +95,14 @@ struct InitialSyncSetupPage: View {
 
             Section {
                 Button {
-                    safariPage = SafariPage(url: userAgreementURL)
+                    safariPage = SafariPage(url: LegalDocumentLinks.userAgreementURL(for: locale))
                 } label: {
                     Label("initialSync.legal.terms", systemImage: "doc.plaintext")
                 }
                 .foregroundStyle(.primary)
 
                 Button {
-                    safariPage = SafariPage(url: privacyPolicyURL)
+                    safariPage = SafariPage(url: LegalDocumentLinks.privacyPolicyURL(for: locale))
                 } label: {
                     Label("initialSync.legal.privacy", systemImage: "lock.shield")
                 }

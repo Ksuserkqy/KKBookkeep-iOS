@@ -1,32 +1,22 @@
 import SwiftUI
 
 struct LegalInfoPage: View {
+    @Environment(\.locale) private var locale
     @State private var safariPage: SafariPage?
-
-    private let userAgreementURL = URL(string: "https://www.ksuser.cn/agreement/user.html")!
-    private let privacyPolicyURL = URL(string: "https://www.ksuser.cn/agreement/privacy.html")!
-    private let thirdPartySharingURL = URL(string: "https://www.ksuser.cn/agreement/third-party-information-sharing.html")!
 
     var body: some View {
         List {
             Button {
-                safariPage = SafariPage(url: userAgreementURL)
+                safariPage = SafariPage(url: LegalDocumentLinks.userAgreementURL(for: locale))
             } label: {
                 Label("legal.userAgreement", systemImage: "doc.plaintext")
             }
             .foregroundStyle(.primary)
 
             Button {
-                safariPage = SafariPage(url: privacyPolicyURL)
+                safariPage = SafariPage(url: LegalDocumentLinks.privacyPolicyURL(for: locale))
             } label: {
                 Label("legal.privacyPolicy", systemImage: "lock.shield")
-            }
-            .foregroundStyle(.primary)
-
-            Button {
-                safariPage = SafariPage(url: thirdPartySharingURL)
-            } label: {
-                Label("legal.thirdPartySharing", systemImage: "person.2.badge.gearshape")
             }
             .foregroundStyle(.primary)
         }
