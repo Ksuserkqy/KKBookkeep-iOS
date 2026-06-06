@@ -8,18 +8,21 @@ final class ProfileStore: ObservableObject {
 
     private let repository: ProfileRepository
     private let syncService: ProfileSyncService
+    private var syncState: ProfileSyncState
 
     init() {
         let repository = ProfileRepository()
         self.repository = repository
         self.syncService = ProfileSyncService()
         self.profile = repository.load()
+        self.syncState = repository.loadSyncState()
     }
 
     init(repository: ProfileRepository, syncService: ProfileSyncService) {
         self.repository = repository
         self.syncService = syncService
         self.profile = repository.load()
+        self.syncState = repository.loadSyncState()
     }
 
     func clearMessage() {
@@ -48,12 +51,14 @@ final class ProfileStore: ObservableObject {
         nextProfile.updatedByDeviceId = DeviceIdentity.currentDeviceId
 
         do {
+            let oldProfile = profile
             try repository.save(nextProfile)
             profile = nextProfile
+            appendLocalProfileOps(from: oldProfile, to: nextProfile, occurredAt: nextProfile.updatedAt)
 
             if let syncConfiguration, syncConfiguration.backupEnabled, syncConfiguration.backupOnChange {
                 do {
-                    try await syncService.backup(profile: nextProfile, configuration: syncConfiguration, secrets: syncSecrets)
+                    try await backupPendingProfileOps(configuration: syncConfiguration, secrets: syncSecrets, forceFullUpload: false)
                     messageKey = "profile.sync.savedAndBackedUp"
                 } catch {
                     messageKey = "profile.sync.error.backupFailed"
@@ -77,7 +82,7 @@ final class ProfileStore: ObservableObject {
         }
 
         do {
-            try await syncService.backup(profile: profile, configuration: configuration, secrets: secrets)
+            try await backupPendingProfileOps(configuration: configuration, secrets: secrets, forceFullUpload: true)
             messageKey = "profile.sync.backupSucceeded"
             return true
         } catch {
@@ -94,13 +99,12 @@ final class ProfileStore: ObservableObject {
         }
 
         do {
-            guard let remoteProfile = try await syncService.importProfile(configuration: configuration, secrets: secrets) else {
+            let didImport = try await importProfileData(configuration: configuration, secrets: secrets, manual: true)
+            guard didImport else {
                 messageKey = "profile.sync.importNoRemoteProfile"
                 return true
             }
 
-            try repository.save(remoteProfile)
-            profile = remoteProfile
             messageKey = "profile.sync.importSucceeded"
             return true
         } catch {
@@ -109,21 +113,18 @@ final class ProfileStore: ObservableObject {
         }
     }
 
-    func importIfRemoteProfileIsNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
-        guard configuration.backupEnabled else { return }
+    @discardableResult
+    func importIfRemoteProfileIsNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else { return true }
 
         do {
-            guard let remoteProfile = try await syncService.importProfile(configuration: configuration, secrets: secrets) else {
-                return
+            if try await importProfileData(configuration: configuration, secrets: secrets, manual: false) {
+                messageKey = "profile.sync.importSucceeded"
             }
-
-            guard remoteProfile.isNewer(than: profile) else { return }
-
-            try repository.save(remoteProfile)
-            profile = remoteProfile
-            messageKey = "profile.sync.importSucceeded"
+            return true
         } catch {
-            return
+            messageKey = "profile.sync.error.importFailed"
+            return false
         }
     }
 
@@ -135,13 +136,7 @@ final class ProfileStore: ObservableObject {
         }
 
         do {
-            guard let remoteProfile = try await syncService.importProfile(configuration: configuration, secrets: secrets) else {
-                return true
-            }
-
-            if remoteProfile.isNewer(than: profile) {
-                try repository.save(remoteProfile)
-                profile = remoteProfile
+            if try await importProfileData(configuration: configuration, secrets: secrets, manual: false) {
                 messageKey = "profile.sync.importSucceeded"
             }
 
@@ -168,6 +163,139 @@ final class ProfileStore: ObservableObject {
             return false
         }
     }
+
+    private func appendLocalProfileOps(from oldProfile: PersonalProfile, to newProfile: PersonalProfile, occurredAt: Date) {
+        var didAppend = false
+        for field in PersonalProfileField.allCases where oldProfile.fieldValue(for: field) != newProfile.fieldValue(for: field) {
+            let op = PersonalProfileOp(
+                deviceId: DeviceIdentity.currentDeviceId,
+                seq: syncState.nextSeq,
+                field: field,
+                occurredAt: occurredAt,
+                payload: newProfile.fieldValue(for: field)
+            )
+            syncState.nextSeq += 1
+            syncState.localOps.append(op)
+            syncState.processedOpIds.insert(op.opId)
+            syncState.fieldSortKeys[field.rawValue] = op.sortKey
+            didAppend = true
+        }
+
+        if didAppend {
+            persistSyncState()
+        }
+    }
+
+    private func initializeProfileSyncStateIfNeeded() {
+        guard syncState.localOps.isEmpty, syncState.processedOpIds.isEmpty else { return }
+        let occurredAt = profile.updatedAt
+        for field in PersonalProfileField.allCases {
+            let op = PersonalProfileOp(
+                deviceId: DeviceIdentity.currentDeviceId,
+                seq: syncState.nextSeq,
+                field: field,
+                occurredAt: occurredAt,
+                createdAt: occurredAt,
+                payload: profile.fieldValue(for: field)
+            )
+            syncState.nextSeq += 1
+            syncState.localOps.append(op)
+            syncState.processedOpIds.insert(op.opId)
+            syncState.fieldSortKeys[field.rawValue] = op.sortKey
+        }
+        persistSyncState()
+    }
+
+    private func backupPendingProfileOps(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        forceFullUpload: Bool
+    ) async throws {
+        initializeProfileSyncStateIfNeeded()
+        let ops = forceFullUpload
+            ? syncState.localOps
+            : syncState.localOps.filter { !syncState.uploadedOpIds.contains($0.opId) }
+        guard !ops.isEmpty else { return }
+
+        try await syncService.backup(ops: ops, configuration: configuration, secrets: secrets)
+        syncState.uploadedOpIds.formUnion(ops.map(\.opId))
+        persistSyncState()
+    }
+
+    @discardableResult
+    private func importProfileData(configuration: SyncConfiguration, secrets: SyncSecrets, manual: Bool) async throws -> Bool {
+        var didChange = false
+
+        if let remoteProfile = try await syncService.importProfile(configuration: configuration, secrets: secrets) {
+            if manual || remoteProfile.isNewer(than: profile) {
+                try applyRemoteProfileSnapshot(remoteProfile)
+                didChange = true
+            }
+        }
+
+        let remoteOps = try await syncService.importOps(configuration: configuration, secrets: secrets)
+        let unappliedOps = remoteOps
+            .filter { !syncState.processedOpIds.contains($0.opId) }
+            .sorted(by: JSONLSyncLogService<PersonalProfileOp>.opSort)
+
+        for op in unappliedOps {
+            didChange = applyRemoteProfileOp(op) || didChange
+        }
+
+        if didChange {
+            try repository.save(profile)
+            persistSyncState()
+        }
+
+        return didChange || !remoteOps.isEmpty
+    }
+
+    private func applyRemoteProfileSnapshot(_ remoteProfile: PersonalProfile) throws {
+        profile = remoteProfile
+        for field in PersonalProfileField.allCases {
+            let key = ProfileOpSortKey(
+                occurredAt: remoteProfile.updatedAt,
+                deviceId: remoteProfile.updatedByDeviceId,
+                seq: remoteProfile.revision
+            )
+            if key >= (syncState.fieldSortKeys[field.rawValue] ?? .zero) {
+                syncState.fieldSortKeys[field.rawValue] = key
+            }
+        }
+        try repository.save(remoteProfile)
+        persistSyncState()
+    }
+
+    @discardableResult
+    private func applyRemoteProfileOp(_ op: PersonalProfileOp) -> Bool {
+        guard op.schemaVersion == 1, op.entity == "personalProfile", op.action == "update" else { return false }
+        guard !op.deviceId.isEmpty, op.seq > 0, let payload = op.payload else { return false }
+        guard !syncState.processedOpIds.contains(op.opId) else { return false }
+
+        syncState.processedOpIds.insert(op.opId)
+        let currentKey = syncState.fieldSortKeys[op.field.rawValue] ?? .zero
+        guard op.sortKey >= currentKey else {
+            persistSyncState()
+            return false
+        }
+
+        var updatedProfile = profile
+        updatedProfile.apply(payload, to: op.field)
+        updatedProfile.revision += 1
+        updatedProfile.updatedAt = max(updatedProfile.updatedAt, op.occurredAt)
+        updatedProfile.updatedByDeviceId = op.deviceId
+        profile = updatedProfile
+        syncState.fieldSortKeys[op.field.rawValue] = op.sortKey
+        return true
+    }
+
+    private func persistSyncState() {
+        do {
+            try repository.saveSyncState(syncState)
+        } catch {
+            assertionFailure("Failed to save profile sync state: \(error)")
+        }
+    }
 }
 
 struct ProfileRepository {
@@ -188,6 +316,17 @@ struct ProfileRepository {
         return document.profile
     }
 
+    func loadSyncState() -> ProfileSyncState {
+        guard
+            let data = try? Data(contentsOf: syncStateURL()),
+            let state = try? Self.decoder.decode(ProfileSyncState.self, from: data)
+        else {
+            return .empty
+        }
+
+        return state
+    }
+
     func save(_ profile: PersonalProfile) throws {
         let fileURL = profileURL()
         try fileManager.createDirectory(
@@ -199,12 +338,31 @@ struct ProfileRepository {
         try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
     }
 
+    func saveSyncState(_ state: ProfileSyncState) throws {
+        let fileURL = syncStateURL()
+        try fileManager.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let data = try Self.encoder.encode(state)
+        try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+    }
+
     private func profileURL() -> URL {
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return baseURL
             .appendingPathComponent("KKBookkeep", isDirectory: true)
             .appendingPathComponent("Profile", isDirectory: true)
             .appendingPathComponent("personal-profile.json")
+    }
+
+    private func syncStateURL() -> URL {
+        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return baseURL
+            .appendingPathComponent("KKBookkeep", isDirectory: true)
+            .appendingPathComponent("Profile", isDirectory: true)
+            .appendingPathComponent("profile-sync-state.json")
     }
 
     private static let encoder: JSONEncoder = {

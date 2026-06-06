@@ -2,6 +2,7 @@ import Foundation
 import SQLite3
 
 enum LedgerSyncDomain: String, CaseIterable {
+    case profile
     case metadata
     case transactions
     case templates

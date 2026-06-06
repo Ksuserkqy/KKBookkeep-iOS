@@ -588,6 +588,10 @@
 "sync.settings.savedButBackupFailed" = "Sync settings saved, but data backup failed. Check the selected file location, sync password, and credentials.";
 "sync.settings.savedButImportFailed" = "Sync settings saved, but remote data import failed. To avoid overwriting cloud data, check the selected file location, sync password, and credentials, then try again.";
 "sync.settings.message.title" = "Sync Settings";
+"sync.backup.confirmBeforeImport.title" = "Import Sync Space First?";
+"sync.backup.confirmBeforeImport.message" = "The sync space may already contain data. This device has not completed its first import yet, so importing first is recommended to avoid replacing the remote profile with this device's default information.";
+"sync.backup.confirmBeforeImport.importFirst" = "Import First";
+"sync.backup.confirmBeforeImport.continueBackup" = "Back Up Anyway";
 "sync.settings.error.saveFailed" = "Could not save sync settings. Please try again.";
 "sync.settings.error.providerUnavailable" = "This device cannot access iCloud Drive. Make sure it is signed in to Apple ID and iCloud Drive is enabled.";
 "sync.settings.error.encryptionPasswordRequired" = "Enter a sync password before enabling encrypted backup.";

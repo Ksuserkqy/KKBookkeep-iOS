@@ -39,6 +39,42 @@ struct PersonalProfile: Codable, Equatable {
     }
 }
 
+extension PersonalProfile {
+    func fieldValue(for field: PersonalProfileField) -> PersonalProfileFieldValue {
+        switch field {
+        case .displayName:
+            return PersonalProfileFieldValue(stringValue: displayName)
+        case .email:
+            return PersonalProfileFieldValue(stringValue: email)
+        case .avatarImageDataBase64:
+            return PersonalProfileFieldValue(stringValue: avatarImageDataBase64)
+        case .currency:
+            return PersonalProfileFieldValue(stringValue: currency.rawValue)
+        case .timeZone:
+            return PersonalProfileFieldValue(stringValue: timeZone.rawValue)
+        case .note:
+            return PersonalProfileFieldValue(stringValue: note)
+        }
+    }
+
+    mutating func apply(_ value: PersonalProfileFieldValue, to field: PersonalProfileField) {
+        switch field {
+        case .displayName:
+            displayName = value.stringValue ?? ""
+        case .email:
+            email = value.stringValue ?? ""
+        case .avatarImageDataBase64:
+            avatarImageDataBase64 = value.stringValue
+        case .currency:
+            currency = value.stringValue.flatMap(ProfileCurrency.init(rawValue:)) ?? currency
+        case .timeZone:
+            timeZone = value.stringValue.flatMap(ProfileTimeZone.init(rawValue:)) ?? timeZone
+        case .note:
+            note = value.stringValue ?? ""
+        }
+    }
+}
+
 struct PersonalProfileSyncDocument: Codable {
     let schemaVersion: Int
     let entity: String

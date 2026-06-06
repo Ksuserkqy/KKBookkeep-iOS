@@ -21,9 +21,11 @@ final class SyncSettingsViewModel: ObservableObject {
     @Published var isRunningSyncAction = false
     @Published var settingsMessageKey: String?
     @Published var isShowingSettingsMessage = false
+    @Published var isShowingBackupBeforeImportConfirmation = false
 
     private weak var syncSettingsStore: SyncSettingsStore?
     private weak var syncCoordinator: SyncCoordinator?
+    private var pendingBackupConfirmation: (configuration: SyncConfiguration, secrets: SyncSecrets)?
 
     func configure(syncSettingsStore: SyncSettingsStore, syncCoordinator: SyncCoordinator) {
         self.syncSettingsStore = syncSettingsStore
@@ -99,19 +101,79 @@ final class SyncSettingsViewModel: ObservableObject {
 
     func backupNow() async {
         await runSyncAction {
-            guard let syncCoordinator = self.syncCoordinator else {
+            guard let syncSettingsStore = self.syncSettingsStore, let syncCoordinator = self.syncCoordinator else {
                 self.showSettingsMessage("sync.backup.error.failed")
                 return
             }
 
             let configuration = self.savedOrCurrentConfiguration()
-            let didBackup = await syncCoordinator.backupCurrentData(
+            let secrets = self.currentSyncSecrets()
+            if await self.shouldConfirmBackupBeforeImport(
                 configuration: configuration,
-                secrets: self.currentSyncSecrets(),
-                forceFullUpload: true
+                secrets: secrets,
+                syncSettingsStore: syncSettingsStore,
+                syncCoordinator: syncCoordinator
+            ) {
+                self.pendingBackupConfirmation = (configuration, secrets)
+                self.isShowingBackupBeforeImportConfirmation = true
+                return
+            }
+
+            await self.performBackupNow(
+                configuration: configuration,
+                secrets: secrets,
+                syncCoordinator: syncCoordinator
             )
-            self.showSettingsMessage(didBackup ? "sync.backup.succeeded" : "sync.backup.error.failed")
         }
+    }
+
+    func confirmBackupBeforeImport() async {
+        guard let syncCoordinator else {
+            showSettingsMessage("sync.backup.error.failed")
+            return
+        }
+
+        let pending = pendingBackupConfirmation
+        pendingBackupConfirmation = nil
+        guard let pending else { return }
+
+        await runSyncAction {
+            await self.performBackupNow(
+                configuration: pending.configuration,
+                secrets: pending.secrets,
+                syncCoordinator: syncCoordinator
+            )
+        }
+    }
+
+    func cancelBackupBeforeImport() {
+        pendingBackupConfirmation = nil
+        isShowingBackupBeforeImportConfirmation = false
+    }
+
+    private func shouldConfirmBackupBeforeImport(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        syncSettingsStore: SyncSettingsStore,
+        syncCoordinator: SyncCoordinator
+    ) async -> Bool {
+        guard configuration.backupEnabled else { return false }
+        guard syncSettingsStore.setupChoice != .syncSpace else { return false }
+        guard syncSettingsStore.configuration.lastBackupAt == nil else { return false }
+        return await syncCoordinator.hasRemoteData(configuration: configuration, secrets: secrets)
+    }
+
+    private func performBackupNow(
+        configuration: SyncConfiguration,
+        secrets: SyncSecrets,
+        syncCoordinator: SyncCoordinator
+    ) async {
+        let didBackup = await syncCoordinator.backupCurrentData(
+            configuration: configuration,
+            secrets: secrets,
+            forceFullUpload: true
+        )
+        showSettingsMessage(didBackup ? "sync.backup.succeeded" : "sync.backup.error.failed")
     }
 
     func importNow() async {

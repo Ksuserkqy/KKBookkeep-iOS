@@ -588,6 +588,10 @@
 "sync.settings.savedButBackupFailed" = "同步设置已保存，但数据备份失败。请检查所选文件位置、同步密码和凭据。";
 "sync.settings.savedButImportFailed" = "同步设置已保存，但导入远端数据失败。为避免覆盖云端，请检查所选文件位置、同步密码和凭据后重试。";
 "sync.settings.message.title" = "同步设置";
+"sync.backup.confirmBeforeImport.title" = "先导入同步空间？";
+"sync.backup.confirmBeforeImport.message" = "检测到同步空间可能已有数据。这台设备还没有完成首次导入，建议先从同步空间导入，避免用本机默认资料覆盖远端个人信息。";
+"sync.backup.confirmBeforeImport.importFirst" = "先导入";
+"sync.backup.confirmBeforeImport.continueBackup" = "仍然备份";
 "sync.settings.error.saveFailed" = "同步设置保存失败，请稍后重试。";
 "sync.settings.error.providerUnavailable" = "当前设备无法访问 iCloud 云盘，请确认系统已登录 Apple ID 并启用 iCloud 云盘。";
 "sync.settings.error.encryptionPasswordRequired" = "启用加密备份前，请先填写同步密码。";

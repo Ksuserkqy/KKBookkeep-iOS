@@ -235,6 +235,64 @@ final class LedgerSQLiteStoreTests: XCTestCase {
         XCTAssertEqual(ops.map(\.opId), ["op.encrypted"])
     }
 
+    func testProfileJSONLSyncLogImportsFieldOpsInStableOrder() async throws {
+        let storage = InMemorySyncStorage()
+        let service = JSONLSyncLogService<PersonalProfileOp> { _, _ in storage }
+        let descriptor = SyncLogDescriptor(domain: .profile, remoteDirectory: "KKBookKeep/v1/profile-devices")
+        let configuration = syncConfiguration(encryptionEnabled: false)
+        let displayNameOp = profileOp(
+            opId: "profile.displayName",
+            deviceId: "device-b",
+            seq: 1,
+            field: .displayName,
+            value: "Lamb",
+            timestamp: 20
+        )
+        let emailOp = profileOp(
+            opId: "profile.email",
+            deviceId: "device-a",
+            seq: 1,
+            field: .email,
+            value: "me@example.com",
+            timestamp: 10
+        )
+
+        try await service.backup(
+            ops: [displayNameOp, emailOp],
+            configuration: configuration,
+            secrets: SyncSecrets(webDAVSecret: "", encryptionPassword: ""),
+            descriptor: descriptor
+        )
+
+        let importedOps = try await service.importRemoteOps(
+            configuration: configuration,
+            secrets: SyncSecrets(webDAVSecret: "", encryptionPassword: ""),
+            descriptor: descriptor
+        )
+        XCTAssertEqual(importedOps.map(\.opId), ["profile.email", "profile.displayName"])
+    }
+
+    func testProfileOpSortKeyUsesLaterNicknameUpdate() {
+        let earlier = profileOp(
+            opId: "nickname.earlier",
+            deviceId: "device-a",
+            seq: 1,
+            field: .displayName,
+            value: "A",
+            timestamp: 10
+        )
+        let later = profileOp(
+            opId: "nickname.later",
+            deviceId: "device-b",
+            seq: 1,
+            field: .displayName,
+            value: "B",
+            timestamp: 20
+        )
+
+        XCTAssertGreaterThan(later.sortKey, earlier.sortKey)
+    }
+
     private func makeStore() -> LedgerSQLiteStore {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -281,6 +339,25 @@ final class LedgerSQLiteStoreTests: XCTestCase {
             occurredAt: transaction.createdAt,
             createdAt: transaction.createdAt,
             payload: transaction
+        )
+    }
+
+    private func profileOp(
+        opId: String,
+        deviceId: String,
+        seq: Int,
+        field: PersonalProfileField,
+        value: String?,
+        timestamp: TimeInterval
+    ) -> PersonalProfileOp {
+        PersonalProfileOp(
+            opId: opId,
+            deviceId: deviceId,
+            seq: seq,
+            field: field,
+            occurredAt: Date(timeIntervalSince1970: timestamp),
+            createdAt: Date(timeIntervalSince1970: timestamp),
+            payload: PersonalProfileFieldValue(stringValue: value)
         )
     }
 }

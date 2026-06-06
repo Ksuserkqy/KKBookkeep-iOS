@@ -5,6 +5,7 @@ import UIKit
 struct TransactionsPage: View {
     @EnvironmentObject private var draftStore: DraftBookkeepingStore
     @EnvironmentObject private var profileStore: ProfileStore
+    @EnvironmentObject private var syncCoordinator: SyncCoordinator
     @State private var editingTransaction: DraftTransaction?
     @State private var deletingTransaction: DraftTransaction?
     @State private var dateFilter = TransactionDateFilter()
@@ -142,6 +143,9 @@ struct TransactionsPage: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle(Text("tab.transactions"))
+            .refreshable {
+                _ = await syncCoordinator.refreshNow()
+            }
             .onAppear {
                 initializeDateFilterIfNeeded()
             }
@@ -1441,4 +1445,5 @@ private struct TransactionEditorPage: View {
     TransactionsPage()
         .environmentObject(DraftBookkeepingStore())
         .environmentObject(ProfileStore())
+        .environmentObject(SyncCoordinator())
 }

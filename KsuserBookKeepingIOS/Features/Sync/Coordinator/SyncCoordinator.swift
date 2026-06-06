@@ -116,9 +116,10 @@ final class SyncCoordinator: ObservableObject {
 
         if profileBackedUp, ledgerDataBackedUp {
             try? syncSettingsStore.markBackupCompleted()
+            return await importRemoteDataAfterSuccessfulBackupIfNeeded(configuration: configuration)
         }
 
-        return profileBackedUp && ledgerDataBackedUp
+        return false
     }
 
     func importNow(manual: Bool) async -> Bool {
@@ -143,9 +144,46 @@ final class SyncCoordinator: ObservableObject {
         return profileImported && metadataImported && transactionsImported && templatesImported && budgetsImported
     }
 
+    func refreshNow() async -> Bool {
+        guard let syncSettingsStore else { return false }
+
+        let configuration = syncSettingsStore.configuration
+        guard configuration.backupEnabled else { return true }
+
+        _ = await backupNow(forceFullUpload: false)
+        return await importNow(manual: false)
+    }
+
     func testConnection(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
         guard let profileStore else { return false }
         return await profileStore.testSyncLocation(configuration: configuration, secrets: secrets)
+    }
+
+    func hasRemoteData(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        do {
+            let storage = try SyncStorageFactory.storage(for: configuration, webDAVSecret: secrets.webDAVSecret)
+            if (try? await storage.readFile(at: "KKBookKeep/v1/profile/personal-profile.json")) != nil {
+                return true
+            }
+
+            let directories = [
+                "KKBookKeep/v1/profile-devices",
+                "KKBookKeep/v1/ledgers/default/metadata-devices",
+                "KKBookKeep/v1/ledgers/default/devices",
+                "KKBookKeep/v1/ledgers/default/template-devices",
+                "KKBookKeep/v1/ledgers/default/budget-devices"
+            ]
+
+            for directory in directories {
+                if let deviceIds = try? await storage.listDirectories(at: directory), !deviceIds.isEmpty {
+                    return true
+                }
+            }
+        } catch {
+            return false
+        }
+
+        return false
     }
 
     func importRemoteDataBeforeBackup(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
@@ -188,8 +226,13 @@ final class SyncCoordinator: ObservableObject {
         )
         if profileBackedUp, ledgerDataBackedUp {
             try? syncSettingsStore.markBackupCompleted()
+            return await importRemoteDataAfterSuccessfulBackupIfNeeded(configuration: configuration)
         }
-        return profileBackedUp && ledgerDataBackedUp
+        return false
+    }
+
+    func importAfterBackupIfEnabled(configuration: SyncConfiguration) async -> Bool {
+        await importRemoteDataAfterSuccessfulBackupIfNeeded(configuration: configuration)
     }
 
     func importCurrentData(
@@ -214,36 +257,54 @@ final class SyncCoordinator: ObservableObject {
         return profileImported && metadataImported && transactionsImported && templatesImported && budgetsImported
     }
 
-    private func importRemoteDataIfNeeded(force: Bool = false) async {
+    @discardableResult
+    private func importRemoteDataIfNeeded(force: Bool = false) async -> Bool {
         guard
             let profileStore,
             let syncSettingsStore,
             let draftBookkeepingStore
         else {
-            return
+            return false
         }
 
         let configuration = syncSettingsStore.configuration
-        guard configuration.backupEnabled, configuration.autoImport else { return }
-        guard !isImportingRemoteData else { return }
+        guard configuration.backupEnabled, configuration.autoImport else { return true }
+        guard !isImportingRemoteData else { return true }
 
         if
             !force,
             let lastRemoteDataImportAt,
             Date().timeIntervalSince(lastRemoteDataImportAt) < 60
         {
-            return
+            return true
         }
 
         isImportingRemoteData = true
+        defer { isImportingRemoteData = false }
+
         let secrets = syncSettingsStore.secrets(for: configuration)
-        await profileStore.importIfRemoteProfileIsNewer(configuration: configuration, secrets: secrets)
-        await draftBookkeepingStore.importIfRemoteMetadataIsNewer(configuration: configuration, secrets: secrets)
-        await draftBookkeepingStore.importIfRemoteTransactionsAreNewer(configuration: configuration, secrets: secrets)
-        await draftBookkeepingStore.importIfRemoteTemplatesAreNewer(configuration: configuration, secrets: secrets)
-        await draftBookkeepingStore.importIfRemoteBudgetsAreNewer(configuration: configuration, secrets: secrets)
-        lastRemoteDataImportAt = Date()
-        isImportingRemoteData = false
+        let profileImported = await profileStore.importIfRemoteProfileIsNewer(configuration: configuration, secrets: secrets)
+        let metadataImported = await draftBookkeepingStore.importIfRemoteMetadataIsNewer(configuration: configuration, secrets: secrets)
+        let transactionsImported = await draftBookkeepingStore.importIfRemoteTransactionsAreNewer(configuration: configuration, secrets: secrets)
+        let templatesImported = await draftBookkeepingStore.importIfRemoteTemplatesAreNewer(configuration: configuration, secrets: secrets)
+        let budgetsImported = await draftBookkeepingStore.importIfRemoteBudgetsAreNewer(configuration: configuration, secrets: secrets)
+        let didImport = profileImported && metadataImported && transactionsImported && templatesImported && budgetsImported
+        if didImport {
+            lastRemoteDataImportAt = Date()
+        }
+        return didImport
+    }
+
+    private func importRemoteDataAfterSuccessfulBackupIfNeeded(configuration: SyncConfiguration) async -> Bool {
+        guard
+            let syncSettingsStore,
+            configuration.autoImport,
+            configuration.hasSameSyncParameters(as: syncSettingsStore.configuration)
+        else {
+            return true
+        }
+
+        return await importRemoteDataIfNeeded(force: true)
     }
 
     private func restartFallbackSyncCheck() {
@@ -310,6 +371,7 @@ final class SyncCoordinator: ObservableObject {
         )
         if didBackup {
             try? syncSettingsStore.markBackupCompleted()
+            _ = await importRemoteDataAfterSuccessfulBackupIfNeeded(configuration: configuration)
         }
         isBackingUpLedgerData = false
 

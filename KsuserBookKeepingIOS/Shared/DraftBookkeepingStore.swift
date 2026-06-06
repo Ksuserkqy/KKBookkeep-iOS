@@ -994,55 +994,67 @@ final class DraftBookkeepingStore: ObservableObject {
         }
     }
 
-    func importIfRemoteTransactionsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
-        guard configuration.backupEnabled else { return }
+    @discardableResult
+    func importIfRemoteTransactionsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else { return true }
 
         do {
             let didImport = try await importTransactionOps(configuration: configuration, secrets: secrets)
             if didImport {
                 messageKey = "bookkeeping.transactions.sync.importSucceeded"
             }
+            return true
         } catch {
-            return
+            messageKey = "bookkeeping.transactions.sync.error.importFailed"
+            return false
         }
     }
 
-    func importIfRemoteTemplatesAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
-        guard configuration.backupEnabled else { return }
+    @discardableResult
+    func importIfRemoteTemplatesAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else { return true }
 
         do {
             let didImport = try await importTemplateOps(configuration: configuration, secrets: secrets)
             if didImport {
                 messageKey = "bookkeeping.templates.sync.importSucceeded"
             }
+            return true
         } catch {
-            return
+            messageKey = "bookkeeping.templates.sync.error.importFailed"
+            return false
         }
     }
 
-    func importIfRemoteBudgetsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
-        guard configuration.backupEnabled else { return }
+    @discardableResult
+    func importIfRemoteBudgetsAreNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else { return true }
 
         do {
             let didImport = try await importBudgetOps(configuration: configuration, secrets: secrets)
             if didImport {
                 messageKey = "bookkeeping.budgets.sync.importSucceeded"
             }
+            return true
         } catch {
-            return
+            messageKey = "bookkeeping.budgets.sync.error.importFailed"
+            return false
         }
     }
 
-    func importIfRemoteMetadataIsNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async {
-        guard configuration.backupEnabled else { return }
+    @discardableResult
+    func importIfRemoteMetadataIsNewer(configuration: SyncConfiguration, secrets: SyncSecrets) async -> Bool {
+        guard configuration.backupEnabled else { return true }
 
         do {
             let didImport = try await importMetadataOps(configuration: configuration, secrets: secrets)
             if didImport {
                 messageKey = "bookkeeping.metadata.sync.importSucceeded"
             }
+            return true
         } catch {
-            return
+            messageKey = "bookkeeping.metadata.sync.error.importFailed"
+            return false
         }
     }
 

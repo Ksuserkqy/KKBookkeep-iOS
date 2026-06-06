@@ -199,5 +199,17 @@ struct SyncSettingsPage: View {
                 Text(LocalizedStringKey(messageKey))
             }
         }
+        .alert(Text("sync.backup.confirmBeforeImport.title"), isPresented: $viewModel.isShowingBackupBeforeImportConfirmation) {
+            Button("sync.backup.confirmBeforeImport.importFirst", role: .cancel) {
+                viewModel.cancelBackupBeforeImport()
+            }
+            Button("sync.backup.confirmBeforeImport.continueBackup", role: .destructive) {
+                Task {
+                    await viewModel.confirmBackupBeforeImport()
+                }
+            }
+        } message: {
+            Text("sync.backup.confirmBeforeImport.message")
+        }
     }
 }
