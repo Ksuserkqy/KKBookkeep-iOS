@@ -19,6 +19,8 @@ struct ContentView: View {
     @AppStorage("app.theme") private var theme = AppTheme.system.rawValue
     @StateObject private var appLock = AppLockManager()
     @State private var isPrivacyCovered = false
+    @State private var isShowingLaunchLoading = false
+    @State private var launchLoadingDelayTask: Task<Void, Never>?
     @State private var selectedTab = AppTab.dashboard
     @State private var requestedRecordKind: DraftEntryKind?
 
@@ -66,13 +68,21 @@ struct ContentView: View {
                 .tag(AppTab.profile)
             }
 
+            if isShowingLaunchLoading {
+                AppLaunchLoadingView()
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
+
             if appLock.isLocked {
                 AppLockView(appLock: appLock)
                     .ignoresSafeArea()
                     .transition(.opacity)
+                    .zIndex(2)
             } else if isPrivacyCovered {
                 Color(.systemGroupedBackground)
                     .ignoresSafeArea()
+                    .zIndex(2)
             }
         }
         .dismissKeyboardOnBackgroundTap()
@@ -96,6 +106,9 @@ struct ContentView: View {
         }
         .onChange(of: syncSettingsStore.configuration) { _, _ in
             syncCoordinator.handleConfigurationChanged()
+        }
+        .onChange(of: syncCoordinator.isRunningLaunchImport) { _, isRunning in
+            updateLaunchLoadingVisibility(isRunning: isRunning)
         }
         .onOpenURL { url in
             handleDeepLink(url)
@@ -137,6 +150,10 @@ struct ContentView: View {
             .environmentObject(draftBookkeepingStore)
             .environmentObject(syncCoordinator)
         }
+        .onDisappear {
+            launchLoadingDelayTask?.cancel()
+            launchLoadingDelayTask = nil
+        }
     }
 
     private func handleQuickAction(_ action: HomeScreenQuickAction?) {
@@ -170,6 +187,30 @@ struct ContentView: View {
             selectedTab = .dashboard
         default:
             break
+        }
+    }
+
+    private func updateLaunchLoadingVisibility(isRunning: Bool) {
+        launchLoadingDelayTask?.cancel()
+
+        guard isRunning else {
+            launchLoadingDelayTask = nil
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isShowingLaunchLoading = false
+            }
+            return
+        }
+
+        launchLoadingDelayTask = Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard syncCoordinator.isRunningLaunchImport else { return }
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    isShowingLaunchLoading = true
+                }
+            }
         }
     }
 

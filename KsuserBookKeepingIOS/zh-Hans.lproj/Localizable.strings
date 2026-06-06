@@ -10,6 +10,8 @@
 "common.ok" = "确定";
 "common.save" = "保存";
 
+"launch.loading.subtitle" = "正在整理本机账本和同步数据…";
+
 "initialSync.legal.navigationTitle" = "欢迎使用";
 "initialSync.legal.title" = "欢迎使用羊羊记账";
 "initialSync.legal.subtitle" = "继续前请阅读并同意以下条款。";

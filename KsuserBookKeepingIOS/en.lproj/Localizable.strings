@@ -10,6 +10,8 @@
 "common.ok" = "OK";
 "common.save" = "Save";
 
+"launch.loading.subtitle" = "Preparing your local ledger and sync data...";
+
 "initialSync.legal.navigationTitle" = "Welcome";
 "initialSync.legal.title" = "Welcome to KKBookkeep";
 "initialSync.legal.subtitle" = "Please review and accept the following terms before continuing.";

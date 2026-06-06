@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class SyncCoordinator: ObservableObject {
     @Published var isShowingInitialSyncSetup = false
+    @Published private(set) var isRunningLaunchImport = false
 
     private weak var profileStore: ProfileStore?
     private weak var syncSettingsStore: SyncSettingsStore?
@@ -34,7 +35,7 @@ final class SyncCoordinator: ObservableObject {
             isShowingInitialSyncSetup = true
         } else {
             Task {
-                await importRemoteDataIfNeeded(force: true)
+                await runLaunchImport()
             }
         }
 
@@ -233,6 +234,15 @@ final class SyncCoordinator: ObservableObject {
 
     func importAfterBackupIfEnabled(configuration: SyncConfiguration) async -> Bool {
         await importRemoteDataAfterSuccessfulBackupIfNeeded(configuration: configuration)
+    }
+
+    private func runLaunchImport() async {
+        guard !isRunningLaunchImport else { return }
+
+        isRunningLaunchImport = true
+        defer { isRunningLaunchImport = false }
+
+        await importRemoteDataIfNeeded(force: true)
     }
 
     func importCurrentData(
