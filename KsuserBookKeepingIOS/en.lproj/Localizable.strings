@@ -730,6 +730,7 @@
 "about.feedback" = "Send Feedback";
 "about.sponsor" = "Sponsor Me";
 "feedback.title" = "Send Feedback";
+"feedback.message" = "Hello everyone, I am a 2025 student from Shanghai Polytechnic University (SSPU) in Shanghai, China. I am very happy that you are using my app. If it has helped you, please do not hesitate to share your suggestions. I will read them carefully and reply when I can. Because of my university studies, I may not be able to respond immediately, but I will check regularly. Thank you.";
 "feedback.email" = "Send Email";
 "feedback.githubIssue" = "Open a GitHub Issue";
 "sponsor.title" = "Sponsor Me";

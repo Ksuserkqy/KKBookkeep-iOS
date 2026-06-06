@@ -730,6 +730,7 @@
 "about.feedback" = "向我提意见";
 "about.sponsor" = "赞助我";
 "feedback.title" = "向我提意见";
+"feedback.message" = "大家好，我是一名来自 上海第二工业大学 的 2025 级学生，非常开心您能使用我的软件，如果这帮助到了您，请不要吝啬你的建议，我会认真听取并作出回复的，再次感谢各位！";
 "feedback.email" = "发送邮件";
 "feedback.githubIssue" = "在 GitHub 提 Issue";
 "sponsor.title" = "赞助我";
