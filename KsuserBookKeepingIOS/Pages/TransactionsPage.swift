@@ -12,6 +12,10 @@ struct TransactionsPage: View {
     @State private var selectedAccountId: String?
     @State private var selectedCategoryId: String?
     @State private var hasInitializedDateFilter = false
+    @State private var isSelectionMode = false
+    @State private var selectedTransactionIds = Set<String>()
+    @State private var isSelectionFilterPresented = false
+    @State private var isBatchEditorPresented = false
 
     private var filteredTransactions: [DraftTransaction] {
         draftStore.transactions.filter { transaction in
@@ -46,6 +50,66 @@ struct TransactionsPage: View {
 
     private var hasActiveFilters: Bool {
         selectedAccountId != nil || selectedCategoryId != nil
+    }
+
+    private var filteredTransactionIds: Set<String> {
+        Set(filteredTransactions.map(\.id))
+    }
+
+    private var areAllFilteredTransactionsSelected: Bool {
+        !filteredTransactions.isEmpty && filteredTransactionIds.isSubset(of: selectedTransactionIds)
+    }
+
+    private var monthSelectionOptions: [TransactionMonthSelectionOption] {
+        let calendar = Calendar.current
+        let groupedTransactions = Dictionary(grouping: draftStore.transactions) { transaction in
+            startOfMonth(for: transaction.date, calendar: calendar)
+        }
+
+        return groupedTransactions
+            .map { monthStart, transactions in
+                TransactionMonthSelectionOption(
+                    monthStart: monthStart,
+                    title: monthTitle(for: monthStart),
+                    transactionIds: Set(transactions.map(\.id))
+                )
+            }
+            .sorted { $0.monthStart > $1.monthStart }
+    }
+
+    private var categorySelectionOptions: [TransactionCategorySelectionOption] {
+        categoryHierarchyItems.compactMap { item in
+            let transactionIds = Set(
+                draftStore.transactions
+                    .filter { $0.categoryId == item.category.id }
+                    .map(\.id)
+            )
+
+            guard !transactionIds.isEmpty else {
+                return nil
+            }
+
+            return TransactionCategorySelectionOption(
+                category: item.category,
+                title: archivedAwareName(
+                    draftStore.categoryDisplayName(for: item.category.id),
+                    isArchived: item.category.isArchived
+                ),
+                subtitle: categorySelectionSubtitle(for: item.category, count: transactionIds.count),
+                transactionIds: transactionIds,
+                depth: item.depth
+            )
+        }
+    }
+
+    private var categoryHierarchyItems: [DraftCategoryHierarchyItem] {
+        DraftEntryKind.allCases.flatMap { kind in
+            let rootCategories = draftStore.categories
+                .filter { $0.kind == kind && $0.parentId == nil }
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+            return rootCategories.flatMap { hierarchyItems(from: $0, depth: 1, visitedIds: []) }
+        }
     }
 
     var body: some View {
@@ -83,6 +147,18 @@ struct TransactionsPage: View {
                             hasActiveFilters: hasActiveFilters,
                             resetFilters: resetFilters
                         )
+
+                        if isSelectionMode {
+                            TransactionBatchSelectionBar(
+                                selectedCount: selectedTransactionIds.count,
+                                onSelectByFilter: {
+                                    isSelectionFilterPresented = true
+                                },
+                                onClearSelection: {
+                                    selectedTransactionIds = []
+                                }
+                            )
+                        }
                     }
                     .listRowSeparator(.hidden)
 
@@ -99,34 +175,43 @@ struct TransactionsPage: View {
                         ForEach(groupedTransactions) { group in
                             Section {
                                 ForEach(group.transactions) { transaction in
-                TransactionSummaryCard(
-                    transaction: transaction,
-                    accountItem: accountItem(for: transaction),
-                    categoryItem: categoryItem(for: transaction),
-                    timeText: Self.timeText(for: transaction.date),
-                    onEdit: {
-                        editingTransaction = transaction
-                    }
+                                    TransactionSummaryCard(
+                                        transaction: transaction,
+                                        accountItem: accountItem(for: transaction),
+                                        categoryItem: categoryItem(for: transaction),
+                                        timeText: Self.timeText(for: transaction.date),
+                                        isSelecting: isSelectionMode,
+                                        isSelected: selectedTransactionIds.contains(transaction.id),
+                                        onSelect: {
+                                            toggleSelection(for: transaction)
+                                        },
+                                        onEdit: {
+                                            editingTransaction = transaction
+                                        }
                                     )
                                     .padding(.vertical, 6)
                                     .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            deletingTransaction = transaction
-                                        } label: {
-                                            Label("management.action.delete", systemImage: "trash")
+                                        if !isSelectionMode {
+                                            Button(role: .destructive) {
+                                                deletingTransaction = transaction
+                                            } label: {
+                                                Label("management.action.delete", systemImage: "trash")
+                                            }
                                         }
                                     }
                                     .contextMenu {
-                                        Button {
-                                            editingTransaction = transaction
-                                        } label: {
-                                            Label("management.action.edit", systemImage: "pencil")
-                                        }
+                                        if !isSelectionMode {
+                                            Button {
+                                                editingTransaction = transaction
+                                            } label: {
+                                                Label("management.action.edit", systemImage: "pencil")
+                                            }
 
-                                        Button(role: .destructive) {
-                                            deletingTransaction = transaction
-                                        } label: {
-                                            Label("management.action.delete", systemImage: "trash")
+                                            Button(role: .destructive) {
+                                                deletingTransaction = transaction
+                                            } label: {
+                                                Label("management.action.delete", systemImage: "trash")
+                                            }
                                         }
                                     }
                                 }
@@ -143,6 +228,38 @@ struct TransactionsPage: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle(Text("tab.transactions"))
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    if !filteredTransactions.isEmpty {
+                        Button {
+                            if isSelectionMode {
+                                isBatchEditorPresented = true
+                            } else {
+                                enterSelectionMode()
+                            }
+                        } label: {
+                            Label("transactions.batch.edit", systemImage: "pencil.circle")
+                        }
+                        .disabled(isSelectionMode && selectedTransactionIds.isEmpty)
+                    }
+                }
+
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if isSelectionMode {
+                        if !filteredTransactions.isEmpty {
+                            Button {
+                                toggleSelectAllFiltered()
+                            } label: {
+                                Text(LocalizedStringKey(areAllFilteredTransactionsSelected ? "transactions.batch.deselectAll" : "transactions.batch.selectAll"))
+                            }
+                        }
+
+                        Button("common.cancel") {
+                            exitSelectionMode()
+                        }
+                    }
+                }
+            }
             .refreshable {
                 _ = await syncCoordinator.refreshNow()
             }
@@ -151,11 +268,40 @@ struct TransactionsPage: View {
             }
             .onChange(of: draftStore.transactions) { _, _ in
                 initializeDateFilterIfNeeded()
+                pruneSelection()
+            }
+            .onChange(of: dateFilter) { _, _ in
+                pruneSelection()
+            }
+            .onChange(of: selectedAccountId) { _, _ in
+                pruneSelection()
+            }
+            .onChange(of: selectedCategoryId) { _, _ in
+                pruneSelection()
             }
             .sheet(item: $editingTransaction) { transaction in
                 TransactionEditorPage(transaction: transaction)
                     .environmentObject(draftStore)
                     .environmentObject(profileStore)
+            }
+            .sheet(isPresented: $isBatchEditorPresented) {
+                TransactionBatchEditPage(
+                    transactionIds: selectedTransactionIds,
+                    selectedCount: selectedTransactionIds.count,
+                    onSaved: {
+                        exitSelectionMode()
+                    }
+                )
+                .environmentObject(draftStore)
+                .environmentObject(profileStore)
+            }
+            .sheet(isPresented: $isSelectionFilterPresented) {
+                TransactionBatchSelectionFilterSheet(
+                    selectedTransactionIds: $selectedTransactionIds,
+                    currentFilteredIds: filteredTransactionIds,
+                    monthOptions: monthSelectionOptions,
+                    categoryOptions: categorySelectionOptions
+                )
             }
             .confirmationDialog(
                 Text("transactions.delete.title"),
@@ -198,6 +344,42 @@ struct TransactionsPage: View {
         selectedCategoryId = nil
     }
 
+    private func enterSelectionMode() {
+        isSelectionMode = true
+        editingTransaction = nil
+        deletingTransaction = nil
+    }
+
+    private func exitSelectionMode() {
+        isSelectionMode = false
+        selectedTransactionIds = []
+        isSelectionFilterPresented = false
+        isBatchEditorPresented = false
+    }
+
+    private func toggleSelection(for transaction: DraftTransaction) {
+        if selectedTransactionIds.contains(transaction.id) {
+            selectedTransactionIds.remove(transaction.id)
+        } else {
+            selectedTransactionIds.insert(transaction.id)
+        }
+    }
+
+    private func toggleSelectAllFiltered() {
+        if areAllFilteredTransactionsSelected {
+            selectedTransactionIds.subtract(filteredTransactionIds)
+        } else {
+            selectedTransactionIds.formUnion(filteredTransactionIds)
+        }
+    }
+
+    private func pruneSelection() {
+        selectedTransactionIds = selectedTransactionIds.intersection(filteredTransactionIds)
+        if selectedTransactionIds.isEmpty, filteredTransactions.isEmpty {
+            isSelectionMode = false
+        }
+    }
+
     private func matchesAccount(_ transaction: DraftTransaction, accountId: String) -> Bool {
         switch transaction.kind {
         case .expense, .income:
@@ -213,6 +395,44 @@ struct TransactionsPage: View {
                 return lhs.createdAt > rhs.createdAt
             }
             return lhs.date > rhs.date
+        }
+    }
+
+    private func startOfMonth(for date: Date, calendar: Calendar) -> Date {
+        let components = calendar.dateComponents([.year, .month], from: date)
+        return calendar.date(from: components) ?? calendar.startOfDay(for: date)
+    }
+
+    private func monthTitle(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = AppLocalization.locale
+        formatter.dateFormat = DateFormatter.dateFormat(fromTemplate: "yMMMM", options: 0, locale: AppLocalization.locale)
+        return formatter.string(from: date)
+    }
+
+    private func categorySelectionSubtitle(for category: DraftCategory, count: Int) -> String {
+        let kindTitle = AppLocalization.string(category.kind.localizationKey, comment: "")
+        let countText = String(
+            format: AppLocalization.string("transactions.batch.selectionFilters.countFormat", comment: ""),
+            count
+        )
+        return "\(kindTitle) · \(countText)"
+    }
+
+    private func hierarchyItems(
+        from category: DraftCategory,
+        depth: Int,
+        visitedIds: Set<String>
+    ) -> [DraftCategoryHierarchyItem] {
+        guard !visitedIds.contains(category.id) else { return [] }
+
+        let nextVisitedIds = visitedIds.union([category.id])
+        let children = draftStore.categories
+            .filter { $0.parentId == category.id }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+
+        return [DraftCategoryHierarchyItem(category: category, depth: depth)] + children.flatMap { child in
+            hierarchyItems(from: child, depth: depth + 1, visitedIds: nextVisitedIds)
         }
     }
 
@@ -760,11 +980,279 @@ private struct TransactionEmptyFilteredView: View {
     }
 }
 
+private struct TransactionBatchSelectionBar: View {
+    let selectedCount: Int
+    let onSelectByFilter: () -> Void
+    let onClearSelection: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label(
+                String(
+                    format: AppLocalization.string("transactions.batch.selectedCountFormat", comment: ""),
+                    selectedCount
+                ),
+                systemImage: "checkmark.circle"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            Button(action: onSelectByFilter) {
+                Label("transactions.batch.selectionFilters.title", systemImage: "line.3.horizontal.decrease.circle")
+            }
+            .font(.subheadline.weight(.semibold))
+            .buttonStyle(.borderless)
+
+            if selectedCount > 0 {
+                Button(action: onClearSelection) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(Text("transactions.batch.clearSelection"))
+            }
+        }
+    }
+}
+
+private struct TransactionMonthSelectionOption: Identifiable, Equatable {
+    let monthStart: Date
+    let title: String
+    let transactionIds: Set<String>
+
+    var id: Date { monthStart }
+}
+
+private struct TransactionCategorySelectionOption: Identifiable, Equatable {
+    let category: DraftCategory
+    let title: String
+    let subtitle: String
+    let transactionIds: Set<String>
+    let depth: Int
+
+    var id: String { category.id }
+}
+
+private struct TransactionBatchSelectionFilterSheet: View {
+    @Binding var selectedTransactionIds: Set<String>
+    let currentFilteredIds: Set<String>
+    let monthOptions: [TransactionMonthSelectionOption]
+    let categoryOptions: [TransactionCategorySelectionOption]
+    @Environment(\.dismiss) private var dismiss
+    @State private var categorySearchText = ""
+
+    private var filteredCategoryOptions: [TransactionCategorySelectionOption] {
+        let query = categorySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return categoryOptions
+        }
+
+        return categoryOptions.filter { option in
+            option.title.localizedCaseInsensitiveContains(query)
+                || option.category.name.localizedCaseInsensitiveContains(query)
+                || option.subtitle.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        addSelection(currentFilteredIds)
+                    } label: {
+                        TransactionSelectionFilterRow(
+                            title: AppLocalization.string("transactions.batch.selectionFilters.current", comment: ""),
+                            subtitle: countText(for: currentFilteredIds.count),
+                            systemImage: "line.3.horizontal.decrease.circle",
+                            selectedCount: selectedCount(in: currentFilteredIds)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(currentFilteredIds.isEmpty)
+                } footer: {
+                    Text("transactions.batch.selectionFilters.current.footer")
+                }
+
+                Section {
+                    if monthOptions.isEmpty {
+                        TransactionSelectionFilterEmptyRow(titleKey: "transactions.batch.selectionFilters.emptyMonths")
+                    } else {
+                        ForEach(monthOptions) { option in
+                            Button {
+                                addSelection(option.transactionIds)
+                            } label: {
+                                TransactionSelectionFilterRow(
+                                    title: option.title,
+                                    subtitle: countText(for: option.transactionIds.count),
+                                    systemImage: "calendar",
+                                    selectedCount: selectedCount(in: option.transactionIds)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text("transactions.batch.selectionFilters.months")
+                }
+
+                Section {
+                    if filteredCategoryOptions.isEmpty {
+                        TransactionSelectionFilterEmptyRow(titleKey: "transactions.batch.selectionFilters.emptyCategories")
+                    } else {
+                        ForEach(filteredCategoryOptions) { option in
+                            Button {
+                                addSelection(option.transactionIds)
+                            } label: {
+                                TransactionCategorySelectionFilterRow(
+                                    option: option,
+                                    selectedCount: selectedCount(in: option.transactionIds)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text("transactions.batch.selectionFilters.categories")
+                }
+            }
+            .navigationTitle(Text("transactions.batch.selectionFilters.title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(
+                text: $categorySearchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: Text("transactions.filter.search.placeholder")
+            )
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("common.done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func addSelection(_ ids: Set<String>) {
+        selectedTransactionIds.formUnion(ids)
+    }
+
+    private func selectedCount(in ids: Set<String>) -> Int {
+        selectedTransactionIds.intersection(ids).count
+    }
+
+    private func countText(for count: Int) -> String {
+        String(
+            format: AppLocalization.string("transactions.batch.selectionFilters.countFormat", comment: ""),
+            count
+        )
+    }
+}
+
+private struct TransactionSelectionFilterRow: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let selectedCount: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Color.accentColor.opacity(0.14)))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if selectedCount > 0 {
+                Text(
+                    String(
+                        format: AppLocalization.string("transactions.batch.selectionFilters.selectedCountFormat", comment: ""),
+                        selectedCount
+                    )
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+private struct TransactionCategorySelectionFilterRow: View {
+    let option: TransactionCategorySelectionOption
+    let selectedCount: Int
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Spacer()
+                .frame(width: CGFloat(option.depth - 1) * 24)
+
+            DraftVisualBadge(iconName: option.category.iconName, colorHex: option.category.colorHex)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(option.title)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(option.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            if selectedCount > 0 {
+                Text(
+                    String(
+                        format: AppLocalization.string("transactions.batch.selectionFilters.selectedCountFormat", comment: ""),
+                        selectedCount
+                    )
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tint)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+private struct TransactionSelectionFilterEmptyRow: View {
+    let titleKey: LocalizedStringKey
+
+    var body: some View {
+        Text(titleKey)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 8)
+    }
+}
+
 private struct TransactionSummaryCard: View {
     let transaction: DraftTransaction
     let accountItem: DraftVisualSummaryItem
     let categoryItem: DraftVisualSummaryItem
     let timeText: String
+    let isSelecting: Bool
+    let isSelected: Bool
+    let onSelect: () -> Void
     let onEdit: () -> Void
 
     private var amountText: String {
@@ -790,8 +1278,15 @@ private struct TransactionSummaryCard: View {
     }
 
     var body: some View {
-        Button(action: onEdit) {
+        Button(action: isSelecting ? onSelect : onEdit) {
             HStack(alignment: .center, spacing: 12) {
+                if isSelecting {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                        .frame(width: 24)
+                }
+
                 DraftVisualBadge(iconName: categoryItem.iconName, colorHex: categoryItem.colorHex, size: 38)
 
                 VStack(alignment: .leading, spacing: 5) {
@@ -834,9 +1329,11 @@ private struct TransactionSummaryCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.68)
 
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                    if !isSelecting {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
             .contentShape(Rectangle())
@@ -1056,6 +1553,287 @@ private struct TransactionVisualSelectionPage: View {
             .buttonStyle(.plain)
         }
         .navigationTitle(Text(titleKey))
+    }
+}
+
+private struct TransactionBatchEditPage: View {
+    @EnvironmentObject private var draftStore: DraftBookkeepingStore
+    @EnvironmentObject private var profileStore: ProfileStore
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var locationProvider = CurrentLocationProvider()
+
+    let transactionIds: Set<String>
+    let selectedCount: Int
+    let onSaved: () -> Void
+
+    @State private var shouldEditAmount = false
+    @State private var amountText = ""
+    @State private var shouldEditTime = false
+    @State private var time = Date()
+    @State private var shouldEditNote = false
+    @State private var note = ""
+    @State private var locationChange = TransactionBatchLocationChange.unchanged
+    @State private var capturedLocation: DraftLocation?
+    @State private var isLocating = false
+    @State private var locationCaptureToken = 0
+    @State private var locationMessageKey: String?
+    @State private var errorKey: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent("transactions.batch.selected") {
+                        Text(
+                            String(
+                                format: AppLocalization.string("transactions.batch.selectedCountFormat", comment: ""),
+                                selectedCount
+                            )
+                        )
+                    }
+                }
+
+                Section {
+                    Toggle("transactions.batch.field.amount", isOn: $shouldEditAmount)
+
+                    if shouldEditAmount {
+                        RecordAmountInputRow(
+                            placeholderKey: "record.amount.placeholder",
+                            amountText: $amountText,
+                            currencySymbol: profileStore.profile.currency.symbol,
+                            tint: .accentColor
+                        )
+                    }
+
+                    Toggle("transactions.batch.field.time", isOn: $shouldEditTime)
+
+                    if shouldEditTime {
+                        DatePicker("transactions.batch.time", selection: $time, displayedComponents: [.hourAndMinute])
+                    }
+
+                    Toggle("transactions.batch.field.note", isOn: $shouldEditNote)
+
+                    if shouldEditNote {
+                        TextField("record.note.placeholder", text: $note, axis: .vertical)
+                            .lineLimit(2...4)
+                    }
+                } header: {
+                    Text("transactions.batch.section.fields")
+                }
+
+                Section {
+                    Picker("transactions.batch.location", selection: $locationChange) {
+                        ForEach(TransactionBatchLocationChange.allCases) { change in
+                            Text(change.titleKey).tag(change)
+                        }
+                    }
+
+                    switch locationChange {
+                    case .unchanged:
+                        EmptyView()
+                    case .current:
+                        currentLocationRow
+                    case .clear:
+                        Label("transactions.batch.location.clear.message", systemImage: "location.slash")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("transactions.batch.section.location")
+                }
+
+                if let errorKey {
+                    Section {
+                        Text(LocalizedStringKey(errorKey))
+                            .font(.subheadline)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle(Text("transactions.batch.edit.title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("common.cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        save()
+                    } label: {
+                        Label("common.save", systemImage: "checkmark.circle.fill")
+                    }
+                }
+            }
+            .onChange(of: locationChange) { _, newValue in
+                errorKey = nil
+                if newValue == .current, capturedLocation == nil {
+                    captureLocation()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var currentLocationRow: some View {
+        if let capturedLocation {
+            VStack(alignment: .leading, spacing: 8) {
+                Label {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(capturedLocation.displayName)
+                            .foregroundStyle(.primary)
+
+                        Text(capturedLocation.coordinateText)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "location.fill")
+                        .foregroundStyle(.tint)
+                }
+
+                Button {
+                    captureLocation()
+                } label: {
+                    Label("transactions.batch.location.refresh", systemImage: "location")
+                }
+                .font(.subheadline)
+                .disabled(isLocating)
+            }
+        } else {
+            Button {
+                captureLocation()
+            } label: {
+                HStack {
+                    Label("record.location.capture", systemImage: "location")
+
+                    Spacer()
+
+                    if isLocating {
+                        ProgressView()
+                    }
+                }
+            }
+            .disabled(isLocating)
+        }
+
+        if let locationMessageKey {
+            Text(LocalizedStringKey(locationMessageKey))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func captureLocation() {
+        guard !isLocating else { return }
+
+        locationCaptureToken += 1
+        let currentLocationCaptureToken = locationCaptureToken
+        isLocating = true
+        locationMessageKey = "record.location.locating"
+
+        Task {
+            do {
+                let location = try await locationProvider.captureLocation()
+                guard locationCaptureToken == currentLocationCaptureToken else { return }
+                capturedLocation = location
+                locationMessageKey = nil
+            } catch CurrentLocationProvider.ProviderError.denied {
+                guard locationCaptureToken == currentLocationCaptureToken else { return }
+                locationMessageKey = "record.location.error.denied"
+            } catch {
+                guard locationCaptureToken == currentLocationCaptureToken else { return }
+                locationMessageKey = "record.location.error.unavailable"
+            }
+
+            guard locationCaptureToken == currentLocationCaptureToken else { return }
+            isLocating = false
+        }
+    }
+
+    private func save() {
+        draftStore.clearMessage()
+
+        guard shouldEditAmount || shouldEditTime || shouldEditNote || locationChange != .unchanged else {
+            errorKey = "transactions.batch.error.noFields"
+            return
+        }
+
+        let amount: String?
+        if shouldEditAmount {
+            guard let normalizedAmount = normalizedPositiveAmountText(amountText) else {
+                errorKey = "record.error.invalidAmount"
+                return
+            }
+            amount = normalizedAmount
+        } else {
+            amount = nil
+        }
+
+        let locationEdit: DraftTransactionBatchEdit.LocationChange
+        switch locationChange {
+        case .unchanged:
+            locationEdit = .unchanged
+        case .current:
+            guard let capturedLocation else {
+                errorKey = "transactions.batch.error.locationRequired"
+                return
+            }
+            locationEdit = .set(capturedLocation)
+        case .clear:
+            locationEdit = .clear
+        }
+
+        let edit = DraftTransactionBatchEdit(
+            amountText: amount,
+            timeComponents: shouldEditTime ? Calendar.current.dateComponents([.hour, .minute, .second], from: time) : nil,
+            note: shouldEditNote ? note : nil,
+            locationChange: locationEdit
+        )
+
+        guard draftStore.updateTransactions(ids: transactionIds, edit: edit) > 0 else {
+            errorKey = "transactions.batch.error.noChanges"
+            return
+        }
+
+        onSaved()
+        dismiss()
+    }
+
+    private func normalizedPositiveAmountText(_ text: String) -> String? {
+        let normalizedText = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+
+        guard
+            let amountText = DraftAmountFormatter.normalizedAmountText(normalizedText, allowNegative: false),
+            let decimal = Decimal(string: amountText, locale: Locale(identifier: "en_US_POSIX")),
+            decimal > 0
+        else {
+            return nil
+        }
+
+        return amountText
+    }
+}
+
+private enum TransactionBatchLocationChange: String, CaseIterable, Identifiable, Hashable {
+    case unchanged
+    case current
+    case clear
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .unchanged:
+            return "transactions.batch.location.unchanged"
+        case .current:
+            return "transactions.batch.location.current"
+        case .clear:
+            return "transactions.batch.location.clear"
+        }
     }
 }
 

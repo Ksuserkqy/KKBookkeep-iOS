@@ -8,6 +8,7 @@ struct RecordPage: View {
     @StateObject private var locationProvider = CurrentLocationProvider()
 
     @State private var selectedKind = DraftEntryKind.expense
+    @State private var entryMode = RecordEntryMode.single
     @State private var amountText = ""
     @State private var transferInAmountText = ""
     @State private var selectedCategoryId = ""
@@ -17,6 +18,7 @@ struct RecordPage: View {
     @State private var date = Date()
     @State private var note = ""
     @State private var location: DraftLocation?
+    @State private var batchDateComponents: Set<DateComponents> = []
     @State private var isLocating = false
     @State private var locationCaptureToken = 0
     @State private var locationMessageKey: String?
@@ -56,6 +58,10 @@ struct RecordPage: View {
                     categoryAndAccountSection
                 }
 
+                if isBatchEntry {
+                    batchDateSection
+                }
+
                 detailSection
 
                 if let errorKey {
@@ -77,11 +83,25 @@ struct RecordPage: View {
             }
             .navigationTitle(Text("tab.record"))
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if selectedKind != .transfer {
+                        Button {
+                            toggleEntryMode()
+                        } label: {
+                            Label {
+                                Text(LocalizedStringKey(isBatchEntry ? "record.entryMode.single" : "record.entryMode.batch"))
+                            } icon: {
+                                Image(systemName: isBatchEntry ? "doc.text" : "calendar.badge.plus")
+                            }
+                        }
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         saveTransaction()
                     } label: {
-                        Text("record.action.saveTransaction")
+                        Text(LocalizedStringKey(isBatchEntry ? "record.batch.action.saveTransactions" : "record.action.saveTransaction"))
                             .font(.headline)
                     }
                 }
@@ -96,10 +116,17 @@ struct RecordPage: View {
             }
             .onChange(of: selectedKind) { _, _ in
                 errorKey = nil
+                if selectedKind == .transfer {
+                    entryMode = .single
+                }
                 if selectedKind == .transfer, transferInAmountText.isEmpty {
                     transferInAmountText = amountText
                 }
                 normalizeSelections()
+            }
+            .onChange(of: entryMode) { _, _ in
+                errorKey = nil
+                ensureBatchDateSelectionIfNeeded()
             }
             .onChange(of: amountText) { oldValue, newValue in
                 guard selectedKind == .transfer else { return }
@@ -114,6 +141,10 @@ struct RecordPage: View {
                 normalizeSelections()
             }
         }
+    }
+
+    private var isBatchEntry: Bool {
+        selectedKind != .transfer && entryMode == .batch
     }
 
     private var amountSection: some View {
@@ -226,6 +257,21 @@ struct RecordPage: View {
         }
     }
 
+    private var batchDateSection: some View {
+        Section {
+            MultiDatePicker("record.batch.dates", selection: $batchDateComponents)
+        } header: {
+            Text("record.batch.section.dates")
+        } footer: {
+            Text(
+                String(
+                    format: NSLocalizedString("record.batch.selectedCountFormat", comment: ""),
+                    batchDateComponents.count
+                )
+            )
+        }
+    }
+
     private var transferAccountSection: some View {
         Section {
             NavigationLink {
@@ -260,7 +306,11 @@ struct RecordPage: View {
 
     private var detailSection: some View {
         Section {
-            DatePicker("record.dateTime", selection: $date, displayedComponents: [.date, .hourAndMinute])
+            if isBatchEntry {
+                DatePicker("record.batch.time", selection: $date, displayedComponents: [.hourAndMinute])
+            } else {
+                DatePicker("record.dateTime", selection: $date, displayedComponents: [.date, .hourAndMinute])
+            }
 
             locationRow
 
@@ -343,7 +393,19 @@ struct RecordPage: View {
         guard let requestedKind else { return }
 
         selectedKind = requestedKind
+        if requestedKind == .transfer {
+            entryMode = .single
+        }
         self.requestedKind = nil
+    }
+
+    private func toggleEntryMode() {
+        guard selectedKind != .transfer else {
+            entryMode = .single
+            return
+        }
+
+        entryMode = isBatchEntry ? .single : .batch
     }
 
     private func defaultAccountId(in accounts: [DraftAccount]) -> String {
@@ -430,6 +492,11 @@ struct RecordPage: View {
     }
 
     private func saveTransaction() {
+        if isBatchEntry {
+            saveBatchTransactions()
+            return
+        }
+
         draftStore.clearMessage()
 
         guard let normalizedAmount = normalizedPositiveAmountText(amountText) else {
@@ -494,6 +561,64 @@ struct RecordPage: View {
         selectedTab = .transactions
     }
 
+    private func saveBatchTransactions() {
+        draftStore.clearMessage()
+
+        guard selectedKind != .transfer else {
+            errorKey = "record.batch.error.transferUnsupported"
+            return
+        }
+
+        guard let normalizedAmount = normalizedPositiveAmountText(amountText) else {
+            errorKey = "record.error.invalidAmount"
+            return
+        }
+
+        guard !selectedCategoryId.isEmpty else {
+            errorKey = "record.error.categoryRequired"
+            return
+        }
+
+        guard !selectedAccountId.isEmpty else {
+            errorKey = "record.error.accountRequired"
+            return
+        }
+
+        let selectedDates = batchDates()
+        guard !selectedDates.isEmpty else {
+            errorKey = "record.batch.error.noDates"
+            return
+        }
+
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let createdAt = Date()
+        let transactions = selectedDates.enumerated().map { offset, transactionDate in
+            DraftTransaction(
+                id: UUID().uuidString,
+                kind: selectedKind,
+                amountText: normalizedAmount,
+                transferInAmountText: nil,
+                categoryId: selectedCategoryId,
+                accountId: selectedAccountId,
+                fromAccountId: nil,
+                toAccountId: nil,
+                date: transactionDate,
+                note: trimmedNote,
+                location: location,
+                createdAt: createdAt.addingTimeInterval(TimeInterval(offset) / 1000)
+            )
+        }
+
+        guard draftStore.saveTransactions(transactions) > 0 else {
+            errorKey = "record.batch.error.saveFailed"
+            return
+        }
+
+        resetFormForNextTransaction()
+        draftStore.clearMessage()
+        selectedTab = .transactions
+    }
+
     private func showLiveActivityIfNeeded(for transaction: DraftTransaction) {
         let categoryName = draftStore.categoryDisplayName(for: transaction.categoryId)
 
@@ -522,11 +647,13 @@ struct RecordPage: View {
 
     private func resetFormForNextTransaction() {
         selectedKind = .expense
+        entryMode = .single
         amountText = ""
         transferInAmountText = ""
         date = Date()
         note = ""
         location = nil
+        batchDateComponents = []
         isLocating = false
         locationCaptureToken += 1
         locationMessageKey = nil
@@ -561,6 +688,30 @@ struct RecordPage: View {
         }
     }
 
+    private func ensureBatchDateSelectionIfNeeded() {
+        guard isBatchEntry, batchDateComponents.isEmpty else { return }
+        batchDateComponents = [dateComponents(for: date)]
+    }
+
+    private func batchDates() -> [Date] {
+        let calendar = Calendar.current
+        let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: date)
+        return batchDateComponents
+            .compactMap { components in
+                guard let day = calendar.date(from: components) else { return nil }
+                var dateComponents = calendar.dateComponents([.year, .month, .day], from: day)
+                dateComponents.hour = timeComponents.hour
+                dateComponents.minute = timeComponents.minute
+                dateComponents.second = timeComponents.second ?? 0
+                return calendar.date(from: dateComponents)
+            }
+            .sorted()
+    }
+
+    private func dateComponents(for date: Date) -> DateComponents {
+        Calendar.current.dateComponents([.calendar, .era, .year, .month, .day], from: date)
+    }
+
     private func isPositiveAmount(_ text: String) -> Bool {
         normalizedPositiveAmountText(text) != nil
     }
@@ -579,6 +730,22 @@ struct RecordPage: View {
         }
 
         return amountText
+    }
+}
+
+private enum RecordEntryMode: String, CaseIterable, Identifiable {
+    case single
+    case batch
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .single:
+            return "record.entryMode.single"
+        case .batch:
+            return "record.entryMode.batch"
+        }
     }
 }
 

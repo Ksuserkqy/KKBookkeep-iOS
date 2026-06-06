@@ -189,6 +189,31 @@ struct DraftTransaction: Codable, Identifiable, Equatable {
     var createdAt: Date
 }
 
+struct DraftTransactionBatchEdit {
+    enum LocationChange: Equatable {
+        case unchanged
+        case set(DraftLocation)
+        case clear
+    }
+
+    var amountText: String?
+    var timeComponents: DateComponents?
+    var note: String?
+    var locationChange: LocationChange
+
+    init(
+        amountText: String? = nil,
+        timeComponents: DateComponents? = nil,
+        note: String? = nil,
+        locationChange: LocationChange = .unchanged
+    ) {
+        self.amountText = amountText
+        self.timeComponents = timeComponents
+        self.note = note
+        self.locationChange = locationChange
+    }
+}
+
 struct DraftTransactionTemplate: Codable, Identifiable, Equatable {
     var id: String
     var name: String
@@ -686,6 +711,7 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     func saveTransaction(_ transaction: DraftTransaction) {
+        initializeTransactionSyncStateIfNeeded()
         let normalizedTransaction = normalizedTransactionAmounts(transaction)
         transactions.insert(normalizedTransaction, at: 0)
         transactions.sort(by: Self.transactionSort)
@@ -700,9 +726,33 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     @discardableResult
+    func saveTransactions(_ newTransactions: [DraftTransaction]) -> Int {
+        initializeTransactionSyncStateIfNeeded()
+        let normalizedTransactions = newTransactions.map(normalizedTransactionAmounts)
+        guard !normalizedTransactions.isEmpty else { return 0 }
+
+        transactions.append(contentsOf: normalizedTransactions)
+        transactions.sort(by: Self.transactionSort)
+        lastDraft = transactions.first
+        for transaction in normalizedTransactions {
+            applyTransactionToAccountBalances(transaction)
+        }
+        persistAccounts()
+        persistTransactions()
+        persistLastDraft()
+        for transaction in normalizedTransactions {
+            appendLocalTransactionOp(action: .create, transaction: transaction, occurredAt: transaction.createdAt)
+        }
+        persistWidgetSnapshot()
+        messageKey = "record.batch.message.saved"
+        return normalizedTransactions.count
+    }
+
+    @discardableResult
     func updateTransaction(_ transaction: DraftTransaction) -> Bool {
         guard let index = transactions.firstIndex(where: { $0.id == transaction.id }) else { return false }
 
+        initializeTransactionSyncStateIfNeeded()
         let normalizedTransaction = normalizedTransactionAmounts(transaction)
         let originalTransaction = transactions[index]
         applyTransactionToAccountBalances(originalTransaction, multiplier: -1)
@@ -720,9 +770,74 @@ final class DraftBookkeepingStore: ObservableObject {
     }
 
     @discardableResult
+    func updateTransactions(ids: Set<String>, edit: DraftTransactionBatchEdit) -> Int {
+        guard !ids.isEmpty else { return 0 }
+
+        initializeTransactionSyncStateIfNeeded()
+        let normalizedAmount = edit.amountText.flatMap(Self.normalizedPositiveAmountText)
+        guard edit.amountText == nil || normalizedAmount != nil else { return 0 }
+
+        var updatedTransactions: [DraftTransaction] = []
+        for index in transactions.indices where ids.contains(transactions[index].id) {
+            let originalTransaction = transactions[index]
+            var updatedTransaction = originalTransaction
+
+            if let normalizedAmount {
+                updatedTransaction.amountText = normalizedAmount
+                if originalTransaction.kind == .transfer {
+                    updatedTransaction.transferInAmountText = normalizedAmount
+                }
+            }
+
+            if let timeComponents = edit.timeComponents {
+                updatedTransaction.date = Self.date(
+                    preservingDayFrom: originalTransaction.date,
+                    applyingTimeFrom: timeComponents
+                )
+            }
+
+            if let note = edit.note {
+                updatedTransaction.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            switch edit.locationChange {
+            case .unchanged:
+                break
+            case .set(let location):
+                updatedTransaction.location = location
+            case .clear:
+                updatedTransaction.location = nil
+            }
+
+            let normalizedTransaction = normalizedTransactionAmounts(updatedTransaction)
+            guard normalizedTransaction != originalTransaction else { continue }
+
+            applyTransactionToAccountBalances(originalTransaction, multiplier: -1)
+            transactions[index] = normalizedTransaction
+            applyTransactionToAccountBalances(normalizedTransaction)
+            updatedTransactions.append(normalizedTransaction)
+        }
+
+        guard !updatedTransactions.isEmpty else { return 0 }
+
+        transactions.sort(by: Self.transactionSort)
+        lastDraft = transactions.first
+        persistAccounts()
+        persistTransactions()
+        persistLastDraft()
+        for transaction in updatedTransactions {
+            appendLocalTransactionOp(action: .update, transaction: transaction)
+        }
+        persistWidgetSnapshot()
+        messageKey = "transactions.batch.message.updated"
+        return updatedTransactions.count
+    }
+
+    @discardableResult
     func deleteTransaction(id: String) -> Bool {
         guard let index = transactions.firstIndex(where: { $0.id == id }) else { return false }
 
+        initializeTransactionSyncStateIfNeeded()
         let transaction = transactions.remove(at: index)
         applyTransactionToAccountBalances(transaction, multiplier: -1)
         lastDraft = transactions.first
@@ -2763,6 +2878,15 @@ final class DraftBookkeepingStore: ObservableObject {
         }
 
         return amountText
+    }
+
+    private static func date(preservingDayFrom date: Date, applyingTimeFrom timeComponents: DateComponents) -> Date {
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        components.hour = timeComponents.hour ?? calendar.component(.hour, from: date)
+        components.minute = timeComponents.minute ?? calendar.component(.minute, from: date)
+        components.second = timeComponents.second ?? calendar.component(.second, from: date)
+        return calendar.date(from: components) ?? date
     }
 
     private static let plainAmountFormatter: NumberFormatter = {
